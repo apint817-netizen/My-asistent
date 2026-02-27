@@ -80,17 +80,7 @@ export default function AIAssistant() {
 
 
     const generateAIResponse = async (userMessage) => {
-        if (aiProvider === 'google' && !apiKey) {
-            setTimeout(() => {
-                addMessage({
-                    role: 'assistant',
-                    content: 'Пожалуйста, добавь свой Gemini API Key в настройках (иконка шестеренки), чтобы я мог тебе помогать!'
-                });
-                setIsTyping(false);
-            }, 500);
-            return;
-        }
-
+        // Для Google: ключ может быть на сервере Vercel (GOOGLE_API_KEY), поэтому НЕ блокируем
         if (aiProvider === 'proxy' && !proxyParams.url) {
             setTimeout(() => {
                 addMessage({

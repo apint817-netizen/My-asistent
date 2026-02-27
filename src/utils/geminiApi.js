@@ -58,7 +58,8 @@ export async function callAI({ baseUrl, apiKey, model, systemPrompt, history, us
         'Content-Type': 'application/json'
     };
 
-    if (apiKey) {
+    // Отправляем ключ только если он реально задан пользователем (не пустая строка)
+    if (apiKey && apiKey.trim()) {
         headers['Authorization'] = `Bearer ${apiKey}`;
     }
 

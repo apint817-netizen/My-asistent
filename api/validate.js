@@ -1,5 +1,3 @@
-import { getAIClient } from './_lib/ai-client.js';
-
 export default async function handler(req, res) {
     if (req.method !== 'POST') {
         return res.status(405).json({ error: 'Method Not Allowed' });
@@ -7,17 +5,17 @@ export default async function handler(req, res) {
 
     const { text, type } = req.body; // type: 'task' | 'reward'
 
+    // Получаем ключ от клиента (если пользователь ввел его в настройках)
     const authHeader = req.headers.authorization || '';
     let clientKey = authHeader.startsWith('Bearer ') ? authHeader.substring(7).trim() : null;
     if (clientKey === 'undefined' || clientKey === 'null' || clientKey === '' || clientKey === 'AIzaSyB9JNryZQwrYw8aNhplNaVz2kB-TnT88Nc') {
         clientKey = null;
     }
 
-    let aiClient;
-    try {
-        aiClient = getAIClient(clientKey);
-    } catch (err) {
-        // Если нет ключа — пропускаем валидацию
+    const apiKey = clientKey || process.env.GOOGLE_API_KEY;
+
+    if (!apiKey) {
+        // Нет ключа — пропускаем валидацию, не блокируем пользователя
         return res.status(200).json({ valid: true });
     }
 
@@ -55,17 +53,39 @@ export default async function handler(req, res) {
 КРИТИЧЕСКИ ВАЖНО: 
 - Отсекай любой текст, который выглядит как случайные нажатия по клавиатуре (keyboard smash). 
 - Если это не существующее слово или не аббревиатура - отклоняй.
-- Короткие реальные слова ("чай", "бег") - одобряй.`;
+- Короткие реальные слова ("чай", "бег") - одобряй.
+- Отвечай ТОЛЬКО JSON объектом, без лишнего текста.`;
 
-        const response = await aiClient.chat.completions.create({
-            model: "gemini-2.0-flash", // используем легкую быструю модель
-            messages: [{ role: "user", content: prompt }],
-            temperature: 0.1,
-            max_tokens: 100,
-            response_format: { type: "json_object" } // Требуем строгий JSON
-        });
+        // Используем нативный Google REST API (как в chat.js)
+        const body = {
+            contents: [
+                {
+                    role: 'user',
+                    parts: [{ text: prompt }]
+                }
+            ],
+            generationConfig: {
+                temperature: 0.1,
+                maxOutputTokens: 100
+            }
+        };
 
-        const aiText = response.choices?.[0]?.message?.content || '';
+        const response = await fetch(
+            `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${apiKey}`,
+            {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(body)
+            }
+        );
+
+        if (!response.ok) {
+            console.warn('Validation AI request failed:', response.status);
+            return res.status(200).json({ valid: true }); // При ошибке — пропускаем
+        }
+
+        const data = await response.json();
+        const aiText = data.candidates?.[0]?.content?.parts?.[0]?.text || '';
 
         // Извлекаем JSON из ответа
         const jsonMatch = aiText.match(/\{[^}]+\}/);
