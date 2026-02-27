@@ -21,12 +21,10 @@ export default async function handler(req) {
             clientKey = null;
         }
 
-        // Ключ пользователя предоставлен для настройки
-        const FALLBACK_KEY = 'AIzaSyAfgQ49IlHjrtjkgLVJzUE3dKIPt-eybiY';
-        // На Edge process.env.GOOGLE_API_KEY работает только если задан в Vercel
+        // Ключ пользователя должен быть ТОЛЬКО в переменных окружения (Vercel)
         // В Edge Runtime иногда process.env не существует напрямую, используется глобальный process
         const envKey = typeof process !== 'undefined' && process.env ? process.env.GOOGLE_API_KEY : null;
-        const apiKey = clientKey || envKey || FALLBACK_KEY;
+        const apiKey = clientKey || envKey;
 
         if (!apiKey) {
             return new Response(JSON.stringify({ error: 'API Key не настроен' }), {
