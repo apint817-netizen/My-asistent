@@ -65,12 +65,85 @@ export async function callAI({ baseUrl, apiKey, model, systemPrompt, history, us
     let res;
 
     if (baseUrl === GOOGLE_OPENAI_BASE && isDevelopment) {
-        // Локальная разработка: бьем напрямую в Google OpenAI-compatible endpoint
-        res = await fetch(`${GOOGLE_OPENAI_BASE}/chat/completions`, {
-            method: 'POST',
-            headers,
-            body: JSON.stringify(body)
+        // Локальная разработка: бьем НАПРЯМУЮ в Native REST API 구гла (так как OpenAI endpoint глючит с длинными текстами)
+        // Чтобы не залипал демо-ключ, фильтруем его
+        let keyToUse = apiKey;
+        if (keyToUse === 'AIzaSyB9JNryZQwrYw8aNhplNaVz2kB-TnT88Nc' || !keyToUse) {
+            console.warn("ВНИМАНИЕ: Используется пустой или демо-ключ локально. Запросы могут упасть по квоте 429.");
+        }
+
+        // Формируем payload в нативном формате Google:
+        const nativeContents = messages.filter(m => m.role !== 'system').map(m => {
+            const role = m.role === 'assistant' ? 'model' : 'user';
+            const parts = Array.isArray(m.content)
+                ? m.content.map(p => {
+                    if (p.type === 'text') return { text: p.text };
+                    if (p.type === 'image_url') {
+                        const match = p.image_url.url.match(/^data:([^;]+);base64,(.+)$/);
+                        if (match) return { inlineData: { mimeType: match[1], data: match[2] } };
+                    }
+                    return { text: JSON.stringify(p) };
+                })
+                : [{ text: m.content }];
+            return { role, parts };
         });
+
+        const nativeBody = {
+            contents: nativeContents,
+            generationConfig: { temperature: 0.9, maxOutputTokens: maxTokens || 2048 }
+        };
+
+        if (systemPrompt) {
+            nativeBody.system_instruction = { parts: [{ text: systemPrompt }] };
+        }
+
+        const modelToUse = model || 'gemini-2.0-flash';
+        const cleanModel = modelToUse.startsWith('models/') ? modelToUse.replace('models/', '') : modelToUse;
+
+        try {
+            res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${cleanModel}:generateContent?key=${keyToUse}`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(nativeBody)
+            });
+
+            // Нативный парсинг
+            if (!res.ok) {
+                const errorText = await res.text();
+                let parsedError = errorText;
+                try { parsedError = JSON.parse(errorText).error?.message || errorText; } catch (e) { }
+                throw new Error(`Google API Error ${res.status} on ${cleanModel}: ${parsedError}`);
+            }
+
+            const data = await res.json();
+            const textResponse = data.candidates?.[0]?.content?.parts?.[0]?.text;
+            if (!textResponse) throw new Error('Пустой ответ от ИИ');
+            return textResponse;
+        } catch (err) {
+            console.warn("Локальный Google API недоступен или исчерпан лимит:", err.message);
+            console.warn("🔄 Переключаемся на локальный Antigravity Fallback (127.0.0.1:8045)...");
+
+            const fallbackRes = await fetch(`http://127.0.0.1:8045/v1/chat/completions`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': 'Bearer sk-antigravity'
+                },
+                body: JSON.stringify(body) // proxy понимает OpenAI формат
+            });
+
+            if (!fallbackRes.ok) {
+                // Если прокси тоже не работает, прокидываем оригинальную ошибку или ошибку прокси
+                throw err;
+            }
+
+            const fallbackData = await fallbackRes.json();
+            if (fallbackData.choices && fallbackData.choices[0]?.message?.content) {
+                return fallbackData.choices[0].message.content;
+            }
+            throw err;
+        }
+
     } else if (baseUrl === GOOGLE_OPENAI_BASE && !isDevelopment) {
         // Продакшен: бьем в наш надежный сервер Vercel (/api/chat.js с Fallbacks)
         res = await fetch('/api/chat', {
