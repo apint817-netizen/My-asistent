@@ -458,7 +458,7 @@ ${availableRewards}
         }
     };
 
-    const handlePasteCustom = (e) => {
+    const handlePaste = (e) => {
         if (e.clipboardData && e.clipboardData.items) {
             const items = e.clipboardData.items;
             const files = [];
