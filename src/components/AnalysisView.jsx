@@ -260,10 +260,17 @@ ${calendarStr}
             addMessage({ role: 'assistant', content: finalMessage });
         } catch (error) {
             console.error("AI Error:", error);
-            addMessage({
-                role: 'assistant',
-                content: `Ошибка: ${error.message}.`
-            });
+            if (error.message.includes('429') || error.message.includes('Quota exceeded')) {
+                addMessage({
+                    role: 'assistant',
+                    content: `Упс! ⏳ Кажется, мы исчерпали лимит запросов нейросети на эту минуту.\n\nДавайте сделаем крошечную паузу, и через минуту я снова буду с вами!`
+                });
+            } else {
+                addMessage({
+                    role: 'assistant',
+                    content: `Ошибка: ${error.message}. Попробуйте ещё раз через минуту.`
+                });
+            }
         } finally {
             setIsTyping(false);
         }
