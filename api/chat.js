@@ -14,56 +14,124 @@ export default async function handler(req, res) {
         clientKey = null;
     }
 
-    let aiClient;
-    try {
-        aiClient = getAIClient(clientKey);
-    } catch (err) {
-        return res.status(500).json({ error: err.message });
+    // Сначала пытаемся использовать ключ клиента, если его нет - fallback на серверный ключ Vercel
+    const apiKey = clientKey || process.env.GOOGLE_API_KEY;
+
+    if (!apiKey) {
+        return res.status(500).json({
+            error: 'Google API Key не предоставлен клиентом и не настроен на сервере Vercel.'
+        });
     }
 
     try {
-        // Формируем историю чата для OpenAI SDK (role: 'system', 'user', 'assistant')
-        const openAiMessages = messages.map(m => ({
-            role: m.role,
-            content: m.content
-        }));
+        // 1. Ищем системный промпт
+        const systemInstruction = messages.find(m => m.role === 'system')?.content || '';
 
-        // Очищаем имя модели и формируем список для попыток
+        // 2. Формируем историю чата для Google (role: 'user' или 'model')
+        const contents = messages
+            .filter(m => m.role !== 'system')
+            .map(m => ({
+                role: m.role === 'assistant' ? 'model' : 'user',
+                parts: [{ text: m.content }]
+            }));
+
+        // 3. Собираем тело запроса
+        const body = {
+            contents,
+            generationConfig: {
+                temperature,
+                maxOutputTokens: max_tokens
+            }
+        };
+
+        // Добавляем system_instruction только если он есть
+        if (systemInstruction) {
+            body.system_instruction = {
+                parts: [{ text: systemInstruction }]
+            };
+        }
+
+        // 4. Очищаем имя модели и формируем список для попыток
         const targetModel = model || 'gemini-2.0-flash';
         const cleanModelName = targetModel.startsWith('models/') ? targetModel.replace('models/', '') : targetModel;
 
-        const modelsToTry = [cleanModelName, 'gemini-1.5-flash', 'gemini-1.5-pro', 'gemini-pro'];
+        const getAvailableModels = async () => {
+            try {
+                const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models?key=${apiKey}`);
+                if (!res.ok) return [];
+                const data = await res.json();
+
+                // Фильтруем только те, что умеют generateContent
+                const validModels = (data.models || [])
+                    .filter(m => m.supportedGenerationMethods?.includes('generateContent'))
+                    .map(m => m.name.replace('models/', ''));
+
+                return validModels;
+            } catch (e) {
+                console.error('Failed to fetch available Google models:', e);
+                return [];
+            }
+        };
+
+        const availableModels = await getAvailableModels();
+
+        // Интеллектуально подбираем приоритет из доступных моделей 
+        let modelsToTry = [cleanModelName];
+
+        if (availableModels.length > 0) {
+            // Если получили список от Google, добавляем проверенные модели, если они есть в списке
+            const priority = ['gemini-2.0-flash', 'gemini-1.5-flash', 'gemini-1.5-pro', 'gemini-pro'];
+            const availablePriority = priority.filter(p => availableModels.includes(p) || availableModels.includes('models/' + p));
+            modelsToTry.push(...availablePriority);
+
+            // На крайний случай - просто берем первую доступную
+            modelsToTry.push(availableModels[0]);
+        } else {
+            // Fallback, если список получить не удалось
+            modelsToTry.push('gemini-1.5-flash', 'gemini-1.5-pro', 'gemini-pro');
+        }
 
         let lastError = null;
         let successData = null;
 
         for (const modelToTry of [...new Set(modelsToTry)]) {
             try {
-                // Вызываем ИИ через официальный SDK
-                const response = await aiClient.chat.completions.create({
-                    model: modelToTry,
-                    messages: openAiMessages,
-                    temperature: temperature,
-                    max_tokens: max_tokens,
+                // 5. Вызываем Native Google REST API
+                const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${modelToTry}:generateContent?key=${apiKey}`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(body)
                 });
 
-                successData = response;
+                if (!response.ok) {
+                    const errorText = await response.text();
+                    let parsedError = errorText;
+                    try {
+                        const json = JSON.parse(errorText);
+                        parsedError = json.error?.message || errorText;
+                    } catch (e) { }
+
+                    throw new Error(`Google API Error ${response.status} on ${modelToTry}: ${parsedError}`);
+                }
+
+                successData = await response.json();
                 break; // Успех
             } catch (err) {
                 lastError = err;
                 console.warn(`Провал на модели ${modelToTry}:`, err.message);
-                if (err.status === 400) {
-                    // Если 400 Bad Request (например неверный формат) - нет смысла пробовать другие
+                if (err.message.includes('400')) {
+                    // Если 400 Bad Request (например неверный формат ключа) - нет смысла пробовать другие
                     break;
                 }
             }
         }
 
         if (!successData) {
-            return res.status(500).json({ error: lastError?.message || 'Все доступные модели Google исчерпали квоту' });
+            return res.status(500).json({ error: lastError?.message || 'Все доступные модели Google исчерпали квоту или недоступны' });
         }
 
-        const assistantMessage = successData.choices?.[0]?.message?.content || '';
+        // 6. Формируем ответ, обратно совместимый с OpenAI (чтобы не ломать фронтенд)
+        const assistantMessage = successData.candidates?.[0]?.content?.parts?.[0]?.text || '';
 
         return res.status(200).json({
             choices: [
@@ -75,7 +143,7 @@ export default async function handler(req, res) {
                 }
             ],
             usage: {
-                total_tokens: successData.usage?.total_tokens || 0
+                total_tokens: successData.usageMetadata?.totalTokenCount || 0
             }
         });
 
