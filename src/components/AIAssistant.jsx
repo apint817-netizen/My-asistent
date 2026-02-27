@@ -160,7 +160,7 @@ ${availableRewards}
 
             const baseUrl = aiProvider === 'google' ? GOOGLE_OPENAI_BASE : proxyParams.url;
             const key = aiProvider === 'google' ? apiKey : proxyParams.key;
-            const model = aiProvider === 'google' ? (googleModel || 'gemini-2.5-flash') : (proxyParams.model || 'gemini-2.5-flash');
+            const model = aiProvider === 'google' ? (googleModel || 'gemini-2.0-flash') : (proxyParams.model || 'gemini-2.0-flash');
 
             const history = messages.filter(m => m.role !== 'system');
 

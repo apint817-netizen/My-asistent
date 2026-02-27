@@ -31,11 +31,11 @@ export const useStore = create(
         rewards: []
       },
       apiKey: '',
-      googleModel: 'gemini-2.5-flash',
+      googleModel: 'gemini-2.0-flash',
       aiProvider: 'google', // 'google' or 'proxy'
       proxyParams: {
         url: 'http://127.0.0.1:8045/v1',
-        model: 'gemini-2.5-flash',
+        model: 'gemini-2.0-flash',
         key: 'sk-9c00aee346154596bda23aa319d6cbf1'
       },
       calendarTasks: {},

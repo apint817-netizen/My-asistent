@@ -5,7 +5,6 @@ export default async function handler(req, res) {
 
     const { model, messages, temperature = 0.9, max_tokens = 2048 } = req.body;
 
-    // Получаем ключ от клиента (если пользователь ввел его в настройках)
     const authHeader = req.headers.authorization || '';
     let clientKey = authHeader.startsWith('Bearer ') ? authHeader.substring(7).trim() : null;
     if (clientKey === 'undefined' || clientKey === 'null' || clientKey === '' || clientKey === 'AIzaSyB9JNryZQwrYw8aNhplNaVz2kB-TnT88Nc') {
@@ -15,18 +14,15 @@ export default async function handler(req, res) {
     const apiKey = clientKey || process.env.GOOGLE_API_KEY;
 
     if (!apiKey) {
-        return res.status(500).json({
-            error: 'Google API Key не предоставлен клиентом и не настроен на сервере Vercel.'
-        });
+        return res.status(500).json({ error: 'API Key не настроен' });
     }
 
-    let targetModel = model || 'gemini-2.5-flash';
+    // Быстрая модель — gemini-2.0-flash (не thinking, укладывается в таймаут Vercel)
+    let targetModel = model || 'gemini-2.0-flash';
 
     try {
-        // 1. Системный промпт
         const systemInstruction = messages.find(m => m.role === 'system')?.content || '';
 
-        // 2. Формируем историю чата для Google
         const contents = messages
             .filter(m => m.role !== 'system')
             .map(m => {
@@ -35,12 +31,9 @@ export default async function handler(req, res) {
                     const parts = m.content.map(part => {
                         if (part.type === 'text') return { text: part.text };
                         if (part.type === 'image_url' && part.image_url?.url) {
-                            const dataUrl = part.image_url.url;
-                            const match = dataUrl.match(/^data:([^;]+);base64,(.+)$/);
-                            if (match) {
-                                return { inlineData: { mimeType: match[1], data: match[2] } };
-                            }
-                            return { text: '[Изображение: не удалось обработать]' };
+                            const match = part.image_url.url.match(/^data:([^;]+);base64,(.+)$/);
+                            if (match) return { inlineData: { mimeType: match[1], data: match[2] } };
+                            return { text: '[image]' };
                         }
                         return { text: JSON.stringify(part) };
                     });
@@ -49,7 +42,6 @@ export default async function handler(req, res) {
                 return { role, parts: [{ text: m.content }] };
             });
 
-        // 3. Тело запроса
         const body = {
             contents,
             generationConfig: { temperature, maxOutputTokens: max_tokens }
@@ -59,95 +51,55 @@ export default async function handler(req, res) {
             body.system_instruction = { parts: [{ text: systemInstruction }] };
         }
 
-        // ===== ВЫЗОВ GOOGLE API С FALLBACK =====
-
+        // Вызов Google API — без лишних fallback, сразу работающая модель
         const callGemini = async (modelName) => {
-            const cleanName = modelName.startsWith('models/') ? modelName.replace('models/', '') : modelName;
-            const response = await fetch(
-                `https://generativelanguage.googleapis.com/v1beta/models/${cleanName}:generateContent?key=${apiKey}`,
-                {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify(body)
-                }
+            const clean = modelName.replace('models/', '');
+            const resp = await fetch(
+                `https://generativelanguage.googleapis.com/v1beta/models/${clean}:generateContent?key=${apiKey}`,
+                { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) }
             );
-
-            if (!response.ok) {
-                const text = await response.text();
-                throw new Error(`${response.status} on ${cleanName}: ${text}`);
+            if (!resp.ok) {
+                const text = await resp.text();
+                throw new Error(`${resp.status} on ${clean}: ${text.substring(0, 200)}`);
             }
-            return { data: await response.json(), modelUsed: cleanName };
+            return { data: await resp.json(), model: clean };
         };
 
-        // Список моделей для попытки (реально доступные на API ключе!)
-        const cleanModelName = targetModel.startsWith('models/') ? targetModel.replace('models/', '') : targetModel;
-        let modelsToTry = [cleanModelName, 'gemini-2.5-flash', 'gemini-2.0-flash', 'gemini-2.0-flash-lite'];
+        // Быстрый fallback: 2.0-flash → 2.0-flash-lite (обе быстрые, без thinking)
+        const modelsToTry = [...new Set([
+            targetModel.replace('models/', ''),
+            'gemini-2.0-flash',
+            'gemini-2.0-flash-lite'
+        ])];
 
-        // Убираем дубликаты
-        modelsToTry = [...new Set(modelsToTry)];
+        let result = null;
+        let lastError = null;
 
-        let lastError;
-        let success = false;
-        let resultData;
-        let usedModel;
-
-        for (const modelName of modelsToTry) {
+        for (const m of modelsToTry) {
             try {
-                const result = await callGemini(modelName);
-                resultData = result.data;
-                usedModel = result.modelUsed;
-                success = true;
+                result = await callGemini(m);
                 break;
             } catch (e) {
                 lastError = e;
-                console.warn(`Model ${modelName} failed:`, e.message?.substring(0, 100));
-                if (e.message.includes('400')) break; // Неверный ключ
+                if (e.message.includes('400')) break; // bad key
                 continue;
             }
         }
 
-        // Крайний случай: динамическое обнаружение
-        if (!success) {
-            try {
-                const listRes = await fetch(`https://generativelanguage.googleapis.com/v1beta/models?key=${apiKey}`);
-                if (listRes.ok) {
-                    const listData = await listRes.json();
-                    const available = (listData.models || [])
-                        .filter(m => m.supportedGenerationMethods?.includes('generateContent'))
-                        .map(m => m.name.replace('models/', ''));
-
-                    const bestModel = available.find(m => m.includes('flash')) || available[0];
-                    if (bestModel) {
-                        const result = await callGemini(bestModel);
-                        resultData = result.data;
-                        usedModel = result.modelUsed;
-                        success = true;
-                    }
-                }
-            } catch (e) {
-                lastError = e;
-            }
+        if (!result) {
+            throw lastError || new Error('All models failed');
         }
 
-        if (!success) {
-            throw lastError || new Error('All Google models failed');
-        }
-
-        // 4. Ответ в OpenAI-формате
-        const assistantMessage = resultData.candidates?.[0]?.content?.parts?.[0]?.text || '';
+        const text = result.data.candidates?.[0]?.content?.parts?.[0]?.text || '';
 
         return res.status(200).json({
-            choices: [{ message: { role: 'assistant', content: assistantMessage } }],
-            usage: { total_tokens: resultData.usageMetadata?.totalTokenCount || 0 },
-            model_used: usedModel
+            choices: [{ message: { role: 'assistant', content: text } }],
+            usage: { total_tokens: result.data.usageMetadata?.totalTokenCount || 0 },
+            model_used: result.model
         });
 
     } catch (error) {
-        console.error('AI API Error:', error);
-
-        return res.status(500).json({
-            error: error.message || 'Внутренняя ошибка сервера',
-            debug: { model: targetModel, keyPresent: !!apiKey }
-        });
+        console.error('AI Error:', error.message);
+        return res.status(500).json({ error: error.message || 'Internal error' });
     }
 }

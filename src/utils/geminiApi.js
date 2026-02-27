@@ -8,7 +8,7 @@
 const GOOGLE_OPENAI_BASE = 'https://generativelanguage.googleapis.com/v1beta/openai';
 
 // Стабильная модель по умолчанию (доступна на API ключе Vercel)
-const STABLE_MODEL = 'gemini-2.5-flash';
+const STABLE_MODEL = 'gemini-2.0-flash';
 
 // Подставляет стабильную модель если не задана
 function sanitizeModel(model) {
@@ -60,7 +60,7 @@ export async function callAI({ baseUrl, apiKey, model, systemPrompt, history, us
     ];
 
     const body = {
-        model: model || 'gemini-2.5-flash',
+        model: model || 'gemini-2.0-flash',
         messages,
         temperature: 0.9,
         max_tokens: maxTokens || 2048
@@ -110,7 +110,7 @@ export async function callAI({ baseUrl, apiKey, model, systemPrompt, history, us
             nativeBody.system_instruction = { parts: [{ text: systemPrompt }] };
         }
 
-        const modelToUse = model || 'gemini-2.5-flash';
+        const modelToUse = model || 'gemini-2.0-flash';
         const cleanModel = modelToUse.startsWith('models/') ? modelToUse.replace('models/', '') : modelToUse;
 
         try {
@@ -196,13 +196,13 @@ export async function callAI({ baseUrl, apiKey, model, systemPrompt, history, us
 }
 
 export const GOOGLE_MODELS = [
-    { id: 'gemini-2.5-flash', name: 'Gemini 2.5 Flash', description: 'Быстрая, стабильная' },
-    { id: 'gemini-2.5-pro', name: 'Gemini 2.5 Pro', description: 'Сложные задачи' }
+    { id: 'gemini-2.0-flash', name: 'Gemini 2.0 Flash', description: 'Быстрая, стабильная' },
+    { id: 'gemini-2.5-flash', name: 'Gemini 2.5 Flash', description: 'Мощная (с thinking)' }
 ];
 
 export const PROXY_MODELS = [
-    { id: 'gemini-2.5-flash', name: 'Gemini 2.5 Flash', description: 'Через прокси' },
     { id: 'gemini-2.0-flash', name: 'Gemini 2.0 Flash', description: 'Через прокси' },
+    { id: 'gemini-2.5-flash', name: 'Gemini 2.5 Flash', description: 'Через прокси' },
     { id: 'gpt-4o', name: 'GPT-4o', description: 'OpenAI' }
 ];
 
