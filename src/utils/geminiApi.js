@@ -7,7 +7,7 @@
 
 const GOOGLE_OPENAI_BASE = 'https://generativelanguage.googleapis.com/v1beta/openai';
 
-export async function callAI({ baseUrl, apiKey, model, systemPrompt, history, userMessage }) {
+export async function callAI({ baseUrl, apiKey, model, systemPrompt, history, userMessage, maxTokens }) {
     const isDevelopment = import.meta.env.DEV;
 
     const messages = [
@@ -23,7 +23,7 @@ export async function callAI({ baseUrl, apiKey, model, systemPrompt, history, us
         model: model || 'gemini-2.0-flash',
         messages,
         temperature: 0.9,
-        max_tokens: 2048
+        max_tokens: maxTokens || 2048
     };
 
     const headers = {

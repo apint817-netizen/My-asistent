@@ -94,7 +94,7 @@ export default function AIAssistant() {
         try {
             const completedTasks = tasks.filter(t => t.completed).map(t => t.title).join(', ') || 'Нет выполненных';
             const pendingTasks = tasks.filter(t => !t.completed).map(t => `- ${t.title} (ID: ${t.id}, Очки: ${t.value})`).join('\n') || 'Нет невыполненных';
-            const availableRewards = rewards.map(r => `${r.title} (${r.cost} очк.)`).join(', ');
+            const availableRewards = rewards.map(r => `- ${r.title} (ID: ${r.id}, ${r.cost} очк.)`).join('\n') || 'Нет наград';
 
             const recentPurchases = purchaseHistory.slice(0, 5).map(p =>
                 `"${p.title}" (статус: ${p.status === 'refunded' ? `Отменено [Причина: ${p.refundReason}]` : p.status})`
@@ -120,10 +120,14 @@ export default function AIAssistant() {
 2. Если пользователь делится проблемой — сначала прояви эмпатию, потом предлагай решение
 3. При вопросе о составлении плана — перенаправляй пользователя в раздел Анализ.
 
-УПРАВЛЕНИЕ ЗАДАЧАМИ (АКТИВИРУЙ ТЕГИ, ЕСЛИ ПРОСЯТ):
-- Если пользователь просит/говорит, что выполнил задачу, добавь в свой ответ тег: [COMPLETE_TASK: "id_задачи"]
-- Если пользователь просит изменить количество очков за задачу, добавь тег: [EDIT_TASK_POINTS: "id_задачи" | новое_количество_очков]
-*Пользователь не увидит эти теги в чате, они выполнятся системой скрытно.*
+УПРАВЛЕНИЕ ЗАДАЧАМИ И НАГРАДАМИ (АКТИВИРУЙ ТЕГИ ПО ЗАПРОСУ):
+- Отметить задачу выполненной: [COMPLETE_TASK: "id_задачи"]
+- Изменить очки задачи: [EDIT_TASK_POINTS: "id_задачи" | новое_количество_очков]
+- Добавить новую задачу (только по запросу пользователя!): [ADD_TASK: "Название задачи" | Очки]
+- Удалить задачу (только по запросу!): [DELETE_TASK: "id_задачи"]
+- Добавить награду (только по запросу!): [ADD_REWARD: "Название награды" | Стоимость]
+- Удалить награду (только по запросу!): [DELETE_REWARD: "id_награды"]
+*Пользователь не увидит эти теги в чате, они выполнятся системой скрытно. При добавлении задачи/награды пользователю покажется модалка для подтверждения.*
 
 Сегодняшняя дата: ${todayDate}
 
@@ -134,7 +138,8 @@ export default function AIAssistant() {
 ${pendingTasks}
 - Календарь:
 ${calendarStr}
-- Доступные награды: ${availableRewards}`;
+- Доступные награды (копируй ID отсюда):
+${availableRewards}`;
 
             const baseUrl = aiProvider === 'google' ? GOOGLE_OPENAI_BASE : proxyParams.url;
             const key = aiProvider === 'google' ? apiKey : proxyParams.key;
@@ -145,6 +150,10 @@ ${calendarStr}
 
             const completeRegex = /\[COMPLETE_TASK:\s*"([^"]+)"\]/g;
             const editRegex = /\[EDIT_TASK_POINTS:\s*"([^"]+)"\s*\|\s*(\d+)\]/g;
+            const addTaskRegex = /\[ADD_TASK:\s*"([^"]+)"\s*\|\s*(\d+)\]/g;
+            const deleteTaskRegex = /\[DELETE_TASK:\s*"([^"]+)"\]/g;
+            const addRewardRegex = /\[ADD_REWARD:\s*"([^"]+)"\s*\|\s*(\d+)\]/g;
+            const deleteRewardRegex = /\[DELETE_REWARD:\s*"([^"]+)"\]/g;
 
             let cleanResponse = responseText;
             let match;
@@ -164,7 +173,27 @@ ${calendarStr}
                 useStore.getState().editTaskPoints(taskId, points);
             }
 
-            cleanResponse = cleanResponse.replace(completeRegex, '').replace(editRegex, '').trim();
+            while ((match = addTaskRegex.exec(responseText)) !== null) {
+                useStore.getState().addProposal(match[1], parseInt(match[2], 10));
+            }
+
+            while ((match = deleteTaskRegex.exec(responseText)) !== null) {
+                useStore.getState().deleteTaskWithReason(match[1], 'Удалено по запросу через Nova');
+            }
+
+            while ((match = addRewardRegex.exec(responseText)) !== null) {
+                useStore.getState().addRewardProposal(match[1], parseInt(match[2], 10));
+            }
+
+            while ((match = deleteRewardRegex.exec(responseText)) !== null) {
+                useStore.getState().deleteRewardWithReason(match[1], 'Удалено по запросу через Nova');
+            }
+
+            cleanResponse = cleanResponse
+                .replace(completeRegex, '').replace(editRegex, '')
+                .replace(addTaskRegex, '').replace(deleteTaskRegex, '')
+                .replace(addRewardRegex, '').replace(deleteRewardRegex, '')
+                .trim();
 
             addMessage({ role: 'assistant', content: cleanResponse });
         } catch (error) {

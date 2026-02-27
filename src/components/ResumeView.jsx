@@ -174,10 +174,10 @@ export default function ResumeView() {
 Отвечай по-русски. Будь конкретным и полезным. Не лей воду.`;
 
             let textToSend = parsedText;
-            const SAFE_LIMIT = 4000; // Жёсткий лимит для прокси, чтобы избежать "Quota Exceeded"
+            const SAFE_LIMIT = 8000;
             if (textToSend.length > SAFE_LIMIT) {
                 textToSend = textToSend.substring(0, SAFE_LIMIT) + '\n...[Текст обрезан для экономии ИИ-ресурсов. Основная суть сохранена]';
-                console.warn(`Text truncated from ${parsedText.length} to ${SAFE_LIMIT} chars to prevent 429 error`);
+                console.warn(`Text truncated from ${parsedText.length} to ${SAFE_LIMIT} chars`);
             }
 
             const userMessage = `ТЕКУЩЕЕ СОСТОЯНИЕ: ${statusText}\n\nРЕЗЮМЕ:\n${textToSend}`;
@@ -185,11 +185,12 @@ export default function ResumeView() {
             const { callAI } = await import('../utils/geminiApi.js');
             const aiResponse = await callAI({
                 baseUrl: aiProvider === 'google' ? 'https://generativelanguage.googleapis.com/v1beta/openai' : proxyParams.url,
-                apiKey: aiProvider === 'google' ? undefined : proxyParams.key, // Используем ключ сервера для google-режима
+                apiKey: aiProvider === 'google' ? undefined : proxyParams.key,
                 model: aiProvider === 'google' ? googleModel : proxyParams.model,
                 systemPrompt,
                 history: [],
-                userMessage
+                userMessage,
+                maxTokens: 4096
             });
 
             const { cleanText, tasks, habits, calendarTasks, rewards } = parseResumeCommands(aiResponse);
@@ -250,7 +251,7 @@ export default function ResumeView() {
                         <input
                             ref={fileRef}
                             type="file"
-                            accept=".pdf,.docx,.txt"
+                            accept=".pdf,.docx,.txt,.rtf"
                             onChange={handleFileChange}
                             className="hidden"
                         />

@@ -305,17 +305,16 @@ export const useStore = create(
       updateActivity: () => set((state) => {
         const today = new Date().toISOString().split('T')[0];
         if (state.lastActiveDate !== today) {
-          // If missed a day, streak resets. Logic can be refined later.
-          // New day => reset tasks, transfer from calendar, append greeting message
-          const plannedToday = state.calendarTasks[today] || [];
-          const newCalendarTasks = { ...state.calendarTasks };
-          delete newCalendarTasks[today];
+          // New day => reset tasks, transfer from calendar (but keep them in calendar too)
+          const plannedToday = (state.calendarTasks[today] || []).map(t => ({
+            ...t,
+            fromCalendar: true
+          }));
 
           return {
             lastActiveDate: today,
-            streak: state.lastActiveDate ? state.streak + 1 : 1, // simplified streak
+            streak: state.lastActiveDate ? state.streak + 1 : 1,
             tasks: [...plannedToday],
-            calendarTasks: newCalendarTasks,
             chatMessages: [
               ...state.chatMessages,
               { role: 'assistant', content: `Доброе утро! Наступил новый день, список задач сброшен. ${plannedToday.length > 0 ? `В календаре у нас было запланировано ${plannedToday.length} задач на сегодня - они перенесены в активный список.` : 'На сегодня ничего не было запланировано.'} Какие еще у нас цели на сегодня? Расскажи, и я помогу тебе их сформировать.` }

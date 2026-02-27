@@ -61,6 +61,10 @@ export default function AnalysisView() {
     const googleModel = useStore(state => state.googleModel);
     const aiProvider = useStore(state => state.aiProvider);
     const proxyParams = useStore(state => state.proxyParams);
+    const tasks = useStore(state => state.tasks);
+    const tokens = useStore(state => state.tokens);
+    const rewards = useStore(state => state.rewards);
+    const calendarTasks = useStore(state => state.calendarTasks);
 
     const analysisDraft = useStore(state => state.analysisDraft);
     const setAnalysisDraft = useStore(state => state.setAnalysisDraft);
@@ -90,7 +94,7 @@ export default function AnalysisView() {
         if (messages.length === 0) {
             addMessage({
                 role: 'assistant',
-                content: 'Привет! Я Стратег Nova. Моя задача — помочь тебе распланировать день и неделю, чтобы ты не выгорал и двигался к своим целям. Расскажи, какие у тебя главные задачи на ближайшие дни? Есть ли "хвосты" или то, что постоянно откладываешь?'
+                content: 'Привет! Я Стратег Nova. Моя задача — помочь тебе распланировать день и неделю, чтобы ты не выгорал и двигался к своим целям. Расскажи, какие у тебя главные задачи на ближайшие дни? Есть ли \"хвосты\" или то, что постоянно откладываешь?'
             });
         }
     }, [messages, addMessage]);
@@ -118,6 +122,17 @@ export default function AnalysisView() {
 
         try {
             const todayDate = new Date().toISOString().split('T')[0];
+
+            // Формируем контекст текущих задач
+            const completedTasks = tasks.filter(t => t.completed).map(t => t.title).join(', ') || 'Нет выполненных';
+            const pendingTasks = tasks.filter(t => !t.completed).map(t => `- ${t.title} (${t.value} очк.)`).join('\n') || 'Нет невыполненных';
+            const availableRewards = rewards.map(r => `- ${r.title} (${r.cost} очк.)`).join('\n') || 'Нет наград';
+
+            const upcomingDates = Object.keys(calendarTasks || {}).sort().slice(0, 7);
+            const calendarStr = upcomingDates.length > 0
+                ? upcomingDates.map(date => `- ${date}: ${(calendarTasks[date] || []).map(t => t.title).join(', ')}`).join('\n')
+                : 'Пока ничего не запланировано';
+
             const systemInstruction = `Ты Стратег Nova — ИИ-коуч и планировщик. Отвечай по-русски.
 
 ТВОЙ СТИЛЬ:
@@ -131,7 +146,17 @@ export default function AnalysisView() {
 3. Если пользователь отклоняет → спроси "Почему?" и предложи альтернативу
 4. Если пользователь принимает → похвали и спроси, есть ли ещё дела
 
-Сегодня: ${todayDate}. Очки для задач: 5, 10, 15, 30, 50, 100. Стоимость наград: 20, 50, 100, 200, 300, 500.
+Сегодня: ${todayDate}. Очки для задач: от 5 до 100 (ставь любое значение, соразмерно сложности). Стоимость наград: от 20 до 500.
+
+КОНТЕКСТ ПОЛЬЗОВАТЕЛЯ:
+- Баланс очков: ${tokens}
+- Выполнено сегодня: ${completedTasks}
+- Не выполнено:
+${pendingTasks}
+- Доступные награды:
+${availableRewards}
+- Календарь:
+${calendarStr}
 
 ТЕГИ ДЛЯ ГЕНЕРАЦИИ:
 1. Задача на сегодня: [TASK: "Название" | Очки]

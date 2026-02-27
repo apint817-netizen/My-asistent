@@ -29,8 +29,19 @@ export default async function handler(req, res) {
             } else if (fileType === 'application/vnd.openxmlformats-officedocument.wordprocessingml.document' || fileType === 'application/msword') {
                 const result = await mammoth.extractRawText({ buffer });
                 resumeText = result.value;
+            } else if (fileType === 'application/rtf' || fileType === 'text/rtf') {
+                // RTF: strip RTF control sequences and extract plain text
+                let rtfText = buffer.toString('utf-8');
+                rtfText = rtfText.replace(/\\[a-z]+\d*\s?/gi, '').replace(/[{}]/g, '').replace(/\\\\/g, '\\');
+                resumeText = rtfText.trim();
             } else if (fileType.startsWith('text/')) {
                 resumeText = buffer.toString('utf-8');
+            } else {
+                // Fallback: try to read as text
+                const asText = buffer.toString('utf-8');
+                if (asText && asText.length > 20 && !asText.includes('\x00')) {
+                    resumeText = asText;
+                }
             }
         } catch (err) {
             console.error('File parse error:', err);
