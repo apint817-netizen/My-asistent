@@ -48,7 +48,7 @@ export async function callAI({ baseUrl, apiKey, model, systemPrompt, history, us
     ];
 
     const body = {
-        model: model || 'gemini-2.0-flash',
+        model: model || 'gemini-1.5-flash',
         messages,
         temperature: 0.9,
         max_tokens: maxTokens || 2048
@@ -98,7 +98,7 @@ export async function callAI({ baseUrl, apiKey, model, systemPrompt, history, us
             nativeBody.system_instruction = { parts: [{ text: systemPrompt }] };
         }
 
-        const modelToUse = model || 'gemini-2.0-flash';
+        const modelToUse = model || 'gemini-1.5-flash';
         const cleanModel = modelToUse.startsWith('models/') ? modelToUse.replace('models/', '') : modelToUse;
 
         try {
@@ -184,12 +184,12 @@ export async function callAI({ baseUrl, apiKey, model, systemPrompt, history, us
 }
 
 export const GOOGLE_MODELS = [
-    { id: 'gemini-2.0-flash', name: 'Gemini 2.0 Flash', description: 'Быстрая, бесплатная' },
+    { id: 'gemini-1.5-flash', name: 'Gemini 1.5 Flash', description: 'Быстрая, стабильная' },
     { id: 'gemini-1.5-pro', name: 'Gemini 1.5 Pro', description: 'Сложные задачи' }
 ];
 
 export const PROXY_MODELS = [
-    { id: 'gemini-3-flash', name: 'Gemini 3 Flash', description: 'Через прокси' },
+    { id: 'gemini-1.5-flash', name: 'Gemini 1.5 Flash', description: 'Через прокси' },
     { id: 'gemini-2.0-flash', name: 'Gemini 2.0 Flash', description: 'Через прокси' },
     { id: 'gpt-4o', name: 'GPT-4o', description: 'OpenAI' }
 ];

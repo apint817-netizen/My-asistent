@@ -1,5 +1,3 @@
-import { getAIClient } from './_lib/ai-client.js';
-
 export default async function handler(req, res) {
     if (req.method !== 'POST') {
         return res.status(405).json({ error: 'Method Not Allowed' });
@@ -14,7 +12,6 @@ export default async function handler(req, res) {
         clientKey = null;
     }
 
-    // Сначала пытаемся использовать ключ клиента, если его нет - fallback на серверный ключ Vercel
     const apiKey = clientKey || process.env.GOOGLE_API_KEY;
 
     if (!apiKey) {
@@ -22,6 +19,8 @@ export default async function handler(req, res) {
             error: 'Google API Key не предоставлен клиентом и не настроен на сервере Vercel.'
         });
     }
+
+    let targetModel = model || 'gemini-1.5-flash';
 
     try {
         // 1. Ищем системный промпт
@@ -32,22 +31,14 @@ export default async function handler(req, res) {
             .filter(m => m.role !== 'system')
             .map(m => {
                 const role = m.role === 'assistant' ? 'model' : 'user';
-                // Мультимодальный контент (массив частей)
                 if (Array.isArray(m.content)) {
                     const parts = m.content.map(part => {
-                        if (part.type === 'text') {
-                            return { text: part.text };
-                        } else if (part.type === 'image_url' && part.image_url?.url) {
-                            // Извлекаем base64 из data:URI
+                        if (part.type === 'text') return { text: part.text };
+                        if (part.type === 'image_url' && part.image_url?.url) {
                             const dataUrl = part.image_url.url;
                             const match = dataUrl.match(/^data:([^;]+);base64,(.+)$/);
                             if (match) {
-                                return {
-                                    inlineData: {
-                                        mimeType: match[1],
-                                        data: match[2]
-                                    }
-                                };
+                                return { inlineData: { mimeType: match[1], data: match[2] } };
                             }
                             return { text: '[Изображение: не удалось обработать]' };
                         }
@@ -55,127 +46,142 @@ export default async function handler(req, res) {
                     });
                     return { role, parts };
                 }
-                // Обычный текстовый контент
-                return {
-                    role,
-                    parts: [{ text: m.content }]
-                };
+                return { role, parts: [{ text: m.content }] };
             });
 
-        // 3. Собираем тело запроса
+        // 3. Тело запроса
         const body = {
             contents,
-            generationConfig: {
-                temperature,
-                maxOutputTokens: max_tokens
-            }
+            generationConfig: { temperature, maxOutputTokens: max_tokens }
         };
 
-        // Добавляем system_instruction только если он есть
         if (systemInstruction) {
-            body.system_instruction = {
-                parts: [{ text: systemInstruction }]
-            };
+            body.system_instruction = { parts: [{ text: systemInstruction }] };
         }
 
-        // 4. Очищаем имя модели и формируем список для попыток
-        const targetModel = model || 'gemini-2.0-flash';
-        const cleanModelName = targetModel.startsWith('models/') ? targetModel.replace('models/', '') : targetModel;
+        // ===== ЛОГИКА АВТОВЫБОРА МОДЕЛИ (по образцу FinModel) =====
 
+        // Хелпер: вызов Google Native REST API
+        const callGemini = async (modelName) => {
+            const cleanName = modelName.startsWith('models/') ? modelName.replace('models/', '') : modelName;
+            const response = await fetch(
+                `https://generativelanguage.googleapis.com/v1beta/models/${cleanName}:generateContent?key=${apiKey}`,
+                {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(body)
+                }
+            );
+
+            if (!response.ok) {
+                const text = await response.text();
+                throw new Error(`${response.status} on ${cleanName}: ${text}`);
+            }
+            return { data: await response.json(), modelUsed: cleanName };
+        };
+
+        // Хелпер: получить список доступных моделей (крайний случай)
         const getAvailableModels = async () => {
             try {
-                const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models?key=${apiKey}`);
-                if (!res.ok) return [];
-                const data = await res.json();
-
-                // Фильтруем только те, что умеют generateContent
-                const validModels = (data.models || [])
+                const response = await fetch(
+                    `https://generativelanguage.googleapis.com/v1beta/models?key=${apiKey}`
+                );
+                if (!response.ok) return [];
+                const data = await response.json();
+                return (data.models || [])
                     .filter(m => m.supportedGenerationMethods?.includes('generateContent'))
                     .map(m => m.name.replace('models/', ''));
-
-                return validModels;
             } catch (e) {
-                console.error('Failed to fetch available Google models:', e);
+                console.error('Failed to list models', e);
                 return [];
             }
         };
 
-        const availableModels = await getAvailableModels();
+        // 1) Список моделей для попытки (по приоритету, как в FinModel)
+        let modelsToTry = [];
 
-        // Интеллектуально подбираем приоритет из доступных моделей 
-        let modelsToTry = [cleanModelName];
-
-        if (availableModels.length > 0) {
-            // Если получили список от Google, добавляем проверенные модели, если они есть в списке
-            const priority = ['gemini-2.0-flash', 'gemini-1.5-flash', 'gemini-1.5-pro', 'gemini-pro'];
-            const availablePriority = priority.filter(p => availableModels.includes(p) || availableModels.includes('models/' + p));
-            modelsToTry.push(...availablePriority);
-
-            // На крайний случай - просто берем первую доступную
-            modelsToTry.push(availableModels[0]);
-        } else {
-            // Fallback, если список получить не удалось
-            modelsToTry.push('gemini-1.5-flash', 'gemini-1.5-pro', 'gemini-pro');
+        // Запрошенная модель (если gemini-)
+        const cleanModelName = targetModel.startsWith('models/') ? targetModel.replace('models/', '') : targetModel;
+        if (cleanModelName.startsWith('gemini-')) {
+            modelsToTry.push(cleanModelName);
         }
 
-        let lastError = null;
-        let successData = null;
+        // Стабильные фолбеки
+        modelsToTry.push('gemini-1.5-flash');
+        modelsToTry.push('gemini-1.5-flash-latest');
+        modelsToTry.push('gemini-pro');
 
-        for (const modelToTry of [...new Set(modelsToTry)]) {
+        // Убираем дубликаты
+        modelsToTry = [...new Set(modelsToTry)];
+
+        let lastError;
+        let success = false;
+        let resultData;
+        let usedModel;
+
+        // Первый проход: пробуем по списку
+        for (const modelName of modelsToTry) {
             try {
-                // 5. Вызываем Native Google REST API
-                const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${modelToTry}:generateContent?key=${apiKey}`, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify(body)
-                });
+                const result = await callGemini(modelName);
+                resultData = result.data;
+                usedModel = result.modelUsed;
+                success = true;
+                break;
+            } catch (e) {
+                lastError = e;
+                console.warn(`Model ${modelName} failed:`, e.message?.substring(0, 100));
+                // 404 = модель не найдена, пробуем следующую
+                // 429 = квота, тоже пробуем следующую модель
+                if (e.message.includes('400')) break; // Неверный ключ - нет смысла
+                continue;
+            }
+        }
 
-                if (!response.ok) {
-                    const errorText = await response.text();
-                    let parsedError = errorText;
-                    try {
-                        const json = JSON.parse(errorText);
-                        parsedError = json.error?.message || errorText;
-                    } catch (e) { }
+        // 2) Крайний случай: Динамическое обнаружение (как в FinModel)
+        if (!success) {
+            const availableModels = await getAvailableModels();
+            console.log('Available models from Google:', availableModels);
 
-                    throw new Error(`Google API Error ${response.status} on ${modelToTry}: ${parsedError}`);
-                }
+            // Приоритет: flash модели, потом pro, потом любая
+            const bestModel = availableModels.find(m => m.includes('flash')) ||
+                availableModels.find(m => m.includes('pro')) ||
+                availableModels[0];
 
-                successData = await response.json();
-                break; // Успех
-            } catch (err) {
-                lastError = err;
-                console.warn(`Провал на модели ${modelToTry}:`, err.message);
-                if (err.message.includes('400')) {
-                    // Если 400 Bad Request (например неверный формат ключа) - нет смысла пробовать другие
-                    break;
+            if (bestModel) {
+                try {
+                    const result = await callGemini(bestModel);
+                    resultData = result.data;
+                    usedModel = result.modelUsed;
+                    success = true;
+                } catch (e) {
+                    lastError = e;
                 }
             }
         }
 
-        if (!successData) {
-            return res.status(500).json({ error: lastError?.message || 'Все доступные модели Google исчерпали квоту или недоступны' });
+        if (!success) {
+            throw lastError || new Error('All Google models failed, including dynamically discovered ones.');
         }
 
-        // 6. Формируем ответ, обратно совместимый с OpenAI (чтобы не ломать фронтенд)
-        const assistantMessage = successData.candidates?.[0]?.content?.parts?.[0]?.text || '';
+        // 4. Формируем ответ (OpenAI-совместимый формат для фронтенда)
+        const assistantMessage = resultData.candidates?.[0]?.content?.parts?.[0]?.text || '';
 
         return res.status(200).json({
-            choices: [
-                {
-                    message: {
-                        role: 'assistant',
-                        content: assistantMessage
-                    }
-                }
-            ],
-            usage: {
-                total_tokens: successData.usageMetadata?.totalTokenCount || 0
-            }
+            choices: [{ message: { role: 'assistant', content: assistantMessage } }],
+            usage: { total_tokens: resultData.usageMetadata?.totalTokenCount || 0 },
+            model_used: usedModel
         });
 
     } catch (error) {
         console.error('AI API Error:', error);
-        return res.status(500).json({ error: error.message || 'Внутренняя ошибка сервера' });
+
+        return res.status(500).json({
+            error: error.message || 'Внутренняя ошибка сервера',
+            debug: {
+                model: targetModel,
+                keyPresent: !!apiKey,
+                keyPrefix: apiKey?.substring(0, 8) + '...'
+            }
+        });
     }
 }
