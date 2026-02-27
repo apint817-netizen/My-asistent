@@ -140,6 +140,10 @@ h6 {
 }
 
 /* Markdown Content Styles */
+.markdown-content {
+  word-break: break-word;
+}
+
 .markdown-content p {
   margin-bottom: 0.5rem;
 }

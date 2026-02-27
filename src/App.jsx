@@ -179,9 +179,9 @@ function App() {
         activeTab === 'resume' ? (
           <ResumeView />
         ) : (
-          <main className="grid grid-cols-1 lg:grid-cols-3 gap-6 flex-1">
+          <main className="grid grid-cols-1 lg:grid-cols-5 gap-6 flex-1 items-start">
             {/* Left Column: Content Area */}
-            <div className="lg:col-span-2 flex flex-col gap-6 animate-fade-in" style={{ animationDelay: '0.1s' }}>
+            <div className="lg:col-span-3 flex flex-col gap-6 animate-fade-in" style={{ animationDelay: '0.1s' }}>
 
               {activeTab === 'dashboard' ? (
                 <>
@@ -236,8 +236,8 @@ function App() {
             </div>
 
             {/* Right Column: AI Mentorship */}
-            <div className="flex flex-col gap-6 animate-fade-in" style={{ animationDelay: '0.2s' }}>
-              <aside className="glass-panel p-0 flex flex-col h-[600px]">
+            <div className="lg:col-span-2 flex flex-col gap-6 animate-fade-in lg:sticky lg:top-6" style={{ animationDelay: '0.2s' }}>
+              <aside className="glass-panel p-0 flex flex-col h-[600px] lg:h-[calc(100vh-120px)] lg:min-h-[600px]">
                 <AIAssistant />
               </aside>
             </div>

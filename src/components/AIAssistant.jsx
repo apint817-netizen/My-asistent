@@ -302,10 +302,19 @@ ${availableRewards}
             addMessage({ role: 'assistant', content: cleanResponse });
         } catch (error) {
             console.error("AI Error:", error);
-            addMessage({
-                role: 'assistant',
-                content: `Ошибка при обращении к ИИ: ${error.message}. Проверьте правильность настроек API.`
-            });
+
+            // Если ошибка связана с квотой (429 Тоо Many Requests)
+            if (error.message.includes('429') || error.message.includes('Quota exceeded')) {
+                addMessage({
+                    role: 'assistant',
+                    content: `Упс! ⏳ Кажется, мы исчерпали лимит запросов нейросети на эту минуту.\n\nДавайте сделаем крошечную паузу, и через минуту я снова буду с вами! (Также вы можете сменить ключ или модель в настройках)`
+                });
+            } else {
+                addMessage({
+                    role: 'assistant',
+                    content: `Ошибка при обращении к ИИ: ${error.message}. Проверьте правильность настроек API.`
+                });
+            }
         } finally {
             setIsTyping(false);
         }
@@ -502,7 +511,7 @@ ${availableRewards}
                 <div className="flex flex-col gap-2">
                     {msg.content.map((part, idx) => {
                         if (part.type === 'text') {
-                            return <div key={idx} className="whitespace-pre-wrap">{part.text}</div>;
+                            return <div key={idx} className="whitespace-pre-wrap break-words">{part.text}</div>;
                         } else if (part.type === 'image_url') {
                             return (
                                 <img
@@ -651,7 +660,7 @@ ${availableRewards}
                                         </div>
                                     ) : (
                                         <>
-                                            <div className={`p-3 rounded-2xl text-sm shadow-sm ${msg.role === 'user'
+                                            <div className={`p-3 rounded-2xl text-sm shadow-sm break-words overflow-hidden ${msg.role === 'user'
                                                 ? 'bg-blue-600/20 border border-blue-500/30 text-white rounded-tr-none'
                                                 : 'bg-accent/10 border border-accent/20 text-text-primary rounded-tl-none markdown-content'
                                                 }`}>
