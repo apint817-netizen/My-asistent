@@ -20,13 +20,13 @@ export default async function handler(req, res) {
         });
     }
 
-    let targetModel = model || 'gemini-1.5-flash';
+    let targetModel = model || 'gemini-2.5-flash';
 
     try {
-        // 1. Ищем системный промпт
+        // 1. Системный промпт
         const systemInstruction = messages.find(m => m.role === 'system')?.content || '';
 
-        // 2. Формируем историю чата для Google (role: 'user' или 'model')
+        // 2. Формируем историю чата для Google
         const contents = messages
             .filter(m => m.role !== 'system')
             .map(m => {
@@ -59,9 +59,8 @@ export default async function handler(req, res) {
             body.system_instruction = { parts: [{ text: systemInstruction }] };
         }
 
-        // ===== ЛОГИКА АВТОВЫБОРА МОДЕЛИ (по образцу FinModel) =====
+        // ===== ВЫЗОВ GOOGLE API С FALLBACK =====
 
-        // Хелпер: вызов Google Native REST API
         const callGemini = async (modelName) => {
             const cleanName = modelName.startsWith('models/') ? modelName.replace('models/', '') : modelName;
             const response = await fetch(
@@ -80,36 +79,9 @@ export default async function handler(req, res) {
             return { data: await response.json(), modelUsed: cleanName };
         };
 
-        // Хелпер: получить список доступных моделей (крайний случай)
-        const getAvailableModels = async () => {
-            try {
-                const response = await fetch(
-                    `https://generativelanguage.googleapis.com/v1beta/models?key=${apiKey}`
-                );
-                if (!response.ok) return [];
-                const data = await response.json();
-                return (data.models || [])
-                    .filter(m => m.supportedGenerationMethods?.includes('generateContent'))
-                    .map(m => m.name.replace('models/', ''));
-            } catch (e) {
-                console.error('Failed to list models', e);
-                return [];
-            }
-        };
-
-        // 1) Список моделей для попытки (по приоритету, как в FinModel)
-        let modelsToTry = [];
-
-        // Запрошенная модель (если gemini-)
+        // Список моделей для попытки (реально доступные на API ключе!)
         const cleanModelName = targetModel.startsWith('models/') ? targetModel.replace('models/', '') : targetModel;
-        if (cleanModelName.startsWith('gemini-')) {
-            modelsToTry.push(cleanModelName);
-        }
-
-        // Стабильные фолбеки
-        modelsToTry.push('gemini-1.5-flash');
-        modelsToTry.push('gemini-1.5-flash-latest');
-        modelsToTry.push('gemini-pro');
+        let modelsToTry = [cleanModelName, 'gemini-2.5-flash', 'gemini-2.0-flash', 'gemini-2.0-flash-lite'];
 
         // Убираем дубликаты
         modelsToTry = [...new Set(modelsToTry)];
@@ -119,7 +91,6 @@ export default async function handler(req, res) {
         let resultData;
         let usedModel;
 
-        // Первый проход: пробуем по списку
         for (const modelName of modelsToTry) {
             try {
                 const result = await callGemini(modelName);
@@ -130,40 +101,39 @@ export default async function handler(req, res) {
             } catch (e) {
                 lastError = e;
                 console.warn(`Model ${modelName} failed:`, e.message?.substring(0, 100));
-                // 404 = модель не найдена, пробуем следующую
-                // 429 = квота, тоже пробуем следующую модель
-                if (e.message.includes('400')) break; // Неверный ключ - нет смысла
+                if (e.message.includes('400')) break; // Неверный ключ
                 continue;
             }
         }
 
-        // 2) Крайний случай: Динамическое обнаружение (как в FinModel)
+        // Крайний случай: динамическое обнаружение
         if (!success) {
-            const availableModels = await getAvailableModels();
-            console.log('Available models from Google:', availableModels);
+            try {
+                const listRes = await fetch(`https://generativelanguage.googleapis.com/v1beta/models?key=${apiKey}`);
+                if (listRes.ok) {
+                    const listData = await listRes.json();
+                    const available = (listData.models || [])
+                        .filter(m => m.supportedGenerationMethods?.includes('generateContent'))
+                        .map(m => m.name.replace('models/', ''));
 
-            // Приоритет: flash модели, потом pro, потом любая
-            const bestModel = availableModels.find(m => m.includes('flash')) ||
-                availableModels.find(m => m.includes('pro')) ||
-                availableModels[0];
-
-            if (bestModel) {
-                try {
-                    const result = await callGemini(bestModel);
-                    resultData = result.data;
-                    usedModel = result.modelUsed;
-                    success = true;
-                } catch (e) {
-                    lastError = e;
+                    const bestModel = available.find(m => m.includes('flash')) || available[0];
+                    if (bestModel) {
+                        const result = await callGemini(bestModel);
+                        resultData = result.data;
+                        usedModel = result.modelUsed;
+                        success = true;
+                    }
                 }
+            } catch (e) {
+                lastError = e;
             }
         }
 
         if (!success) {
-            throw lastError || new Error('All Google models failed, including dynamically discovered ones.');
+            throw lastError || new Error('All Google models failed');
         }
 
-        // 4. Формируем ответ (OpenAI-совместимый формат для фронтенда)
+        // 4. Ответ в OpenAI-формате
         const assistantMessage = resultData.candidates?.[0]?.content?.parts?.[0]?.text || '';
 
         return res.status(200).json({
@@ -177,11 +147,7 @@ export default async function handler(req, res) {
 
         return res.status(500).json({
             error: error.message || 'Внутренняя ошибка сервера',
-            debug: {
-                model: targetModel,
-                keyPresent: !!apiKey,
-                keyPrefix: apiKey?.substring(0, 8) + '...'
-            }
+            debug: { model: targetModel, keyPresent: !!apiKey }
         });
     }
 }

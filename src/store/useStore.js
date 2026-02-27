@@ -31,11 +31,11 @@ export const useStore = create(
         rewards: []
       },
       apiKey: '',
-      googleModel: 'gemini-1.5-flash',
+      googleModel: 'gemini-2.5-flash',
       aiProvider: 'google', // 'google' or 'proxy'
       proxyParams: {
         url: 'http://127.0.0.1:8045/v1',
-        model: 'gemini-1.5-flash',
+        model: 'gemini-2.5-flash',
         key: 'sk-9c00aee346154596bda23aa319d6cbf1'
       },
       calendarTasks: {},
@@ -346,13 +346,13 @@ export const useStore = create(
       name: 'nova-storage-v2.1',
       version: 2,
       migrate: (persistedState, version) => {
-        // Миграция: сбрасываем нестабильные модели на gemini-1.5-flash
-        const unstableModels = ['gemini-2.0-flash', 'gemini-2.5-flash', 'gemini-3-flash', 'gemini-2.0-flash-exp'];
-        if (persistedState && unstableModels.includes(persistedState.googleModel)) {
-          persistedState.googleModel = 'gemini-1.5-flash';
+        // Миграция: сбрасываем несуществующие/старые модели на gemini-2.5-flash
+        const oldModels = ['gemini-1.5-flash', 'gemini-3-flash', 'gemini-2.0-flash-exp'];
+        if (persistedState && oldModels.includes(persistedState.googleModel)) {
+          persistedState.googleModel = 'gemini-2.5-flash';
         }
-        if (persistedState?.proxyParams && unstableModels.includes(persistedState.proxyParams.model)) {
-          persistedState.proxyParams = { ...persistedState.proxyParams, model: 'gemini-1.5-flash' };
+        if (persistedState?.proxyParams && oldModels.includes(persistedState.proxyParams.model)) {
+          persistedState.proxyParams = { ...persistedState.proxyParams, model: 'gemini-2.5-flash' };
         }
         return persistedState;
       }
