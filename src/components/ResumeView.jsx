@@ -56,6 +56,7 @@ export default function ResumeView() {
     const googleModel = useStore(state => state.googleModel);
     const aiProvider = useStore(state => state.aiProvider);
     const proxyParams = useStore(state => state.proxyParams);
+    const apiKey = useStore(state => state.apiKey);
 
     const [file, setFile] = useState(null);
     const [textInput, setTextInput] = useState('');
@@ -185,7 +186,7 @@ export default function ResumeView() {
 
             const aiResponse = await callAI({
                 baseUrl: aiProvider === 'google' ? 'https://generativelanguage.googleapis.com/v1beta/openai' : proxyParams.url,
-                apiKey: aiProvider === 'google' ? undefined : proxyParams.key,
+                apiKey: aiProvider === 'google' ? apiKey : proxyParams.key,
                 model: aiProvider === 'google' ? googleModel : proxyParams.model,
                 systemPrompt,
                 history: [],
@@ -198,7 +199,12 @@ export default function ResumeView() {
             setParsedItems({ tasks, habits, calendarTasks, rewards });
 
         } catch (err) {
-            setError(err.message);
+            console.error("Analysis Error:", err);
+            if (err.message.includes('429') || err.message.includes('Quota exceeded')) {
+                setError('Упс! ⏳ Кажется, мы исчерпали лимит запросов нейросети на эту минуту.\n\nДавайте сделаем крошечную паузу, и через минуту всё снова заработает! (Также вы можете сменить ключ или модель в настройках)');
+            } else {
+                setError(`Ошибка анализа: ${err.message}. Проверьте правильность настроек API.`);
+            }
         } finally {
             setIsAnalyzing(false);
         }
