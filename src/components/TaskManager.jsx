@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useStore } from '../store/useStore';
-import { Plus, Check, Trash2, Zap, GripVertical } from 'lucide-react';
+import { Plus, Check, Trash2, Zap, ChevronsUpDown } from 'lucide-react';
 import {
     DndContext,
     closestCenter,
@@ -18,7 +18,7 @@ import {
     useSortable
 } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
-import { restrictToVerticalAxis, restrictToParentElement } from '@dnd-kit/modifiers';
+import { restrictToVerticalAxis } from '@dnd-kit/modifiers';
 
 function SortableTaskItem({ task, index, handleToggle, setDeletingTask, isDragOverlay }) {
     const {
@@ -41,11 +41,11 @@ function SortableTaskItem({ task, index, handleToggle, setDeletingTask, isDragOv
         <div
             ref={setNodeRef}
             style={isDragOverlay ? undefined : style}
-            className={`glass-card p-4 flex items-center justify-between group ${task.completed ? 'opacity-50' : ''} ${isDragOverlay ? 'shadow-2xl shadow-accent/30 border-accent/50 scale-[1.02] ring-2 ring-accent/30' : ''}`}
+            className={`glass-card p-4 flex items-center justify-between group origin-center ${task.completed ? 'opacity-50' : ''} ${isDragOverlay ? 'shadow-[0_15px_30px_rgba(0,0,0,0.5)] border-accent/80 scale-[1.03] rotate-1 ring-2 ring-accent/60 bg-bg-card z-50' : ''}`}
         >
             <div className="flex items-center gap-3 flex-1">
-                <div {...attributes} {...listeners} className="cursor-grab active:cursor-grabbing text-text-secondary hover:text-white mt-0.5 outline-none">
-                    <GripVertical size={16} />
+                <div {...attributes} {...listeners} className="cursor-grab active:cursor-grabbing text-text-secondary hover:text-white p-1.5 hover:bg-white/5 rounded-md transition-colors mt-0.5 outline-none touch-none" title="Перетащить">
+                    <ChevronsUpDown size={16} />
                 </div>
                 <div className="w-5 text-center text-xs font-bold text-text-secondary">
                     {index + 1}
@@ -167,14 +167,14 @@ export default function TaskManager() {
 
     return (
         <div className="flex flex-col h-full relative">
-            <div className="flex-1 overflow-y-auto space-y-3 mb-6 pr-2">
+            <div className="flex-1 overflow-y-auto flex flex-col gap-3 mb-6 pr-2 pb-2">
                 <DndContext
                     sensors={sensors}
                     collisionDetection={closestCenter}
                     onDragStart={handleDragStart}
                     onDragEnd={handleDragEnd}
                     onDragCancel={handleDragCancel}
-                    modifiers={[restrictToVerticalAxis, restrictToParentElement]}
+                    modifiers={[restrictToVerticalAxis]}
                 >
                     <SortableContext
                         items={tasks.map(t => t.id)}

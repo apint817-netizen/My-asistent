@@ -12,6 +12,7 @@ export default function AIAssistant() {
     const tokens = useStore(state => state.tokens);
     const rewards = useStore(state => state.rewards);
     const purchaseHistory = useStore(state => state.purchaseHistory);
+    const addCalendarTask = useStore(state => state.addCalendarTask);
 
     const apiKey = useStore(state => state.apiKey);
     const googleModel = useStore(state => state.googleModel);
@@ -44,7 +45,12 @@ export default function AIAssistant() {
     const chatMsgs = useMemo(() => {
         let msgs = messages.filter(m => m.role !== 'system');
         if (searchQuery.trim()) {
-            msgs = msgs.filter(m => m.content.toLowerCase().includes(searchQuery.toLowerCase()));
+            msgs = msgs.filter(m => {
+                const textContent = Array.isArray(m.content)
+                    ? m.content.map(p => p.text || '').join(' ')
+                    : (m.content || '');
+                return textContent.toLowerCase().includes(searchQuery.toLowerCase());
+            });
         }
         return msgs;
     }, [messages, searchQuery]);
@@ -108,7 +114,11 @@ export default function AIAssistant() {
                 `"${p.title}" (ID: ${p.purchaseId}, статус: ${p.status === 'refunded' ? `Отменено [Причина: ${p.refundReason}]` : p.status === 'used' ? 'Использовано' : 'Активно — можно использовать'})`
             ).join('; ') || 'Нет покупок';
 
-            const todayDate = new Date().toISOString().split('T')[0];
+            const today = new Date();
+            const todayDate = today.toISOString().split('T')[0];
+            const daysOfWeek = ['Воскресенье', 'Понедельник', 'Вторник', 'Среда', 'Четверг', 'Пятница', 'Суббота'];
+            const todayDayOfWeek = daysOfWeek[today.getDay()];
+
             const upcomingDates = Object.keys(calendarTasks || {}).sort().slice(0, 5);
             const calendarStr = upcomingDates.length > 0
                 ? upcomingDates.map(date => `- ${date}: ${calendarTasks[date].reduce((sum, t) => sum + t.value, 0)} очков нагрузки`).join('\n')
@@ -132,7 +142,8 @@ export default function AIAssistant() {
 Задачи:
 - Отметить выполненной: [COMPLETE_TASK: "id или #номер или название"]
 - Изменить очки: [EDIT_TASK_POINTS: "id" | новые_очки]
-- Добавить задачу: [ADD_TASK: "Название" | Очки]
+- Добавить задачу (В ОСНОВНОЙ СПИСОК): [ADD_TASK: "Название" | Очки]
+- Добавить регулярную/задачу на дату (В КАЛЕНДАРЬ): [ADD_CALENDAR_TASK: "Название" | Очки | "YYYY-MM-DD"]
 - Удалить задачу: [DELETE_TASK: "id"]
 
 Награды и покупки:
@@ -141,10 +152,10 @@ export default function AIAssistant() {
 - Купить награду (списать очки): [BUY_REWARD: "id"]
 - Использовать покупку: [USE_PURCHASE: "id_покупки"]
 
-ВАЖНО: Ты можешь находить задачу по номеру в списке (#2), по названию или по ID. Используй ЛЮБОЙ метод, который понятнее по контексту.
-*Теги невидимы для пользователя, выполняются системой. При ADD_TASK/ADD_REWARD покажется модалка подтверждения.*
+ВАЖНО: Ты можешь находить задачу по номеру в списке (#2), по названию или по ID. Используй ЛЮБОЙ метод, который понятнее по контексту. 
+*Если пользователь просит поставить задачу "на завтра", "на дату" или "каждый день" — используй [ADD_CALENDAR_TASK: "Название" | Очки | "YYYY-MM-DD"] с вычисленной датой в формате YYYY-MM-DD (например 2026-03-01). Если на несколько дней — используй тег несколько раз.*
 
-Сегодняшняя дата: ${todayDate}
+Сегодня: ${todayDate} (${todayDayOfWeek})
 
 КОНТЕКСТ ПОЛЬЗОВАТЕЛЯ:
 - Баланс очков: ${tokens}
@@ -178,6 +189,7 @@ ${availableRewards}
             const completeRegex = /\[COMPLETE_TASK:\s*"([^"]+)"\]/g;
             const editRegex = /\[EDIT_TASK_POINTS:\s*"([^"]+)"\s*\|\s*(\d+)\]/g;
             const addTaskRegex = /\[ADD_TASK:\s*"([^"]+)"\s*\|\s*(\d+)\]/g;
+            const addCalendarTaskRegex = /\[ADD_CALENDAR_TASK:\s*"([^"]+)"\s*\|\s*(\d+)\s*\|\s*"([^"]+)"\]/g;
             const deleteTaskRegex = /\[DELETE_TASK:\s*"([^"]+)"\]/g;
             const addRewardRegex = /\[ADD_REWARD:\s*"([^"]+)"\s*\|\s*(\d+)\]/g;
             const deleteRewardRegex = /\[DELETE_REWARD:\s*"([^"]+)"\]/g;
@@ -243,6 +255,14 @@ ${availableRewards}
                 useStore.getState().addProposal(match[1], parseInt(match[2], 10));
             }
 
+            // ADD_CALENDAR_TASK
+            while ((match = addCalendarTaskRegex.exec(responseText)) !== null) {
+                const title = match[1];
+                const pts = parseInt(match[2], 10);
+                const dateStr = match[3];
+                useStore.getState().addCalendarTask(dateStr, title, pts);
+            }
+
             // DELETE_TASK
             while ((match = deleteTaskRegex.exec(responseText)) !== null) {
                 const task = findTask(match[1]);
@@ -273,7 +293,8 @@ ${availableRewards}
 
             cleanResponse = cleanResponse
                 .replace(completeRegex, '').replace(editRegex, '')
-                .replace(addTaskRegex, '').replace(deleteTaskRegex, '')
+                .replace(addTaskRegex, '').replace(addCalendarTaskRegex, '')
+                .replace(deleteTaskRegex, '')
                 .replace(addRewardRegex, '').replace(deleteRewardRegex, '')
                 .replace(buyRewardRegex, '').replace(usePurchaseRegex, '')
                 .trim();
@@ -488,7 +509,7 @@ ${availableRewards}
                                     key={idx}
                                     src={part.image_url.url}
                                     alt="Вложение"
-                                    className="max-w-72 md:max-w-sm rounded-lg object-contain shadow-sm border border-white/10"
+                                    className="max-w-full h-auto max-h-[300px] rounded-lg object-contain shadow-sm border border-white/10"
                                 />
                             );
                         }
