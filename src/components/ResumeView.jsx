@@ -2,6 +2,7 @@ import React, { useState, useRef } from 'react';
 import { useStore } from '../store/useStore';
 import { Upload, FileText, Loader, CheckCircle, AlertCircle, Send, Briefcase, Brain, Zap, Heart, GraduationCap, Flame } from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
+import { callAI } from '../utils/geminiApi';
 
 const STATUS_OPTIONS = [
     { id: 'job_search', label: 'Ищу работу', icon: Briefcase, color: 'text-blue-400' },
@@ -182,7 +183,6 @@ export default function ResumeView() {
 
             const userMessage = `ТЕКУЩЕЕ СОСТОЯНИЕ: ${statusText}\n\nРЕЗЮМЕ:\n${textToSend}`;
 
-            const { callAI } = await import('../utils/geminiApi.js');
             const aiResponse = await callAI({
                 baseUrl: aiProvider === 'google' ? 'https://generativelanguage.googleapis.com/v1beta/openai' : proxyParams.url,
                 apiKey: aiProvider === 'google' ? undefined : proxyParams.key,
