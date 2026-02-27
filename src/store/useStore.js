@@ -343,7 +343,19 @@ export const useStore = create(
       })
     }),
     {
-      name: 'nova-storage-v2.1', // Changed storage key to load new defaults
+      name: 'nova-storage-v2.1',
+      version: 2,
+      migrate: (persistedState, version) => {
+        // Миграция: сбрасываем нестабильные модели на gemini-1.5-flash
+        const unstableModels = ['gemini-2.0-flash', 'gemini-2.5-flash', 'gemini-3-flash', 'gemini-2.0-flash-exp'];
+        if (persistedState && unstableModels.includes(persistedState.googleModel)) {
+          persistedState.googleModel = 'gemini-1.5-flash';
+        }
+        if (persistedState?.proxyParams && unstableModels.includes(persistedState.proxyParams.model)) {
+          persistedState.proxyParams = { ...persistedState.proxyParams, model: 'gemini-1.5-flash' };
+        }
+        return persistedState;
+      }
     }
   )
 );
