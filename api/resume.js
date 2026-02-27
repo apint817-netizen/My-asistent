@@ -1,0 +1,52 @@
+import mammoth from 'mammoth';
+
+export const config = {
+    api: {
+        bodyParser: {
+            sizeLimit: '10mb'
+        }
+    }
+};
+
+export default async function handler(req, res) {
+    if (req.method !== 'POST') {
+        return res.status(405).json({ error: 'Method Not Allowed' });
+    }
+
+    const { text, fileContent, fileType } = req.body;
+
+    let resumeText = text || '';
+
+    // Parse file content if provided
+    if (fileContent && fileType) {
+        try {
+            const buffer = Buffer.from(fileContent, 'base64');
+
+            if (fileType === 'application/pdf') {
+                const pdfParse = (await import('pdf-parse/lib/pdf-parse.js')).default;
+                const pdfData = await pdfParse(buffer);
+                resumeText = pdfData.text;
+            } else if (fileType === 'application/vnd.openxmlformats-officedocument.wordprocessingml.document' || fileType === 'application/msword') {
+                const result = await mammoth.extractRawText({ buffer });
+                resumeText = result.value;
+            } else if (fileType.startsWith('text/')) {
+                resumeText = buffer.toString('utf-8');
+            }
+        } catch (err) {
+            console.error('File parse error:', err);
+            return res.status(400).json({ error: 'Не удалось прочитать файл. Попробуйте другой формат.' });
+        }
+    }
+
+    if (!resumeText.trim()) {
+        return res.status(400).json({ error: 'Пустое резюме. Загрузите файл или введите текст.' });
+    }
+
+    // Truncate if too long
+    const maxChars = 6000;
+    if (resumeText.length > maxChars) {
+        resumeText = resumeText.substring(0, maxChars) + '\n...(текст обрезан)';
+    }
+
+    return res.status(200).json({ parsedText: resumeText });
+}

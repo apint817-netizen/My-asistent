@@ -1,0 +1,476 @@
+# Инструкция по интеграции AI в приложение FinModel-AI
+
+> Полное описание того, как Google Gemini AI интегрирован в проект — с архитектурой, кодом, форматами данных и fallback-стратегией. Документ предназначен для того, чтобы любой AI-ассистент или разработчик мог воспроизвести или модифицировать эту интеграцию.
+
+---
+
+## 1. Общая архитектура
+
+```mermaid
+graph TD
+    A[Фронтенд — AIChat.tsx] -->|POST /api/chat| B[API Route — chat/route.ts]
+    A2[Генерация проекта] -->|POST /api/project/generate| C[API Route — project/generate/route.ts]
+    A3[Закупки — Чат] -->|POST /api/procurement/chat| D[API Route — procurement/chat/route.ts]
+    A4[Закупки — Рекомендации] -->|POST /api/procurement/recommend| E[API Route — procurement/recommend/route.ts]
+    A5[Бизнес-аналитика] -->|POST /api/business/analyze| F[API Route — business/analyze/route.ts]
+    
+    B --> G{GOOGLE_API_KEY?}
+    C --> G
+    
+    G -->|Да| H[Нативный Google REST API]
+    G -->|Нет| I[OpenAI SDK → Локальный сервер]
+    
+    D --> J[OpenAI SDK — ai-client.ts]
+    E --> J
+    F --> J
+    J --> K[Google OpenAI-совместимый endpoint]
+```
+
+### Два способа вызова AI
+
+| Способ | Где используется | Описание |
+|--------|-----------------|----------|
+| **Нативный REST API** | [chat/route.ts](file:///e:/Antigravity%20work/Finmodelapp/finmodel-ai/src/app/api/chat/route.ts), [project/generate/route.ts](file:///e:/Antigravity%20work/Finmodelapp/finmodel-ai/src/app/api/project/generate/route.ts) | Прямые HTTP-запросы к `generativelanguage.googleapis.com` |
+| **OpenAI SDK** | `procurement/*`, `business/analyze`, [ai-client.ts](file:///e:/Antigravity%20work/Finmodelapp/finmodel-ai/src/lib/ai-client.ts) | OpenAI SDK с переключаемым `baseURL` |
+
+---
+
+## 2. Переменные окружения
+
+Файл [.env](file:///e:/Antigravity%20work/Finmodelapp/finmodel-ai/.env) / [.env.local](file:///e:/Antigravity%20work/Finmodelapp/finmodel-ai/.env.local) / Vercel Environment Variables:
+
+```env
+# Главный ключ — если задан, приложение работает через Google Gemini
+GOOGLE_API_KEY="AIza..."
+
+# Альтернатива для OpenAI (если GOOGLE_API_KEY не задан)
+OPENAI_API_KEY="sk-..."
+
+# Локальный fallback-сервер (если нет ни одного ключа)
+ANTIGRAVITY_URL="http://127.0.0.1:8045/v1"
+ANTIGRAVITY_API_KEY="sk-antigravity"
+```
+
+> [!IMPORTANT]
+> Логика решения, какой провайдер использовать, строится на проверке `!!process.env.GOOGLE_API_KEY`.
+> Если ключ Google задан — используется Google. Если нет — OpenAI SDK с локальным сервером.
+
+---
+
+## 3. AI-клиент (OpenAI SDK)
+
+**Файл:** [ai-client.ts](file:///e:/Antigravity%20work/Finmodelapp/finmodel-ai/src/lib/ai-client.ts)
+
+Центральный модуль, создающий OpenAI-совместимый клиент:
+
+```typescript
+import OpenAI from 'openai';
+
+const apiKey = process.env.GOOGLE_API_KEY 
+    || process.env.ANTIGRAVITY_API_KEY 
+    || 'sk-antigravity';
+
+const baseURL = process.env.GOOGLE_API_KEY
+    ? 'https://generativelanguage.googleapis.com/v1beta/openai'  // Google OpenAI-совместимый endpoint
+    : (process.env.ANTIGRAVITY_URL || 'http://127.0.0.1:8045/v1');
+
+export const aiClient = new OpenAI({ apiKey, baseURL });
+```
+
+### Как это работает
+
+- Google предоставляет OpenAI-совместимый endpoint по адресу `https://generativelanguage.googleapis.com/v1beta/openai`
+- Это позволяет использовать стандартный OpenAI SDK (`openai` npm пакет v6+) для вызова моделей Gemini
+- В качестве `apiKey` передаётся Google API Key
+- Модели указываются как `gemini-2.0-flash`, `gemini-1.5-flash` и т.д.
+
+### Пример вызова через SDK
+
+```typescript
+const response = await aiClient.chat.completions.create({
+    model: "gemini-2.0-flash",
+    messages: [
+        { role: "system", content: "Системный промпт..." },
+        { role: "user", content: "Запрос пользователя..." },
+    ],
+    temperature: 0.7,
+});
+
+const text = response.choices[0]?.message?.content;
+```
+
+---
+
+## 4. Нативный Google REST API
+
+**Файлы:** [chat/route.ts](file:///e:/Antigravity%20work/Finmodelapp/finmodel-ai/src/app/api/chat/route.ts), [project/generate/route.ts](file:///e:/Antigravity%20work/Finmodelapp/finmodel-ai/src/app/api/project/generate/route.ts)
+
+Для основного чата и генерации проекта используются **прямые HTTP-запросы** к Google API (без SDK). Это даёт больше контроля.
+
+### 4.1. Endpoint
+
+```
+POST https://generativelanguage.googleapis.com/v1beta/models/{MODEL_NAME}:generateContent?key={API_KEY}
+```
+
+### 4.2. Формат запроса
+
+```typescript
+const response = await fetch(
+    `https://generativelanguage.googleapis.com/v1beta/models/${modelName}:generateContent?key=${API_KEY}`,
+    {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+            // История сообщений
+            contents: messages.map(msg => ({
+                role: msg.role === 'assistant' ? 'model' : 'user',
+                parts: [{ text: msg.content }]
+            })),
+            // Системная инструкция (аналог system prompt)
+            system_instruction: {
+                parts: [{ text: systemPrompt }]
+            },
+            // Настройки генерации
+            generationConfig: {
+                temperature: 0.7,
+                maxOutputTokens: 8192
+            }
+        })
+    }
+);
+```
+
+### 4.3. Формат ответа
+
+```json
+{
+    "candidates": [
+        {
+            "content": {
+                "parts": [
+                    { "text": "Ответ модели..." }
+                ]
+            }
+        }
+    ],
+    "usageMetadata": {
+        "totalTokenCount": 1234
+    }
+}
+```
+
+### 4.4. Извлечение текста
+
+```typescript
+const data = await response.json();
+const text = data.candidates?.[0]?.content?.parts?.[0]?.text || 'No response';
+const tokens = data.usageMetadata?.totalTokenCount || 0;
+```
+
+### 4.5. Маппинг ролей
+
+| OpenAI формат | Google формат | Описание |
+|---------------|---------------|----------|
+| `system` | `system_instruction.parts[].text` | Системный промпт передаётся отдельным полем |
+| `user` | `role: "user"` | Без изменений |
+| `assistant` | `role: "model"` | ⚠️ `assistant` → `model` |
+
+---
+
+## 5. Стратегия Fallback (отказоустойчивость)
+
+Приложение реализует 3-уровневую стратегию выбора модели:
+
+```mermaid
+graph TD
+    A[Запрос] --> B{Пользователь выбрал модель?}
+    B -->|Да, gemini-*| C[Попробовать выбранную модель]
+    B -->|Нет| D[Стандартные fallback модели]
+    C -->|Ошибка 404| D
+    D --> E["gemini-1.5-flash"]
+    E -->|Ошибка| F["gemini-1.5-flash-latest"]
+    F -->|Ошибка| G["gemini-pro"]
+    G -->|Ошибка| H[Динамическое обнаружение]
+    H --> I["GET /v1beta/models?key=..."]
+    I --> J{Найдены модели?}
+    J -->|Да| K[Выбрать flash → pro → первую]
+    J -->|Нет| L[Ошибка — все модели недоступны]
+```
+
+### Код динамического обнаружения моделей
+
+```typescript
+const getAvailableModels = async () => {
+    const response = await fetch(
+        `https://generativelanguage.googleapis.com/v1beta/models?key=${API_KEY}`
+    );
+    const data = await response.json();
+    
+    // Фильтрация моделей, поддерживающих generateContent
+    return data.models
+        .filter(m => m.supportedGenerationMethods?.includes('generateContent'))
+        .map(m => m.name.replace('models/', ''));
+};
+```
+
+### Приоритет при динамическом обнаружении
+
+```typescript
+const bestModel = availableModels.find(m => m.includes('flash'))
+    || availableModels.find(m => m.includes('pro'))
+    || availableModels[0];
+```
+
+---
+
+## 6. Все API-маршруты и их особенности
+
+### 6.1. `/api/chat` — Основной чат-консультант
+
+| Параметр | Описание |
+|----------|----------|
+| **Способ вызова** | Нативный REST API (Google) / OpenAI SDK (fallback) |
+| **Модели** | `gemini-1.5-flash` → `gemini-pro` → динамика |
+| **Входные данные** | `messages`, `modelData`, `model`, `mode` |
+| **Режимы** | `analysis` (анализ) / `editing` (редактирование данных) |
+| **Температура** | 0.7 |
+| **Max tokens** | 8192 (Google) / 2000 (OpenAI) |
+
+#### Режим «Редактор» — команды для изменения данных
+
+AI может генерировать команды для изменения финансовой модели в формате:
+
+```
+[ACTION_REQUIRED]
+{
+  "action": "addExpense" | "updateExpense" | "deleteExpense" | ...,
+  "data": {
+    "id": "ID_элемента",
+    "name": "Название",
+    "monthlyAmount": 50000
+  }
+}
+[/ACTION_REQUIRED]
+```
+
+Доступные действия: `addInvestment`, `updateInvestment`, `deleteInvestment`, `addRevenue`, `updateRevenue`, `deleteRevenue`, `addExpense`, `updateExpense`, `deleteExpense`.
+
+---
+
+### 6.2. `/api/project/generate` — Генерация финансовой модели
+
+| Параметр | Описание |
+|----------|----------|
+| **Способ вызова** | Нативный REST API (Google) / OpenAI SDK (fallback) |
+| **Формат ответа** | JSON (через `responseMimeType: "application/json"`) |
+| **Температура** | 0.4 |
+
+```json
+{
+  "name": "Название проекта",
+  "investments": [{ "category": "Оборудование", "amount": 100000 }],
+  "revenues": [{ "name": "Услуга", "monthlyAmount": 50000, "type": "recurring" }],
+  "expenses": [{ "name": "Аренда", "monthlyAmount": 30000, "type": "fixed" }],
+  "aiChatMessage": "Приветственное сообщение от консультанта..."
+}
+```
+
+---
+
+### 6.3. `/api/procurement/chat` — Чат по закупкам
+
+| Параметр | Описание |
+|----------|----------|
+| **Способ вызова** | OpenAI SDK (`aiClient`) |
+| **Модель** | `gemini-2.0-flash` |
+| **Температура** | 0.7 |
+| **Max Duration** | 60 секунд |
+
+---
+
+### 6.4. `/api/procurement/recommend` — Рекомендации по закупкам
+
+| Параметр | Описание |
+|----------|----------|
+| **Способ вызова** | OpenAI SDK (`aiClient`) |
+| **Модель** | `gemini-2.0-flash` |
+| **Температура** | 0.5 |
+| **Формат ответа** | JSON (парсится вручную из текста) |
+
+---
+
+### 6.5. `/api/business/analyze` — Анализ бизнеса
+
+| Параметр | Описание |
+|----------|----------|
+| **Способ вызова** | OpenAI SDK (`aiClient`) |
+| **Модель** | `gemini-2.0-flash` |
+| **Температура** | 0.5 |
+| **Формат ответа** | JSON (парсится вручную из текста) |
+
+---
+
+## 7. Фронтенд — компонент AIChat.tsx
+
+**Файл:** [AIChat.tsx](file:///e:/Antigravity%20work/Finmodelapp/finmodel-ai/src/components/AIChat.tsx)
+
+### Доступные модели (фронтенд)
+
+```typescript
+const AVAILABLE_MODELS = [
+    { id: 'gemini-1.5-flash', name: 'Google Gemini (Auto)', provider: 'Google', 
+      description: 'Автоматический выбор (Flash/Pro)' },
+];
+```
+
+### Отправка запроса
+
+```typescript
+const response = await fetch('/api/chat', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+        messages: [...messages, userMessage],  // История чата
+        modelData,                              // Данные финансовой модели
+        model: selectedModel,                   // Выбранная модель (gemini-1.5-flash)
+        mode: aiMode,                           // 'analysis' или 'editing'
+    }),
+});
+```
+
+### Обработка действий AI
+
+Фронтенд парсит ответ на наличие блоков `[ACTION_REQUIRED]...[/ACTION_REQUIRED]` и вызывает `onAction`:
+
+```typescript
+const actionRegex = /\[ACTION_REQUIRED\]([\s\S]*?)\[\/ACTION_REQUIRED\]/g;
+let match;
+while ((match = actionRegex.exec(assistantContent)) !== null) {
+    const actionJson = JSON.parse(match[1]);
+    onAction(actionJson.action, actionJson.data);
+}
+// Очистка из отображаемого текста
+assistantContent = assistantContent.replace(actionRegex, '').trim();
+```
+
+---
+
+## 8. Зависимости (npm)
+
+```json
+{
+    "openai": "^6.21.0"
+}
+```
+
+> [!NOTE]
+> Специальных Google AI SDK не используется. Применяются только:
+> 1. `openai` npm пакет — для OpenAI-совместимых вызовов
+> 2. Нативный `fetch` — для прямых REST-запросов к Google API
+
+---
+
+## 9. Обработка ошибок
+
+### Серверная сторона
+
+```typescript
+return NextResponse.json({
+    error: 'Ошибка при обращении к ИИ',
+    details: error.message,
+    debug: {
+        provider: isGoogle ? 'Google (Native)' : 'Antigravity (Local)',
+        keyStatus: isGoogle ? `Google Key present (${key?.substring(0, 8)}...)` : 'No Google Key found',
+        model: targetModel,
+        baseURL: '...',
+    },
+    hint: isGoogle
+        ? 'Проверьте API ключ и лимиты Google AI Studio'
+        : 'Убедитесь, что Antigravity Manager запущен',
+}, { status: 500 });
+```
+
+### Клиентская сторона
+
+Ошибки отображаются прямо в чате как сообщение ассистента с debug-информацией:
+```
+❌ Ошибка: ...
+💡 Проверьте API ключ и лимиты Google AI Studio
+🔧 Debug Info: Provider: Google (Native), Key: AIza..., Model: gemini-1.5-flash
+```
+
+---
+
+## 10. Чеклист для интеграции нового AI провайдера
+
+Если нужно добавить другой AI-провайдер (Claude, GPT-4, DeepSeek, и т.д.):
+
+### Шаг 1: Переменные окружения
+
+Добавить ключ в [.env](file:///e:/Antigravity%20work/Finmodelapp/finmodel-ai/.env):
+```env
+NEW_PROVIDER_API_KEY="..."
+```
+
+### Шаг 2: Обновить [ai-client.ts](file:///e:/Antigravity%20work/Finmodelapp/finmodel-ai/src/lib/ai-client.ts)
+
+Добавить условие для нового провайдера:
+```typescript
+const baseURL = process.env.GOOGLE_API_KEY
+    ? 'https://generativelanguage.googleapis.com/v1beta/openai'
+    : process.env.NEW_PROVIDER_API_KEY
+    ? 'https://api.newprovider.com/v1'
+    : (process.env.ANTIGRAVITY_URL || 'http://127.0.0.1:8045/v1');
+```
+
+### Шаг 3: Обновить API-маршруты
+
+Для каждого [route.ts](file:///e:/Antigravity%20work/Finmodelapp/finmodel-ai/src/app/api/chat/route.ts):
+- Добавить проверку `!!process.env.NEW_PROVIDER_API_KEY`
+- Реализовать вызов API нового провайдера
+- Сохранить fallback-стратегию
+
+### Шаг 4: Обновить фронтенд ([AIChat.tsx](file:///e:/Antigravity%20work/Finmodelapp/finmodel-ai/src/components/AIChat.tsx))
+
+Добавить новые модели в `AVAILABLE_MODELS`:
+```typescript
+const AVAILABLE_MODELS = [
+    { id: 'gemini-1.5-flash', name: 'Google Gemini', provider: 'Google', ... },
+    { id: 'new-model', name: 'New Provider', provider: 'NewProvider', ... },
+];
+```
+
+### Шаг 5: Обработка ответа
+
+Убедиться, что формат ответа приводится к единому виду:
+```typescript
+return NextResponse.json({
+    message: assistantMessage,  // Текст ответа
+    usage: { total_tokens: N }, // Использование токенов
+});
+```
+
+---
+
+## 11. Используемые модели Google Gemini
+
+| Модель | Где используется | Назначение |
+|--------|-----------------|------------|
+| `gemini-1.5-flash` | Чат, генерация | Основная быстрая модель |
+| `gemini-1.5-flash-latest` | Чат, генерация | Fallback |
+| `gemini-1.5-pro` | Генерация | Fallback для сложных задач |
+| `gemini-pro` | Чат, генерация | Старый fallback |
+| `gemini-2.0-flash` | Закупки, бизнес-анализ | Новая быстрая модель (через SDK) |
+
+---
+
+## 12. Ключевые паттерны
+
+1. **Двойной подход**: Нативный REST API для контроля + OpenAI SDK для простоты
+2. **3-уровневый fallback**: Выбранная модель → стандартные → динамическое обнаружение
+3. **Маппинг ролей**: `assistant` ↔ `model`, `system` → `system_instruction`
+4. **JSON-форматирование**: `responseMimeType: "application/json"` для структурированных ответов
+5. **Парсинг команд**: Регулярные выражения для извлечения `[ACTION_REQUIRED]` блоков
+6. **Очистка JSON**: Удаление markdown code fences из ответов AI перед парсингом
+7. **Русский язык**: Все системные промпты на русском языке
