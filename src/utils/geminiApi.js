@@ -7,7 +7,20 @@
 
 const GOOGLE_OPENAI_BASE = 'https://generativelanguage.googleapis.com/v1beta/openai';
 
+// Стабильная модель по умолчанию (как в FinModel)
+const STABLE_MODEL = 'gemini-1.5-flash';
+const UNSTABLE_MODELS = ['gemini-2.0-flash', 'gemini-2.5-flash', 'gemini-3-flash', 'gemini-2.0-flash-exp'];
+
+// Автоматически заменяет нестабильные модели на стабильную
+function sanitizeModel(model) {
+    if (!model || UNSTABLE_MODELS.includes(model)) return STABLE_MODEL;
+    return model;
+}
+
 export async function callAI({ baseUrl, apiKey, model, systemPrompt, history, userMessage, maxTokens, attachments }) {
+    // Принудительно заменяем нестабильные модели
+    model = sanitizeModel(model);
+
     const isDevelopment = import.meta.env.DEV;
 
     // Формируем контент пользователя
