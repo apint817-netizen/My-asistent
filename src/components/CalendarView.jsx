@@ -10,6 +10,8 @@ const CalendarView = () => {
     const [showMonthPicker, setShowMonthPicker] = useState(false);
 
     const { calendarTasks, addCalendarTask, deleteCalendarTask, toggleCalendarTask } = useStore();
+    const tasks = useStore(state => state.tasks);
+    const todayStr = new Date().toISOString().split('T')[0];
 
     const getDaysInMonth = (year, month) => {
         return new Date(year, month + 1, 0).getDate();
@@ -71,13 +73,26 @@ const CalendarView = () => {
         setNewTaskValue(10);
     };
 
-    const selectedDateTasks = selectedDate && calendarTasks[selectedDate] ? calendarTasks[selectedDate] : [];
+    // Объединяем задачи: calendarTasks + mainTasks для сегодня
+    const getTasksForDate = (dateStr) => {
+        const calTasks = (calendarTasks[dateStr] || []).map(t => ({ ...t, source: 'calendar' }));
+        if (dateStr === todayStr) {
+            // Добавляем задачи с основного экрана (исключая те, что уже были из календаря)
+            const mainTasks = tasks
+                .filter(t => !t.fromCalendar)
+                .map(t => ({ ...t, source: 'main' }));
+            return [...calTasks, ...mainTasks];
+        }
+        return calTasks;
+    };
 
-    // Calculate total workload per day
+    const selectedDateTasks = selectedDate ? getTasksForDate(selectedDate) : [];
+
+    // Calculate total workload per day (включая задачи с основного экрана для сегодня)
     const getDayWorkload = (dayStr) => {
-        const tasks = calendarTasks[dayStr] || [];
-        if (tasks.length === 0) return 0;
-        return tasks.reduce((sum, task) => sum + task.value, 0);
+        const allTasks = getTasksForDate(dayStr);
+        if (allTasks.length === 0) return 0;
+        return allTasks.reduce((sum, task) => sum + task.value, 0);
     };
 
     const getWorkloadColor = (points) => {
@@ -194,10 +209,13 @@ const CalendarView = () => {
                             </div>
                         ) : (
                             selectedDateTasks.map(task => (
-                                <div key={task.id} className="bg-bg-primary border border-border p-3 rounded-xl flex items-center justify-between group">
+                                <div key={task.id + task.source} className={`bg-bg-primary border p-3 rounded-xl flex items-center justify-between group ${task.source === 'main' ? 'border-blue-500/30 bg-blue-500/5' : 'border-border'}`}>
                                     <div className="flex items-center gap-3">
                                         <button
-                                            onClick={() => toggleCalendarTask(selectedDate, task.id)}
+                                            onClick={() => task.source === 'calendar'
+                                                ? toggleCalendarTask(selectedDate, task.id)
+                                                : useStore.getState().toggleTask(task.id)
+                                            }
                                             className={`w-5 h-5 rounded-full border-2 flex items-center justify-center transition-colors 
                                             ${task.completed ? 'bg-success border-success text-black' : 'border-text-secondary hover:border-success'}`}
                                         >
@@ -205,17 +223,25 @@ const CalendarView = () => {
                                         </button>
                                         <div className="flex flex-col">
                                             <span className={`text-sm ${task.completed ? 'line-through text-text-secondary' : 'text-text-primary'}`}>
+                                                {task.source === 'main' && <span className="text-blue-400 mr-1">📋</span>}
                                                 {task.title}
                                             </span>
-                                            <span className="text-[10px] text-accent font-bold">+{task.value} ОЧКОВ</span>
+                                            <div className="flex items-center gap-2">
+                                                <span className="text-[10px] text-accent font-bold">+{task.value} ОЧКОВ</span>
+                                                {task.source === 'main' && (
+                                                    <span className="text-[9px] text-blue-400/70 font-medium">Основной список</span>
+                                                )}
+                                            </div>
                                         </div>
                                     </div>
-                                    <button
-                                        onClick={() => deleteCalendarTask(selectedDate, task.id)}
-                                        className="text-text-secondary hover:text-error transition-colors p-1 opacity-0 group-hover:opacity-100"
-                                    >
-                                        <Trash2 size={14} />
-                                    </button>
+                                    {task.source === 'calendar' && (
+                                        <button
+                                            onClick={() => deleteCalendarTask(selectedDate, task.id)}
+                                            className="text-text-secondary hover:text-error transition-colors p-1 opacity-0 group-hover:opacity-100"
+                                        >
+                                            <Trash2 size={14} />
+                                        </button>
+                                    )}
                                 </div>
                             ))
                         )}

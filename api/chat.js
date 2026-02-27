@@ -30,10 +30,37 @@ export default async function handler(req, res) {
         // 2. Формируем историю чата для Google (role: 'user' или 'model')
         const contents = messages
             .filter(m => m.role !== 'system')
-            .map(m => ({
-                role: m.role === 'assistant' ? 'model' : 'user',
-                parts: [{ text: m.content }]
-            }));
+            .map(m => {
+                const role = m.role === 'assistant' ? 'model' : 'user';
+                // Мультимодальный контент (массив частей)
+                if (Array.isArray(m.content)) {
+                    const parts = m.content.map(part => {
+                        if (part.type === 'text') {
+                            return { text: part.text };
+                        } else if (part.type === 'image_url' && part.image_url?.url) {
+                            // Извлекаем base64 из data:URI
+                            const dataUrl = part.image_url.url;
+                            const match = dataUrl.match(/^data:([^;]+);base64,(.+)$/);
+                            if (match) {
+                                return {
+                                    inlineData: {
+                                        mimeType: match[1],
+                                        data: match[2]
+                                    }
+                                };
+                            }
+                            return { text: '[Изображение: не удалось обработать]' };
+                        }
+                        return { text: JSON.stringify(part) };
+                    });
+                    return { role, parts };
+                }
+                // Обычный текстовый контент
+                return {
+                    role,
+                    parts: [{ text: m.content }]
+                };
+            });
 
         // 3. Собираем тело запроса
         const body = {

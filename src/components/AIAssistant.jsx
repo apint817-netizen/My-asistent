@@ -1,6 +1,6 @@
 import { useState, useRef, useEffect, useMemo } from 'react';
 import { useStore } from '../store/useStore';
-import { Send, Bot, User, MessageSquare, Eraser, Settings, Zap, Link as LinkIcon, HelpCircle, ChevronDown, Check, Copy, Edit2, X, Search } from 'lucide-react';
+import { Send, Bot, User, MessageSquare, Eraser, Settings, Zap, Link as LinkIcon, HelpCircle, ChevronDown, Check, Copy, Edit2, X, Search, Paperclip, FileText, Image as ImageIcon } from 'lucide-react';
 import { callAI, GOOGLE_OPENAI_BASE } from '../utils/geminiApi';
 import ReactMarkdown from 'react-markdown';
 
@@ -31,6 +31,11 @@ export default function AIAssistant() {
     const [editingMessageIndex, setEditingMessageIndex] = useState(null);
     const [editInput, setEditInput] = useState('');
     const [copiedIndex, setCopiedIndex] = useState(null);
+
+    // Состояния для прикрепленных файлов
+    const [attachments, setAttachments] = useState([]);
+    const [isDragging, setIsDragging] = useState(false);
+    const fileInputRef = useRef(null);
 
     useEffect(() => {
         setChatDraft(input);
@@ -92,12 +97,15 @@ export default function AIAssistant() {
         }
 
         try {
-            const completedTasks = tasks.filter(t => t.completed).map(t => t.title).join(', ') || 'Нет выполненных';
-            const pendingTasks = tasks.filter(t => !t.completed).map(t => `- ${t.title} (ID: ${t.id}, Очки: ${t.value})`).join('\n') || 'Нет невыполненных';
-            const availableRewards = rewards.map(r => `- ${r.title} (ID: ${r.id}, ${r.cost} очк.)`).join('\n') || 'Нет наград';
+            // Нумерованный список задач (ИИ может ссылаться по номеру)
+            const pendingTasksList = tasks.filter(t => !t.completed);
+            const completedTasksList = tasks.filter(t => t.completed);
+            const pendingTasks = pendingTasksList.map((t, i) => `${i + 1}. ${t.title} (ID: ${t.id}, ${t.value} очк.)`).join('\n') || 'Нет невыполненных';
+            const completedTasks = completedTasksList.map(t => t.title).join(', ') || 'Нет выполненных';
+            const availableRewards = rewards.map((r, i) => `${i + 1}. ${r.title} (ID: ${r.id}, ${r.cost} очк.)`).join('\n') || 'Нет наград';
 
             const recentPurchases = purchaseHistory.slice(0, 5).map(p =>
-                `"${p.title}" (статус: ${p.status === 'refunded' ? `Отменено [Причина: ${p.refundReason}]` : p.status})`
+                `"${p.title}" (ID: ${p.purchaseId}, статус: ${p.status === 'refunded' ? `Отменено [Причина: ${p.refundReason}]` : p.status === 'used' ? 'Использовано' : 'Активно — можно использовать'})`
             ).join('; ') || 'Нет покупок';
 
             const todayDate = new Date().toISOString().split('T')[0];
@@ -120,79 +128,154 @@ export default function AIAssistant() {
 2. Если пользователь делится проблемой — сначала прояви эмпатию, потом предлагай решение
 3. При вопросе о составлении плана — перенаправляй пользователя в раздел Анализ.
 
-УПРАВЛЕНИЕ ЗАДАЧАМИ И НАГРАДАМИ (АКТИВИРУЙ ТЕГИ ПО ЗАПРОСУ):
-- Отметить задачу выполненной: [COMPLETE_TASK: "id_задачи"]
-- Изменить очки задачи: [EDIT_TASK_POINTS: "id_задачи" | новое_количество_очков]
-- Добавить новую задачу (только по запросу пользователя!): [ADD_TASK: "Название задачи" | Очки]
-- Удалить задачу (только по запросу!): [DELETE_TASK: "id_задачи"]
-- Добавить награду (только по запросу!): [ADD_REWARD: "Название награды" | Стоимость]
-- Удалить награду (только по запросу!): [DELETE_REWARD: "id_награды"]
-*Пользователь не увидит эти теги в чате, они выполнятся системой скрытно. При добавлении задачи/награды пользователю покажется модалка для подтверждения.*
+ПОЛНОЕ УПРАВЛЕНИЕ (ТЕГИ — ТОЛЬКО ПО ЗАПРОСУ ПОЛЬЗОВАТЕЛЯ):
+Задачи:
+- Отметить выполненной: [COMPLETE_TASK: "id или #номер или название"]
+- Изменить очки: [EDIT_TASK_POINTS: "id" | новые_очки]
+- Добавить задачу: [ADD_TASK: "Название" | Очки]
+- Удалить задачу: [DELETE_TASK: "id"]
+
+Награды и покупки:
+- Добавить награду: [ADD_REWARD: "Название" | Стоимость]
+- Удалить награду: [DELETE_REWARD: "id"]
+- Купить награду (списать очки): [BUY_REWARD: "id"]
+- Использовать покупку: [USE_PURCHASE: "id_покупки"]
+
+ВАЖНО: Ты можешь находить задачу по номеру в списке (#2), по названию или по ID. Используй ЛЮБОЙ метод, который понятнее по контексту.
+*Теги невидимы для пользователя, выполняются системой. При ADD_TASK/ADD_REWARD покажется модалка подтверждения.*
 
 Сегодняшняя дата: ${todayDate}
 
 КОНТЕКСТ ПОЛЬЗОВАТЕЛЯ:
 - Баланс очков: ${tokens}
 - Выполнено сегодня: ${completedTasks}
-- Не выполнено (копируй ID отсюда для тегов):
+- Невыполненные задачи (ссылайся по номеру #N, названию или ID):
 ${pendingTasks}
 - Календарь:
 ${calendarStr}
-- Доступные награды (копируй ID отсюда):
-${availableRewards}`;
+- Награды (ссылайся по номеру, названию или ID):
+${availableRewards}
+- Последние покупки: ${recentPurchases}`;
 
             const baseUrl = aiProvider === 'google' ? GOOGLE_OPENAI_BASE : proxyParams.url;
             const key = aiProvider === 'google' ? apiKey : proxyParams.key;
             const model = aiProvider === 'google' ? (googleModel || 'gemini-2.0-flash') : (proxyParams.model || 'gemini-3-flash');
 
             const history = messages.filter(m => m.role !== 'system');
-            const responseText = await callAI({ baseUrl, apiKey: key, model, systemPrompt: systemInstruction, history, userMessage });
 
+            // Если есть вложения, передаем их в callAI
+            const responseText = await callAI({
+                baseUrl,
+                apiKey: key,
+                model,
+                systemPrompt: systemInstruction,
+                history,
+                userMessage,
+                attachments: attachments.length > 0 ? attachments : undefined
+            });
+
+            // --- Обработка всех тегов ---
             const completeRegex = /\[COMPLETE_TASK:\s*"([^"]+)"\]/g;
             const editRegex = /\[EDIT_TASK_POINTS:\s*"([^"]+)"\s*\|\s*(\d+)\]/g;
             const addTaskRegex = /\[ADD_TASK:\s*"([^"]+)"\s*\|\s*(\d+)\]/g;
             const deleteTaskRegex = /\[DELETE_TASK:\s*"([^"]+)"\]/g;
             const addRewardRegex = /\[ADD_REWARD:\s*"([^"]+)"\s*\|\s*(\d+)\]/g;
             const deleteRewardRegex = /\[DELETE_REWARD:\s*"([^"]+)"\]/g;
+            const buyRewardRegex = /\[BUY_REWARD:\s*"([^"]+)"\]/g;
+            const usePurchaseRegex = /\[USE_PURCHASE:\s*"([^"]+)"\]/g;
 
             let cleanResponse = responseText;
             let match;
 
+            // Утилита: найти задачу по ID, номеру (#N) или частичному названию
+            const findTask = (ref) => {
+                const currentTasks = useStore.getState().tasks;
+                const pending = currentTasks.filter(t => !t.completed);
+                // По ID
+                let found = currentTasks.find(t => t.id === ref);
+                if (found) return found;
+                // По номеру (#2)
+                const numMatch = ref.match(/^#?(\d+)$/);
+                if (numMatch) {
+                    const idx = parseInt(numMatch[1], 10) - 1;
+                    if (idx >= 0 && idx < pending.length) return pending[idx];
+                }
+                // По названию (нечёткий поиск)
+                const lower = ref.toLowerCase();
+                found = currentTasks.find(t => t.title.toLowerCase() === lower);
+                if (found) return found;
+                found = currentTasks.find(t => t.title.toLowerCase().includes(lower));
+                return found || null;
+            };
+
+            // Утилита: найти награду по ID, номеру или названию
+            const findReward = (ref) => {
+                const currentRewards = useStore.getState().rewards;
+                let found = currentRewards.find(r => r.id === ref);
+                if (found) return found;
+                const numMatch = ref.match(/^#?(\d+)$/);
+                if (numMatch) {
+                    const idx = parseInt(numMatch[1], 10) - 1;
+                    if (idx >= 0 && idx < currentRewards.length) return currentRewards[idx];
+                }
+                const lower = ref.toLowerCase();
+                found = currentRewards.find(r => r.title.toLowerCase().includes(lower));
+                return found || null;
+            };
+
+            // COMPLETE_TASK
             while ((match = completeRegex.exec(responseText)) !== null) {
-                const taskId = match[1];
-                const task = useStore.getState().tasks.find(t => t.id === taskId);
-                if (task) {
-                    useStore.getState().toggleTask(taskId);
-                    if (!task.completed) useStore.getState().addTokens(task.value);
+                const task = findTask(match[1]);
+                if (task && !task.completed) {
+                    useStore.getState().toggleTask(task.id);
+                    useStore.getState().addTokens(task.value);
                 }
             }
 
+            // EDIT_TASK_POINTS
             while ((match = editRegex.exec(responseText)) !== null) {
-                const taskId = match[1];
-                const points = parseInt(match[2], 10);
-                useStore.getState().editTaskPoints(taskId, points);
+                const task = findTask(match[1]);
+                if (task) useStore.getState().editTaskPoints(task.id, parseInt(match[2], 10));
             }
 
+            // ADD_TASK
             while ((match = addTaskRegex.exec(responseText)) !== null) {
                 useStore.getState().addProposal(match[1], parseInt(match[2], 10));
             }
 
+            // DELETE_TASK
             while ((match = deleteTaskRegex.exec(responseText)) !== null) {
-                useStore.getState().deleteTaskWithReason(match[1], 'Удалено по запросу через Nova');
+                const task = findTask(match[1]);
+                if (task) useStore.getState().deleteTaskWithReason(task.id, 'Удалено по запросу через Nova');
             }
 
+            // ADD_REWARD
             while ((match = addRewardRegex.exec(responseText)) !== null) {
                 useStore.getState().addRewardProposal(match[1], parseInt(match[2], 10));
             }
 
+            // DELETE_REWARD
             while ((match = deleteRewardRegex.exec(responseText)) !== null) {
-                useStore.getState().deleteRewardWithReason(match[1], 'Удалено по запросу через Nova');
+                const reward = findReward(match[1]);
+                if (reward) useStore.getState().deleteRewardWithReason(reward.id, 'Удалено по запросу через Nova');
+            }
+
+            // BUY_REWARD
+            while ((match = buyRewardRegex.exec(responseText)) !== null) {
+                const reward = findReward(match[1]);
+                if (reward) useStore.getState().buyRewardById(reward.id);
+            }
+
+            // USE_PURCHASE
+            while ((match = usePurchaseRegex.exec(responseText)) !== null) {
+                useStore.getState().usePurchase(match[1]);
             }
 
             cleanResponse = cleanResponse
                 .replace(completeRegex, '').replace(editRegex, '')
                 .replace(addTaskRegex, '').replace(deleteTaskRegex, '')
                 .replace(addRewardRegex, '').replace(deleteRewardRegex, '')
+                .replace(buyRewardRegex, '').replace(usePurchaseRegex, '')
                 .trim();
 
             addMessage({ role: 'assistant', content: cleanResponse });
@@ -208,15 +291,34 @@ ${availableRewards}`;
     };
 
     const handleSend = async (e) => {
-        e.preventDefault();
-        if (!input.trim()) return;
+        if (e) e.preventDefault();
+        if (!input.trim() && attachments.length === 0) return;
 
         const userMsg = input.trim();
+        const currentAttachments = [...attachments];
+
         setInput('');
-        addMessage({ role: 'user', content: userMsg });
+        setAttachments([]);
+
+        // Формируем контент для локального отображения в чате (с превьюшками файлов)
+        let displayContent = userMsg;
+        if (currentAttachments.length > 0) {
+            const parts = [];
+            if (userMsg) parts.push({ type: 'text', text: userMsg });
+            currentAttachments.forEach(att => {
+                if (att.type === 'image') {
+                    parts.push({ type: 'image_url', image_url: { url: `data:${att.mimeType};base64,${att.base64}` } });
+                } else {
+                    parts.push({ type: 'text', text: `\n📎 Файл: ${att.name}` });
+                }
+            });
+            displayContent = parts;
+        }
+
+        addMessage({ role: 'user', content: displayContent });
         setIsTyping(true);
 
-        await generateAIResponse(userMsg);
+        await generateAIResponse(userMsg, currentAttachments);
     };
 
     const handleEditSave = (index) => {
@@ -269,8 +371,154 @@ ${availableRewards}`;
         return new Date(dateString).toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' });
     };
 
+    // --- Обработка файлов ---
+    const handleFileSelect = (e) => {
+        const files = Array.from(e.target.files);
+        processFiles(files);
+        if (fileInputRef.current) fileInputRef.current.value = '';
+    };
+
+    const processFiles = (files) => {
+        const newAttachments = [];
+        let filesProcessed = 0;
+
+        files.forEach(file => {
+            const reader = new FileReader();
+
+            if (file.type.startsWith('image/')) {
+                reader.onload = (e) => {
+                    const base64Data = e.target.result.split(',')[1];
+                    newAttachments.push({
+                        id: Date.now() + Math.random(),
+                        name: file.name,
+                        type: 'image',
+                        mimeType: file.type,
+                        base64: base64Data,
+                        preview: e.target.result
+                    });
+
+                    filesProcessed++;
+                    if (filesProcessed === files.length) {
+                        setAttachments(prev => [...prev, ...newAttachments]);
+                    }
+                };
+                reader.readAsDataURL(file);
+            } else if (file.type.startsWith('text/') || file.name.endsWith('.json') || file.name.endsWith('.csv') || file.name.endsWith('.md')) {
+                reader.onload = (e) => {
+                    newAttachments.push({
+                        id: Date.now() + Math.random(),
+                        name: file.name,
+                        type: 'file',
+                        mimeType: file.type || 'text/plain',
+                        textContent: e.target.result
+                    });
+
+                    filesProcessed++;
+                    if (filesProcessed === files.length) {
+                        setAttachments(prev => [...prev, ...newAttachments]);
+                    }
+                };
+                reader.readAsText(file);
+            } else {
+                addMessage({
+                    role: 'system',
+                    content: `[ОШИБКА] Файл "${file.name}" не поддерживается. Разрешены только изображения и текстовые файлы.`
+                });
+                filesProcessed++;
+                if (filesProcessed === files.length && newAttachments.length > 0) {
+                    setAttachments(prev => [...prev, ...newAttachments]);
+                }
+            }
+        });
+    };
+
+    const removeAttachment = (id) => {
+        setAttachments(prev => prev.filter(att => att.id !== id));
+    };
+
+    const handleDragOver = (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        setIsDragging(true);
+    };
+
+    const handleDragLeave = (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        setIsDragging(false);
+    };
+
+    const handleDrop = (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        setIsDragging(false);
+
+        if (e.dataTransfer.files && e.dataTransfer.files.length > 0) {
+            processFiles(Array.from(e.dataTransfer.files));
+        }
+    };
+
+    const handlePasteCustom = (e) => {
+        if (e.clipboardData && e.clipboardData.items) {
+            const items = e.clipboardData.items;
+            const files = [];
+            for (let i = 0; i < items.length; i++) {
+                if (items[i].kind === 'file') {
+                    files.push(items[i].getAsFile());
+                }
+            }
+            if (files.length > 0) {
+                e.preventDefault(); // Предотвращаем вставку в текстовое поле, так как это файл
+                processFiles(files);
+            }
+        }
+    };
+
+    // Рендер сообщения с поддержкой массива (текст + картинки/файлы)
+    const renderMessageContent = (msg) => {
+        if (Array.isArray(msg.content)) {
+            return (
+                <div className="flex flex-col gap-2">
+                    {msg.content.map((part, idx) => {
+                        if (part.type === 'text') {
+                            return <div key={idx} className="whitespace-pre-wrap">{part.text}</div>;
+                        } else if (part.type === 'image_url') {
+                            return (
+                                <img
+                                    key={idx}
+                                    src={part.image_url.url}
+                                    alt="Вложение"
+                                    className="max-w-72 md:max-w-sm rounded-lg object-contain shadow-sm border border-white/10"
+                                />
+                            );
+                        }
+                        return null;
+                    })}
+                </div>
+            );
+        }
+        return msg.role === 'user' ? <div className="whitespace-pre-wrap">{msg.content}</div> : <ReactMarkdown>{msg.content}</ReactMarkdown>;
+    };
+
     return (
-        <div className="flex flex-col h-full bg-black/20 rounded-inherit overflow-hidden relative" style={{ maxHeight: '100%' }}>
+        <div
+            className="flex flex-col h-full bg-black/20 rounded-inherit overflow-hidden relative"
+            style={{ maxHeight: '100%' }}
+            onDragOver={handleDragOver}
+            onDragLeave={handleDragLeave}
+            onDrop={handleDrop}
+        >
+            {/* Drag & Drop Overlay */}
+            {isDragging && (
+                <div className="absolute inset-0 z-50 bg-black/80 backdrop-blur-sm border-2 border-dashed border-accent flex flex-col items-center justify-center rounded-3xl m-2">
+                    <div className="w-20 h-20 rounded-full bg-accent/20 flex items-center justify-center mb-4 animate-pulse">
+                        <ImageIcon size={40} className="text-accent" />
+                    </div>
+                    <h2 className="text-2xl font-bold mb-2 text-white">Отпустите файлы здесь</h2>
+                    <p className="text-text-secondary">Поддерживаются изображения и текстовые файлы</p>
+                </div>
+            )}
+
             {/* Header */}
             <div className="p-4 border-b border-border bg-black/10 flex items-center justify-between gap-3 z-10">
                 <div className="flex items-center gap-3">
@@ -383,10 +631,10 @@ ${availableRewards}`;
                                     ) : (
                                         <>
                                             <div className={`p-3 rounded-2xl text-sm shadow-sm ${msg.role === 'user'
-                                                ? 'bg-blue-600/20 border border-blue-500/30 text-white rounded-tr-none whitespace-pre-wrap'
+                                                ? 'bg-blue-600/20 border border-blue-500/30 text-white rounded-tr-none'
                                                 : 'bg-accent/10 border border-accent/20 text-text-primary rounded-tl-none markdown-content'
                                                 }`}>
-                                                {msg.role === 'user' ? msg.content : <ReactMarkdown>{msg.content}</ReactMarkdown>}
+                                                {renderMessageContent(msg)}
                                             </div>
 
                                             <div className={`flex items-center gap-2 mt-1 text-[10px] text-text-secondary opacity-0 group-hover:opacity-100 transition-opacity ${msg.role === 'user' ? 'justify-end pr-1' : 'justify-start pl-1'}`}>
@@ -429,13 +677,63 @@ ${availableRewards}`;
             </div>
 
             {/* Input Area */}
-            <div className="p-4 border-t border-border bg-white/5 backdrop-blur-md z-10">
-                <form onSubmit={handleSend} className="relative flex items-end">
+            <div className="p-4 border-t border-border bg-[#0d0d12] relative z-10">
+
+                {/* Отдельная панель превью файлов над инпутом */}
+                {attachments.length > 0 && (
+                    <div className="flex gap-2 mb-3 bg-black/30 p-2.5 rounded-xl border border-border/50 overflow-x-auto custom-scrollbar">
+                        {attachments.map(att => (
+                            <div key={att.id} className="relative shrink-0 group">
+                                {att.type === 'image' ? (
+                                    <div className="w-16 h-16 rounded-lg overflow-hidden border border-border">
+                                        <img src={att.preview} alt="preview" className="w-full h-full object-cover" />
+                                    </div>
+                                ) : (
+                                    <div className="w-16 h-16 rounded-lg bg-black/50 border border-border flex flex-col items-center justify-center p-1">
+                                        <FileText size={20} className="text-blue-400 mb-1" />
+                                        <span className="text-[9px] text-text-secondary truncate w-full text-center px-1" title={att.name}>
+                                            {att.name}
+                                        </span>
+                                    </div>
+                                )}
+                                <button
+                                    onClick={() => removeAttachment(att.id)}
+                                    className="absolute -top-1.5 -right-1.5 w-5 h-5 bg-error text-white rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity shadow-lg"
+                                    type="button"
+                                >
+                                    <X size={12} />
+                                </button>
+                            </div>
+                        ))}
+                    </div>
+                )}
+
+                <form onSubmit={handleSend} className="relative flex items-end bg-[#13131a] border border-border/70 rounded-2xl pl-2 pr-14 py-1 focus-within:border-accent/50 focus-within:ring-1 focus-within:ring-accent/30 transition-all shadow-inner">
+
+                    {/* Кнопка скрепки */}
+                    <input
+                        type="file"
+                        ref={fileInputRef}
+                        onChange={handleFileSelect}
+                        className="hidden"
+                        multiple
+                        accept="image/*,.txt,.md,.json,.csv"
+                    />
+                    <button
+                        type="button"
+                        onClick={() => fileInputRef.current?.click()}
+                        className="p-2.5 mb-0.5 text-text-secondary hover:text-white transition-colors rounded-full shrink-0"
+                        title="Прикрепить файл или фото"
+                    >
+                        <Paperclip size={20} />
+                    </button>
+
                     <textarea
-                        placeholder="Написать Nova..."
-                        className="w-full bg-black/40 border border-border rounded-2xl pl-5 pr-12 py-3 text-sm outline-none focus:border-accent focus:ring-1 focus:ring-accent transition-all placeholder:text-text-secondary shadow-inner resize-none custom-scrollbar"
+                        placeholder={attachments.length > 0 ? "Добавить описание..." : "Написать Nova... (или перетащите сюда картинку)"}
+                        className="w-full bg-transparent border-none pl-2 pr-2 py-3 text-sm outline-none text-white placeholder:text-text-secondary resize-none custom-scrollbar"
                         value={input}
                         onChange={(e) => setInput(e.target.value)}
+                        onPaste={handlePaste}
                         onKeyDown={(e) => {
                             if (e.key === 'Enter' && !e.shiftKey) {
                                 e.preventDefault();
@@ -448,10 +746,10 @@ ${availableRewards}`;
                     />
                     <button
                         type="submit"
-                        disabled={!input.trim() || isTyping}
-                        className="absolute right-2 bottom-2 p-2 rounded-full bg-accent text-white hover:bg-accent-hover transition-colors disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer flex justify-center items-center h-8 w-8"
+                        disabled={(!input.trim() && attachments.length === 0) || isTyping}
+                        className="absolute right-2 bottom-2 p-2 rounded-xl bg-accent text-white hover:bg-accent-hover transition-colors disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer flex justify-center items-center h-9 w-9"
                     >
-                        <Send size={15} className="-ml-0.5" />
+                        <Send size={16} className="-ml-0.5" />
                     </button>
                 </form>
             </div>

@@ -203,6 +203,24 @@ export const useStore = create(
         )
       })),
 
+      buyRewardById: (rewardId) => set((state) => {
+        const reward = state.rewards.find(r => r.id === rewardId);
+        if (!reward || state.tokens < reward.cost) return state;
+        return {
+          tokens: state.tokens - reward.cost,
+          purchaseHistory: [{
+            ...reward,
+            purchaseId: Date.now().toString(),
+            date: new Date().toISOString(),
+            status: 'active'
+          }, ...state.purchaseHistory],
+          chatMessages: [...state.chatMessages, {
+            role: 'system',
+            content: `Вы потратили ${reward.cost} очков на "${reward.title}" через Nova. Наслаждайтесь!`
+          }]
+        };
+      }),
+
       addCalendarTask: (dateStr, title, value) => set((state) => {
         const tasksForDate = state.calendarTasks[dateStr] || [];
         return {

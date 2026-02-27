@@ -8,6 +8,7 @@ import {
     PointerSensor,
     useSensor,
     useSensors,
+    DragOverlay,
 } from '@dnd-kit/core';
 import {
     arrayMove,
@@ -17,8 +18,9 @@ import {
     useSortable
 } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
+import { restrictToVerticalAxis, restrictToParentElement } from '@dnd-kit/modifiers';
 
-function SortableTaskItem({ task, index, handleToggle, setDeletingTask }) {
+function SortableTaskItem({ task, index, handleToggle, setDeletingTask, isDragOverlay }) {
     const {
         attributes,
         listeners,
@@ -31,15 +33,15 @@ function SortableTaskItem({ task, index, handleToggle, setDeletingTask }) {
     const style = {
         transform: CSS.Transform.toString(transform),
         transition,
-        zIndex: isDragging ? 2 : 1,
-        opacity: isDragging ? 0.8 : 1,
+        zIndex: isDragging ? 10 : 1,
+        opacity: isDragging ? 0.3 : 1,
     };
 
     return (
         <div
             ref={setNodeRef}
-            style={style}
-            className={`glass-card p-4 flex items-center justify-between group ${task.completed ? 'opacity-50' : ''}`}
+            style={isDragOverlay ? undefined : style}
+            className={`glass-card p-4 flex items-center justify-between group ${task.completed ? 'opacity-50' : ''} ${isDragOverlay ? 'shadow-2xl shadow-accent/30 border-accent/50 scale-[1.02] ring-2 ring-accent/30' : ''}`}
         >
             <div className="flex items-center gap-3 flex-1">
                 <div {...attributes} {...listeners} className="cursor-grab active:cursor-grabbing text-text-secondary hover:text-white mt-0.5 outline-none">
@@ -88,6 +90,7 @@ export default function TaskManager() {
     const [deleteReason, setDeleteReason] = useState('');
     const [validationError, setValidationError] = useState('');
     const [isValidating, setIsValidating] = useState(false);
+    const [activeId, setActiveId] = useState(null);
 
     const handleToggle = (task) => {
         toggleTask(task.id);
@@ -136,7 +139,7 @@ export default function TaskManager() {
     const sensors = useSensors(
         useSensor(PointerSensor, {
             activationConstraint: {
-                distance: 5, // 5px tolerance
+                distance: 8,
             },
         }),
         useSensor(KeyboardSensor, {
@@ -144,7 +147,12 @@ export default function TaskManager() {
         })
     );
 
+    const handleDragStart = (event) => {
+        setActiveId(event.active.id);
+    };
+
     const handleDragEnd = (event) => {
+        setActiveId(null);
         const { active, over } = event;
         if (over && active.id !== over.id) {
             const oldIndex = tasks.findIndex((t) => t.id === active.id);
@@ -153,13 +161,20 @@ export default function TaskManager() {
         }
     };
 
+    const handleDragCancel = () => setActiveId(null);
+    const activeTask = activeId ? tasks.find(t => t.id === activeId) : null;
+    const activeIndex = activeTask ? tasks.indexOf(activeTask) : -1;
+
     return (
         <div className="flex flex-col h-full relative">
             <div className="flex-1 overflow-y-auto space-y-3 mb-6 pr-2">
                 <DndContext
                     sensors={sensors}
                     collisionDetection={closestCenter}
+                    onDragStart={handleDragStart}
                     onDragEnd={handleDragEnd}
+                    onDragCancel={handleDragCancel}
+                    modifiers={[restrictToVerticalAxis, restrictToParentElement]}
                 >
                     <SortableContext
                         items={tasks.map(t => t.id)}
@@ -175,6 +190,17 @@ export default function TaskManager() {
                             />
                         ))}
                     </SortableContext>
+                    <DragOverlay dropAnimation={{ duration: 200, easing: 'ease' }}>
+                        {activeTask ? (
+                            <SortableTaskItem
+                                task={activeTask}
+                                index={activeIndex}
+                                handleToggle={() => { }}
+                                setDeletingTask={() => { }}
+                                isDragOverlay
+                            />
+                        ) : null}
+                    </DragOverlay>
                 </DndContext>
                 {tasks.length === 0 && (
                     <div className="text-center text-text-secondary py-8 flex items-center justify-center flex-col gap-2">

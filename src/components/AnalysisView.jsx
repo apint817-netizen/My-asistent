@@ -123,10 +123,11 @@ export default function AnalysisView() {
         try {
             const todayDate = new Date().toISOString().split('T')[0];
 
-            // Формируем контекст текущих задач
+            // Нумерованные списки для поиска по номеру
+            const pendingTasksList = tasks.filter(t => !t.completed);
             const completedTasks = tasks.filter(t => t.completed).map(t => t.title).join(', ') || 'Нет выполненных';
-            const pendingTasks = tasks.filter(t => !t.completed).map(t => `- ${t.title} (${t.value} очк.)`).join('\n') || 'Нет невыполненных';
-            const availableRewards = rewards.map(r => `- ${r.title} (${r.cost} очк.)`).join('\n') || 'Нет наград';
+            const pendingTasks = pendingTasksList.map((t, i) => `${i + 1}. ${t.title} (ID: ${t.id}, ${t.value} очк.)`).join('\n') || 'Нет невыполненных';
+            const availableRewards = rewards.map((r, i) => `${i + 1}. ${r.title} (ID: ${r.id}, ${r.cost} очк.)`).join('\n') || 'Нет наград';
 
             const upcomingDates = Object.keys(calendarTasks || {}).sort().slice(0, 7);
             const calendarStr = upcomingDates.length > 0
@@ -146,25 +147,31 @@ export default function AnalysisView() {
 3. Если пользователь отклоняет → спроси "Почему?" и предложи альтернативу
 4. Если пользователь принимает → похвали и спроси, есть ли ещё дела
 
-Сегодня: ${todayDate}. Очки для задач: от 5 до 100 (ставь любое значение, соразмерно сложности). Стоимость наград: от 20 до 500.
+Сегодня: ${todayDate}. Очки для задач: от 5 до 100. Стоимость наград: от 20 до 500.
 
 КОНТЕКСТ ПОЛЬЗОВАТЕЛЯ:
 - Баланс очков: ${tokens}
 - Выполнено сегодня: ${completedTasks}
-- Не выполнено:
+- Невыполненные задачи (ссылайся по номеру #N, названию или ID):
 ${pendingTasks}
-- Доступные награды:
+- Награды (ссылайся по номеру, названию или ID):
 ${availableRewards}
 - Календарь:
 ${calendarStr}
 
-ТЕГИ ДЛЯ ГЕНЕРАЦИИ:
+ТЕГИ ДЛЯ ЧЕРНОВИКА (добавляют в план справа):
 1. Задача на сегодня: [TASK: "Название" | Очки]
 2. Задача на дату: [CALENDAR_TASK: "Название" | Очки | YYYY-MM-DD]
 3. Привычка: [HABIT: "Название" | Очки]
 4. Награда: [REWARD: "Название" | Стоимость]
 
-Когда используешь теги, скажи: "Я составил черновик плана, он появился справа. Посмотри и скажи, всё ли ок?".`;
+ТЕГИ ДЛЯ ПРЯМОГО УПРАВЛЕНИЯ (выполняются немедленно):
+- Отметить выполненной: [COMPLETE_TASK: "id или #номер или название"]
+- Изменить очки: [EDIT_TASK_POINTS: "id" | новые_очки]
+- Удалить задачу: [DELETE_TASK: "id или #номер или название"]
+- Купить награду: [BUY_REWARD: "id или #номер или название"]
+
+Когда используешь теги черновика, скажи: "Я составил черновик плана, он появился справа. Посмотри и скажи, всё ли ок?".`;
 
             const baseUrl = aiProvider === 'google' ? GOOGLE_OPENAI_BASE : proxyParams.url;
             const key = aiProvider === 'google' ? apiKey : proxyParams.key;
@@ -173,8 +180,77 @@ ${calendarStr}
             const history = messages.filter(m => m.role !== 'system');
             const responseText = await callAI({ baseUrl, apiKey: key, model, systemPrompt: systemInstruction, history, userMessage });
 
-            // Parsing
-            const { cleanText, addedAnything } = parseAnalysisCommands(responseText, draftPlan, updateDraftPlan);
+            // --- Обработка тегов прямого управления ---
+            const completeRegex = /\[COMPLETE_TASK:\s*"([^"]+)"\]/g;
+            const editRegex = /\[EDIT_TASK_POINTS:\s*"([^"]+)"\s*\|\s*(\d+)\]/g;
+            const deleteTaskRegex = /\[DELETE_TASK:\s*"([^"]+)"\]/g;
+            const buyRewardRegex = /\[BUY_REWARD:\s*"([^"]+)"\]/g;
+
+            let processedText = responseText;
+            let match;
+
+            // Утилита: найти задачу по ID, номеру или названию
+            const findTask = (ref) => {
+                const currentTasks = useStore.getState().tasks;
+                const pending = currentTasks.filter(t => !t.completed);
+                let found = currentTasks.find(t => t.id === ref);
+                if (found) return found;
+                const numMatch = ref.match(/^#?(\d+)$/);
+                if (numMatch) {
+                    const idx = parseInt(numMatch[1], 10) - 1;
+                    if (idx >= 0 && idx < pending.length) return pending[idx];
+                }
+                const lower = ref.toLowerCase();
+                found = currentTasks.find(t => t.title.toLowerCase() === lower);
+                if (found) return found;
+                found = currentTasks.find(t => t.title.toLowerCase().includes(lower));
+                return found || null;
+            };
+
+            const findReward = (ref) => {
+                const currentRewards = useStore.getState().rewards;
+                let found = currentRewards.find(r => r.id === ref);
+                if (found) return found;
+                const numMatch = ref.match(/^#?(\d+)$/);
+                if (numMatch) {
+                    const idx = parseInt(numMatch[1], 10) - 1;
+                    if (idx >= 0 && idx < currentRewards.length) return currentRewards[idx];
+                }
+                const lower = ref.toLowerCase();
+                found = currentRewards.find(r => r.title.toLowerCase().includes(lower));
+                return found || null;
+            };
+
+            while ((match = completeRegex.exec(responseText)) !== null) {
+                const task = findTask(match[1]);
+                if (task && !task.completed) {
+                    useStore.getState().toggleTask(task.id);
+                    useStore.getState().addTokens(task.value);
+                }
+            }
+
+            while ((match = editRegex.exec(responseText)) !== null) {
+                const task = findTask(match[1]);
+                if (task) useStore.getState().editTaskPoints(task.id, parseInt(match[2], 10));
+            }
+
+            while ((match = deleteTaskRegex.exec(responseText)) !== null) {
+                const task = findTask(match[1]);
+                if (task) useStore.getState().deleteTaskWithReason(task.id, 'Удалено через Стратег Nova');
+            }
+
+            while ((match = buyRewardRegex.exec(responseText)) !== null) {
+                const reward = findReward(match[1]);
+                if (reward) useStore.getState().buyRewardById(reward.id);
+            }
+
+            processedText = processedText
+                .replace(completeRegex, '').replace(editRegex, '')
+                .replace(deleteTaskRegex, '').replace(buyRewardRegex, '')
+                .trim();
+
+            // Parsing draft commands (TASK, CALENDAR_TASK, HABIT, REWARD)
+            const { cleanText, addedAnything } = parseAnalysisCommands(processedText, draftPlan, updateDraftPlan);
 
             let finalMessage = cleanText;
             if (addedAnything) {

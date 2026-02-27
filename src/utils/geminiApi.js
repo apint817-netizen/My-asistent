@@ -7,8 +7,36 @@
 
 const GOOGLE_OPENAI_BASE = 'https://generativelanguage.googleapis.com/v1beta/openai';
 
-export async function callAI({ baseUrl, apiKey, model, systemPrompt, history, userMessage, maxTokens }) {
+export async function callAI({ baseUrl, apiKey, model, systemPrompt, history, userMessage, maxTokens, attachments }) {
     const isDevelopment = import.meta.env.DEV;
+
+    // Формируем контент пользователя
+    let userContent;
+    if (attachments && attachments.length > 0) {
+        // Мультимодальный формат — массив частей
+        const parts = [];
+        // Текст
+        if (userMessage) {
+            parts.push({ type: 'text', text: userMessage });
+        }
+        // Вложения
+        for (const att of attachments) {
+            if (att.type === 'image') {
+                parts.push({
+                    type: 'image_url',
+                    image_url: {
+                        url: `data:${att.mimeType};base64,${att.base64}`
+                    }
+                });
+            } else {
+                // Текстовые файлы — добавляем как текст
+                parts.push({ type: 'text', text: `\n\n[Файл: ${att.name}]\n${att.textContent || '(не удалось прочитать)'}` });
+            }
+        }
+        userContent = parts;
+    } else {
+        userContent = userMessage;
+    }
 
     const messages = [
         { role: 'system', content: systemPrompt },
@@ -16,7 +44,7 @@ export async function callAI({ baseUrl, apiKey, model, systemPrompt, history, us
             role: m.role === 'model' ? 'assistant' : m.role,
             content: m.content
         })),
-        { role: 'user', content: userMessage }
+        { role: 'user', content: userContent }
     ];
 
     const body = {
