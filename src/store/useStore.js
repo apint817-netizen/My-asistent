@@ -17,6 +17,7 @@ export const useStore = create(
         { id: '2', title: 'Заказать любимую еду', cost: 300 },
         { id: '3', title: 'Вечер отдыха без чувства вины', cost: 500 },
       ],
+      pointsHistory: [],
       purchaseHistory: [],
       chatMessages: [
         { role: 'assistant', content: 'Привет! Я Nova, твой личный ИИ-ассистент. Я здесь, чтобы помочь тебе не сбиться с пути и заработать на свои любимые награды. Давай сделаем сегодня отличный день!', timestamp: new Date().toISOString() }
@@ -39,15 +40,55 @@ export const useStore = create(
         key: 'sk-9c00aee346154596bda23aa319d6cbf1'
       },
       calendarTasks: {},
+      version: 2,
+      showMobileMenu: false,
+      // Тосты
+      toasts: [],
 
       // Actions
       setApiKey: (key) => set({ apiKey: key }),
       setGoogleModel: (model) => set({ googleModel: model }),
       setAiProvider: (provider) => set({ aiProvider: provider }),
       setProxyParams: (params) => set((state) => ({ proxyParams: { ...state.proxyParams, ...params } })),
-      addTokens: (amount) => set((state) => ({ tokens: state.tokens + amount })),
-      spendTokens: (amount) => set((state) => ({ tokens: Math.max(0, state.tokens - amount) })),
-      resetTokens: () => set({ tokens: 0 }),
+      setShowMobileMenu: (show) => set({ showMobileMenu: show }),
+      addToast: (message, type = 'success') => {
+        const id = Date.now().toString() + Math.random();
+        set(state => ({ toasts: [...state.toasts, { id, message, type }] }));
+        setTimeout(() => {
+          set(state => ({ toasts: state.toasts.filter(t => t.id !== id) }));
+        }, 3000);
+      },
+      removeToast: (id) => set(state => ({ toasts: state.toasts.filter(t => t.id !== id) })),
+      addTokens: (amount, title = 'Выполнение задачи') => set((state) => ({
+        tokens: state.tokens + amount,
+        pointsHistory: [{
+          id: Date.now().toString() + Math.random(),
+          title: title,
+          amount: amount,
+          type: 'earn',
+          date: new Date().toISOString()
+        }, ...state.pointsHistory]
+      })),
+      spendTokens: (amount, title = 'Покупка награды') => set((state) => ({
+        tokens: Math.max(0, state.tokens - amount),
+        pointsHistory: [{
+          id: Date.now().toString() + Math.random(),
+          title: title,
+          amount: amount,
+          type: 'spend',
+          date: new Date().toISOString()
+        }, ...state.pointsHistory]
+      })),
+      resetTokens: () => set((state) => ({
+        tokens: 0,
+        pointsHistory: [{
+          id: Date.now().toString() + Math.random(),
+          title: 'Сброс баланса',
+          amount: state.tokens,
+          type: 'reset',
+          date: new Date().toISOString()
+        }, ...state.pointsHistory]
+      })),
       clearSystemLogs: () => set(state => ({ chatMessages: state.chatMessages.filter(m => m.role !== 'system') })),
 
       toggleTask: (taskId) => set((state) => {
@@ -190,6 +231,13 @@ export const useStore = create(
 
         return {
           tokens: state.tokens + purchase.cost,
+          pointsHistory: [{
+            id: Date.now().toString() + Math.random(),
+            title: `Возврат: ${purchase.title}`,
+            amount: purchase.cost,
+            type: 'earn',
+            date: new Date().toISOString()
+          }, ...state.pointsHistory],
           purchaseHistory: state.purchaseHistory.map(p =>
             p.purchaseId === purchaseId
               ? { ...p, status: 'refunded', refundReason: reason }
@@ -210,6 +258,13 @@ export const useStore = create(
         if (!reward || state.tokens < reward.cost) return state;
         return {
           tokens: state.tokens - reward.cost,
+          pointsHistory: [{
+            id: Date.now().toString() + Math.random(),
+            title: `Покупка: ${reward.title}`,
+            amount: reward.cost,
+            type: 'spend',
+            date: new Date().toISOString()
+          }, ...state.pointsHistory],
           purchaseHistory: [{
             ...reward,
             purchaseId: Date.now().toString(),
@@ -259,6 +314,60 @@ export const useStore = create(
             ...state.calendarTasks,
             [dateStr]: tasksForDate.map(t => t.id === taskId ? { ...t, completed: !t.completed } : t)
           }
+        };
+      }),
+
+      addRegularTask: (title, value, period) => set((state) => {
+        const newCalendarTasks = { ...state.calendarTasks };
+        const newTasks = [...state.tasks];
+        const todayStr = new Date().toISOString().split('T')[0];
+        const daysStr = String(period || 'everyday').toLowerCase();
+
+        let targetDays = [];
+        if (daysStr.includes('everyday') || daysStr.includes('every_day') || daysStr.includes('кажд')) {
+          targetDays = [1, 2, 3, 4, 5, 6, 7];
+        } else if (daysStr.includes('work_days') || daysStr.includes('workdays') || daysStr.includes('будн')) {
+          targetDays = [1, 2, 3, 4, 5];
+        } else if (daysStr.includes('weekends') || daysStr.includes('выходн')) {
+          targetDays = [6, 7];
+        } else {
+          targetDays = daysStr.split(',').map(d => parseInt(d.trim(), 10)).filter(n => !isNaN(n) && n >= 1 && n <= 7);
+          if (targetDays.length === 0) targetDays = [1, 2, 3, 4, 5, 6, 7];
+        }
+
+        const taskTitle = title.endsWith('🔄') ? title : `${title} 🔄`;
+
+        for (let i = 0; i < 30; i++) {
+          const trackDate = new Date();
+          trackDate.setDate(trackDate.getDate() + i);
+          const isoDay = trackDate.getDay() === 0 ? 7 : trackDate.getDay();
+
+          if (targetDays.includes(isoDay)) {
+            const dateStr = trackDate.toISOString().split('T')[0];
+            const habitTask = {
+              id: Date.now().toString() + Math.random() + i,
+              title: taskTitle,
+              completed: false,
+              value,
+              isHabit: true
+            };
+
+            if (dateStr === todayStr) {
+              newTasks.push({ ...habitTask });
+            } else {
+              if (!newCalendarTasks[dateStr]) newCalendarTasks[dateStr] = [];
+              newCalendarTasks[dateStr].push({ ...habitTask });
+            }
+          }
+        }
+
+        return {
+          tasks: newTasks,
+          calendarTasks: newCalendarTasks,
+          chatMessages: [...state.chatMessages, {
+            role: 'system',
+            content: `Добавлена регулярная задача "${title}" (${period}) на ближайшие 30 дней.`
+          }]
         };
       }),
 
@@ -316,11 +425,15 @@ export const useStore = create(
         state.draftPlan.regular.forEach(r => {
           const title = r.title + " 🔄";
           const value = r.points || 5;
-          const daysStr = String(r.days || 'everyday').toLowerCase();
+          const daysStr = String(r.schedule || r.days || 'everyday').toLowerCase();
 
           let targetDays = [];
-          if (daysStr.includes('everyday') || daysStr.includes('кажд')) {
+          if (daysStr.includes('everyday') || daysStr.includes('every_day') || daysStr.includes('кажд')) {
             targetDays = [1, 2, 3, 4, 5, 6, 7];
+          } else if (daysStr.includes('work_days') || daysStr.includes('workdays') || daysStr.includes('будн')) {
+            targetDays = [1, 2, 3, 4, 5];
+          } else if (daysStr.includes('weekends') || daysStr.includes('выходн')) {
+            targetDays = [6, 7];
           } else {
             targetDays = daysStr.split(',').map(d => parseInt(d.trim(), 10)).filter(n => !isNaN(n) && n >= 1 && n <= 7);
             if (targetDays.length === 0) targetDays = [1, 2, 3, 4, 5, 6, 7];

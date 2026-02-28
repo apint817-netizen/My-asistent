@@ -1,8 +1,9 @@
 import React, { useState, useRef, useEffect, useMemo } from 'react';
 import { useStore } from '../store/useStore';
-import { Send, Bot, User, Target, Save, Trash2, Calendar as CalendarIcon, ListTodo, RefreshCw, X, Search, Check, Copy, Edit2 } from 'lucide-react';
+import { Send, Bot, User, Target, Save, Trash2, Calendar as CalendarIcon, ListTodo, RefreshCw, X, Search, Check, Copy, Edit2, Eraser, AlertCircle } from 'lucide-react';
 import { callAI, GOOGLE_OPENAI_BASE } from '../utils/geminiApi';
 import ReactMarkdown from 'react-markdown';
+import ConfirmModal from './ConfirmModal';
 
 // Парсер тегов для формирования черновика
 const parseAnalysisCommands = (text, currentDraft, updateDraftPlan) => {
@@ -49,8 +50,9 @@ const parseAnalysisCommands = (text, currentDraft, updateDraftPlan) => {
 
 export default function AnalysisView() {
     const messages = useStore(state => state.analysisMessages);
-    const addMessage = useStore(state => state.addAnalysisMessage);
-    const clearMessages = useStore(state => state.clearAnalysisMessages);
+    const addAnalysisMessage = useStore(state => state.addAnalysisMessage);
+    const clearAnalysisMessages = useStore(state => state.clearAnalysisMessages);
+    const addToast = useStore(state => state.addToast);
 
     const draftPlan = useStore(state => state.draftPlan);
     const updateDraftPlan = useStore(state => state.updateDraftPlan);
@@ -77,6 +79,9 @@ export default function AnalysisView() {
     const [editInput, setEditInput] = useState('');
     const [copiedIndex, setCopiedIndex] = useState(null);
 
+    const [showConfirmLogs, setShowConfirmLogs] = useState(false);
+    const [showConfirmChat, setShowConfirmChat] = useState(false);
+
     const chatMsgs = useMemo(() => {
         let msgs = messages.filter(m => m.role !== 'system');
         if (searchQuery.trim()) {
@@ -92,12 +97,12 @@ export default function AnalysisView() {
     // Initial greeting if empty
     useEffect(() => {
         if (messages.length === 0) {
-            addMessage({
+            addAnalysisMessage({
                 role: 'assistant',
                 content: 'Привет! Я Стратег Nova. Моя задача — помочь тебе распланировать день и неделю, чтобы ты не выгорал и двигался к своим целям. Расскажи, какие у тебя главные задачи на ближайшие дни? Есть ли \"хвосты\" или то, что постоянно откладываешь?'
             });
         }
-    }, [messages, addMessage]);
+    }, [messages, addAnalysisMessage]);
 
     const messagesEndRef = useRef(null);
     const scrollContainerRef = useRef(null);
@@ -131,46 +136,46 @@ export default function AnalysisView() {
 
             const upcomingDates = Object.keys(calendarTasks || {}).sort().slice(0, 7);
             const calendarStr = upcomingDates.length > 0
-                ? upcomingDates.map(date => `- ${date}: ${(calendarTasks[date] || []).map(t => t.title).join(', ')}`).join('\n')
+                ? upcomingDates.map(date => `- ${date}: ${(calendarTasks[date] || []).map(t => t.title).join(', ')} `).join('\n')
                 : 'Пока ничего не запланировано';
 
-            const systemInstruction = `Ты Стратег Nova — ИИ-коуч и планировщик. Отвечай по-русски.
+            const systemInstruction = `Ты Стратег Nova — ИИ - коуч и планировщик.Отвечай по - русски.
 
 ТВОЙ СТИЛЬ:
-- Будь конкретным и деловым. Не лей воду.
-- Задавай 1-2 точных вопроса за раз.
+- Будь конкретным и деловым.Не лей воду.
+- Задавай 1 - 2 точных вопроса за раз.
 - Как только понял ситуацию, СРАЗУ предлагай конкретные задачи и награды через теги.
 
 БЫСТРЫЙ СЦЕНАРИЙ:
-1. Пользователь рассказывает о своих делах → задай 1-2 уточняющих вопроса
-2. После ответа — сразу предложи 2-5 задач и 1-2 награды через теги
+1. Пользователь рассказывает о своих делах → задай 1 - 2 уточняющих вопроса
+2. После ответа — сразу предложи 2 - 5 задач и 1 - 2 награды через теги
 3. Если пользователь отклоняет → спроси "Почему?" и предложи альтернативу
 4. Если пользователь принимает → похвали и спроси, есть ли ещё дела
 
 Сегодня: ${todayDate}. Очки для задач: от 5 до 100. Стоимость наград: от 20 до 500.
 
 КОНТЕКСТ ПОЛЬЗОВАТЕЛЯ:
-- Активная серия дней (streak): ${useStore.getState().streak}
+- Активная серия дней(streak): ${useStore.getState().streak}
 - Баланс очков: ${tokens}
 - Выполнено сегодня: ${completedTasks}
-- Невыполненные задачи (ссылайся по номеру #N, названию или ID):
+- Невыполненные задачи(ссылайся по номеру #N, названию или ID):
 ${pendingTasks}
-- Награды (ссылайся по номеру, названию или ID):
+- Награды(ссылайся по номеру, названию или ID):
 ${availableRewards}
 - Календарь:
 ${calendarStr}
 
-ТЕГИ ДЛЯ ЧЕРНОВИКА (добавляют в план справа):
+ТЕГИ ДЛЯ ЧЕРНОВИКА(добавляют в план справа):
 1. Задача на сегодня: [TASK: "Название" | Очки]
-2. Задача на дату: [CALENDAR_TASK: "Название" | Очки | YYYY-MM-DD]
+2. Задача на дату: [CALENDAR_TASK: "Название" | Очки | YYYY - MM - DD]
 3. Регулярная привычка: [HABIT: "Название" | Очки | "Дни недели (например 1,3,5 для Пн,Ср,Пт или everyday)"]
 4. Награда: [REWARD: "Название" | Стоимость]
 
-ТЕГИ ДЛЯ ПРЯМОГО УПРАВЛЕНИЯ (выполняются немедленно):
+ТЕГИ ДЛЯ ПРЯМОГО УПРАВЛЕНИЯ(выполняются немедленно):
 - Отметить выполненной: [COMPLETE_TASK: "id или #номер или название"]
-- Изменить очки: [EDIT_TASK_POINTS: "id" | новые_очки]
-- Удалить задачу: [DELETE_TASK: "id или #номер или название"]
-- Купить награду: [BUY_REWARD: "id или #номер или название"]
+    - Изменить очки: [EDIT_TASK_POINTS: "id" | новые_очки]
+        - Удалить задачу: [DELETE_TASK: "id или #номер или название"]
+            - Купить награду: [BUY_REWARD: "id или #номер или название"]
 
 Когда используешь теги черновика, скажи: "Я составил черновик плана, он появился справа. Посмотри и скажи, всё ли ок?".`;
 
@@ -256,19 +261,19 @@ ${calendarStr}
 
             let finalMessage = cleanText;
             if (addedAnything) {
-                finalMessage += `\n\n*(Система: Черновик плана обновлен. Проверьте панель справа)*`;
+                finalMessage += `\n\n * (Система: Черновик плана обновлен.Проверьте панель справа)* `;
             }
 
-            addMessage({ role: 'assistant', content: finalMessage });
+            addAnalysisMessage({ role: 'assistant', content: finalMessage });
         } catch (error) {
             console.error("AI Error:", error);
             if (error.message.includes('429') || error.message.includes('Quota exceeded')) {
-                addMessage({
+                addAnalysisMessage({
                     role: 'assistant',
                     content: `Упс! ⏳ Кажется, мы исчерпали лимит запросов нейросети на эту минуту.\n\nДавайте сделаем крошечную паузу, и через минуту я снова буду с вами!`
                 });
             } else {
-                addMessage({
+                addAnalysisMessage({
                     role: 'assistant',
                     content: `Ошибка: ${error.message}. Попробуйте ещё раз через минуту.`
                 });
@@ -284,7 +289,7 @@ ${calendarStr}
 
         const userMsg = input.trim();
         setInput('');
-        addMessage({ role: 'user', content: userMsg });
+        addAnalysisMessage({ role: 'user', content: userMsg });
         setIsTyping(true);
 
         await generateAIResponse(userMsg);
@@ -332,15 +337,9 @@ ${calendarStr}
 
     const handleCommit = () => {
         commitDraftPlan();
-        addMessage({ role: 'system', content: '[СИСТЕМНОЕ СООБЩЕНИЕ] План утвержден и перенесен на Главную и в Календарь.' });
+        addAnalysisMessage({ role: 'system', content: '[СИСТЕМНОЕ СООБЩЕНИЕ] План утвержден и перенесен на Главную и в Календарь.' });
+        addToast("План успешно утвержден!", "success");
     };
-
-    const handleClearChat = () => {
-        if (window.confirm('Сбросить весь диалог?')) {
-            clearMessages();
-            clearDraftPlan();
-        }
-    }
 
     const hasDraftItems = draftPlan.today.length > 0 || draftPlan.future.length > 0 || draftPlan.regular.length > 0 || (draftPlan.rewards || []).length > 0;
 
@@ -384,12 +383,19 @@ ${calendarStr}
                                 <Search size={16} />
                             </button>
                         )}
-                        <button onClick={() => {
-                            if (window.confirm('Очистить историю чата со Стратегом?')) {
-                                useStore.getState().setAnalysisChat([]);
-                            }
-                        }} className="p-2 text-text-secondary hover:text-danger bg-white/5 rounded-lg transition-colors" title="Очистить чат">
-                            <Trash2 size={16} />
+                        <button
+                            onClick={() => setShowConfirmLogs(true)}
+                            className="p-2 rounded-full transition-all text-text-secondary hover:text-warning hover:bg-warning/10 hover:scale-110"
+                            title="Очистить системные логи"
+                        >
+                            <Trash2 size={18} />
+                        </button>
+                        <button
+                            onClick={() => setShowConfirmChat(true)}
+                            className="p-2 rounded-full transition-all text-text-secondary hover:text-danger hover:bg-danger/10 hover:rotate-12 hover:scale-110"
+                            title="Очистить весь чат"
+                        >
+                            <Eraser size={18} />
                         </button>
                     </div>
                 </div>
@@ -416,18 +422,18 @@ ${calendarStr}
                                     </div>
                                 )}
 
-                                <div className={`flex gap-3 animate-fade-in ${msg.role === 'user' ? 'flex-row-reverse' : ''} group`}>
+                                <div className={`flex gap - 3 animate - fade -in ${msg.role === 'user' ? 'flex-row-reverse' : ''} group`}>
                                     {(msg.role !== 'user' && msg.role !== 'system') ? (
                                         <div className="w-8 h-8 rounded-full bg-gradient-to-br from-indigo-500 to-purple-600 flex items-center justify-center shrink-0 mt-1">
                                             <Target size={14} className="text-white" />
                                         </div>
                                     ) : msg.role === 'user' ? (
-                                        <div className={`w-8 h-8 rounded-full flex items-center justify-center shrink-0 bg-blue-600`}>
+                                        <div className={`w - 8 h - 8 rounded - full flex items - center justify - center shrink - 0 bg - blue - 600`}>
                                             <User size={16} className="text-white" />
                                         </div>
                                     ) : null}
 
-                                    <div className={`relative flex flex-col ${msg.role === 'user' ? 'items-end' : 'items-start'} max-w-[85%]`}>
+                                    <div className={`relative flex flex - col ${msg.role === 'user' ? 'items-end' : 'items-start'} max - w - [85 %]`}>
                                         {editingMessageIndex === i && msg.role === 'user' ? (
                                             <div className="w-full min-w-[250px] bg-blue-600/20 border border-blue-500/50 p-3 rounded-2xl rounded-tr-none shadow-sm">
                                                 <textarea
@@ -444,12 +450,12 @@ ${calendarStr}
                                             </div>
                                         ) : (
                                             <>
-                                                <div className={`p-3 rounded-2xl text-sm shadow-sm ${msg.role === 'user'
+                                                <div className={`p - 3 rounded - 2xl text - sm shadow - sm ${msg.role === 'user'
                                                     ? 'bg-blue-600/20 border border-blue-500/30 text-white rounded-tr-none whitespace-pre-wrap'
                                                     : msg.role === 'system'
                                                         ? 'bg-black/30 border border-border text-text-secondary text-sm italic w-full text-center'
                                                         : 'bg-bg-primary border border-border text-text-primary rounded-tl-none prose prose-invert max-w-none'
-                                                    }`}>
+                                                    } `}>
                                                     {msg.role === 'user' || msg.role === 'system' ? (
                                                         <p className="whitespace-pre-wrap leading-relaxed">{msg.content}</p>
                                                     ) : (
@@ -458,7 +464,7 @@ ${calendarStr}
                                                 </div>
 
                                                 {msg.role !== 'system' && (
-                                                    <div className={`flex items-center gap-2 mt-1 text-[10px] text-text-secondary opacity-0 group-hover:opacity-100 transition-opacity ${msg.role === 'user' ? 'justify-end pr-1' : 'justify-start pl-1'}`}>
+                                                    <div className={`flex items - center gap - 2 mt - 1 text - [10px] text - text - secondary opacity - 0 group - hover: opacity - 100 transition - opacity ${msg.role === 'user' ? 'justify-end pr-1' : 'justify-start pl-1'} `}>
                                                         <span>{formatTime(msg.timestamp)}</span>
                                                         <button
                                                             onClick={() => handleCopy(msg.content, i)}
@@ -507,7 +513,7 @@ ${calendarStr}
                         <button
                             key={i}
                             onClick={() => {
-                                addMessage({ role: 'user', content: btn.msg });
+                                addAnalysisMessage({ role: 'user', content: btn.msg });
                                 setIsTyping(true);
                                 generateAIResponse(btn.msg);
                             }}
@@ -539,8 +545,8 @@ ${calendarStr}
                         <button
                             type="submit"
                             disabled={!input.trim() || isTyping}
-                            className={`absolute right-2 bottom-2 p-2 rounded-lg transition-all ${input.trim() && !isTyping ? 'bg-accent text-white hover:bg-accent-hover' : 'text-text-secondary'
-                                }`}
+                            className={`absolute right - 2 bottom - 2 p - 2 rounded - lg transition - all ${input.trim() && !isTyping ? 'bg-accent text-white hover:bg-accent-hover' : 'text-text-secondary'
+                                } `}
                         >
                             <Send size={16} />
                         </button>
@@ -654,6 +660,29 @@ ${calendarStr}
                     </div>
                 )}
             </div>
-        </div >
+
+            <ConfirmModal
+                isOpen={showConfirmLogs}
+                onClose={() => setShowConfirmLogs(false)}
+                onConfirm={() => {
+                    useStore.getState().clearSystemAnalysisLogs();
+                    addToast("Системные логи очищены", "info");
+                }}
+                title="Очистить системные логи?"
+                description="Все записи о выполненных действиях ИИ будут удалены из истории чата Стратега."
+            />
+
+            <ConfirmModal
+                isOpen={showConfirmChat}
+                onClose={() => setShowConfirmChat(false)}
+                onConfirm={() => {
+                    clearAnalysisMessages();
+                    clearDraftPlan(); // Also clear draft plan when chat is cleared
+                    addToast("Чат Стратега очищен", "success");
+                }}
+                title="Очистить чат Стратега?"
+                description="Вся история анализа и черновики плана будут безвозвратно удалены."
+            />
+        </div>
     );
 }

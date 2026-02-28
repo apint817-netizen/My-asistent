@@ -11,9 +11,11 @@ import AnalysisModal from './components/AnalysisModal';
 import ResumeView from './components/ResumeView';
 import HelpView from './components/HelpView';
 import AISettingsModal from './components/AISettingsModal';
+import PointsHistoryModal from './components/PointsHistoryModal';
 import AuthView from './components/AuthView';
 import Tooltip from './components/Tooltip';
 import { supabase, isSupabaseConfigured } from './lib/supabase';
+import ToastContainer from './components/ToastContainer';
 
 function App() {
   const tokens = useStore(state => state.tokens);
@@ -25,6 +27,7 @@ function App() {
   const [showHelp, setShowHelp] = useState(false);
   const [showAISettings, setShowAISettings] = useState(false);
   const [showAnalysisModal, setShowAnalysisModal] = useState(false);
+  const [showPointsHistory, setShowPointsHistory] = useState(false);
 
   // Auth state
   const [user, setUser] = useState(null);
@@ -84,10 +87,12 @@ function App() {
 
   return (
     <div className="container mx-auto max-w-7xl min-h-screen p-4 md:p-8 flex flex-col gap-8 relative overflow-hidden">
+      <ToastContainer />
       <TaskProposalModal />
       <RewardProposalModal />
       <HelpView isOpen={showHelp} onClose={() => setShowHelp(false)} />
       <AISettingsModal isOpen={showAISettings} onClose={() => setShowAISettings(false)} />
+      <PointsHistoryModal isOpen={showPointsHistory} onClose={() => setShowPointsHistory(false)} />
       <AnalysisModal isOpen={showAnalysisModal} onClose={() => setShowAnalysisModal(false)} />
 
       {/* Header Widget */}
@@ -130,18 +135,21 @@ function App() {
           >
             <HelpCircle size={18} />
           </button>
-          <div className="bg-bg-primary/50 backdrop-blur-md border border-border pl-4 pr-6 py-3 rounded-2xl flex items-center gap-4 shadow-lg shadow-black/20">
+          <button
+            onClick={() => setShowPointsHistory(true)}
+            className="bg-bg-primary/50 backdrop-blur-md border border-border pl-4 pr-6 py-3 rounded-2xl flex items-center gap-4 shadow-lg shadow-black/20 hover:bg-bg-primary hover:border-warning/30 transition-all text-left group"
+          >
             <div
-              className="w-12 h-12 rounded-full bg-gradient-to-br from-warning/30 to-warning/10 border border-warning/20 flex items-center justify-center text-warning"
+              className="w-12 h-12 rounded-full bg-gradient-to-br from-warning/30 to-warning/10 border border-warning/20 flex items-center justify-center text-warning group-hover:scale-105 transition-transform"
               style={{ filter: 'drop-shadow(0 0 12px rgba(245,158,11,0.4))' }}
             >
               <Trophy size={24} />
             </div>
             <div className="flex flex-col">
               <span className="font-bold text-2xl leading-none text-white">{tokens}</span>
-              <span className="text-text-secondary text-[11px] uppercase tracking-widest font-bold mt-1">Очков</span>
+              <span className="text-text-secondary text-[11px] uppercase tracking-widest font-bold mt-1 group-hover:text-warning/80 transition-colors">Очков</span>
             </div>
-          </div>
+          </button>
         </div>
       </header>
 

@@ -1,4 +1,5 @@
 import mammoth from 'mammoth';
+import pdfParse from 'pdf-parse';
 
 export const config = {
     api: {
@@ -23,7 +24,6 @@ export default async function handler(req, res) {
             const buffer = Buffer.from(fileContent, 'base64');
 
             if (fileType === 'application/pdf') {
-                const pdfParse = (await import('pdf-parse/lib/pdf-parse.js')).default;
                 const pdfData = await pdfParse(buffer);
                 resumeText = pdfData.text;
             } else if (fileType === 'application/vnd.openxmlformats-officedocument.wordprocessingml.document' || fileType === 'application/msword') {

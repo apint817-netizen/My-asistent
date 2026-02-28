@@ -3,16 +3,17 @@ import { useStore } from '../store/useStore';
 import { Send, Bot, User, MessageSquare, Eraser, Settings, Zap, Link as LinkIcon, HelpCircle, ChevronDown, Check, Copy, Edit2, X, Search, Paperclip, FileText, Image as ImageIcon, Trash2 } from 'lucide-react';
 import { callAI, GOOGLE_OPENAI_BASE } from '../utils/geminiApi';
 import ReactMarkdown from 'react-markdown';
+import ConfirmModal from './ConfirmModal';
 
 export default function AIAssistant() {
     const messages = useStore(state => state.chatMessages);
     const addMessage = useStore(state => state.addChatMessage);
     const clearMessages = useStore(state => state.clearChatMessages);
-    const tasks = useStore(state => state.tasks);
     const tokens = useStore(state => state.tokens);
     const rewards = useStore(state => state.rewards);
     const purchaseHistory = useStore(state => state.purchaseHistory);
     const addCalendarTask = useStore(state => state.addCalendarTask);
+    const addToast = useStore(state => state.addToast);
 
     const apiKey = useStore(state => state.apiKey);
     const googleModel = useStore(state => state.googleModel);
@@ -32,6 +33,8 @@ export default function AIAssistant() {
     const [editingMessageIndex, setEditingMessageIndex] = useState(null);
     const [editInput, setEditInput] = useState('');
     const [copiedIndex, setCopiedIndex] = useState(null);
+    const [showConfirmLogs, setShowConfirmLogs] = useState(false);
+    const [showConfirmChat, setShowConfirmChat] = useState(false);
 
     // Состояния для прикрепленных файлов
     const [attachments, setAttachments] = useState([]);
@@ -133,7 +136,9 @@ export default function AIAssistant() {
 - Отметить выполненной: [COMPLETE_TASK: "id или #номер или название"]
 - Изменить очки: [EDIT_TASK_POINTS: "id" | новые_очки]
 - Добавить задачу (В ОСНОВНОЙ СПИСОК): [ADD_TASK: "Название" | Очки]
-- Добавить регулярную/задачу на дату (В КАЛЕНДАРЬ): [ADD_CALENDAR_TASK: "Название" | Очки | "YYYY-MM-DD"]
+- Добавить задачу на дату (В КАЛЕНДАРЬ): [ADD_CALENDAR_TASK: "Название" | Очки | "YYYY-MM-DD"]
+- Добавить регулярную рутину (В КАЛЕНДАРЬ на месяц): [ADD_REGULAR_TASK: "Название" | Очки | "ПЕРИОД"]
+  (где ПЕРИОД: "EVERY_DAY" (каждый день), "WORK_DAYS" (будни), "WEEKENDS" (выходные) или "1,3,5" для Пн,Ср,Пт)
 - Удалить задачу: [DELETE_TASK: "id"]
 
 Награды и покупки:
@@ -182,6 +187,7 @@ ${availableRewards}
             const editRegex = /\[EDIT_TASK_POINTS:\s*"([^"]+)"\s*\|\s*(\d+)\]/g;
             const addTaskRegex = /\[ADD_TASK:\s*"([^"]+)"\s*\|\s*(\d+)\]/g;
             const addCalendarTaskRegex = /\[ADD_CALENDAR_TASK:\s*"([^"]+)"\s*\|\s*(\d+)\s*\|\s*"([^"]+)"\]/g;
+            const addRegularTaskRegex = /\[ADD_REGULAR_TASK:\s*"([^"]+)"\s*\|\s*(\d+)\s*\|\s*"([^"]+)"\]/g;
             const deleteTaskRegex = /\[DELETE_TASK:\s*"([^"]+)"\]/g;
             const addRewardRegex = /\[ADD_REWARD:\s*"([^"]+)"\s*\|\s*(\d+)\]/g;
             const deleteRewardRegex = /\[DELETE_REWARD:\s*"([^"]+)"\]/g;
@@ -253,6 +259,14 @@ ${availableRewards}
                 const pts = parseInt(match[2], 10);
                 const dateStr = match[3];
                 useStore.getState().addCalendarTask(dateStr, title, pts);
+            }
+
+            // ADD_REGULAR_TASK
+            while ((match = addRegularTaskRegex.exec(responseText)) !== null) {
+                const title = match[1];
+                const pts = parseInt(match[2], 10);
+                const period = match[3];
+                useStore.getState().addRegularTask(title, pts, period);
             }
 
             // DELETE_TASK
@@ -580,18 +594,14 @@ ${availableRewards}
                         </button>
                     )}
                     <button
-                        onClick={() => {
-                            if (window.confirm('Удалить все системные логи из этого чата?')) {
-                                useStore.getState().clearSystemLogs();
-                            }
-                        }}
+                        onClick={() => setShowConfirmLogs(true)}
                         className="p-2 rounded-full transition-all text-text-secondary hover:text-warning hover:bg-warning/10 hover:scale-110"
                         title="Очистить системные логи"
                     >
                         <Trash2 size={18} />
                     </button>
                     <button
-                        onClick={clearMessages}
+                        onClick={() => setShowConfirmChat(true)}
                         className="p-2 rounded-full transition-all text-text-secondary hover:text-danger hover:bg-danger/10 hover:rotate-12 hover:scale-110"
                         title="Очистить весь чат"
                     >
@@ -786,6 +796,28 @@ ${availableRewards}
                     </button>
                 </form>
             </div>
+
+            <ConfirmModal
+                isOpen={showConfirmLogs}
+                onClose={() => setShowConfirmLogs(false)}
+                onConfirm={() => {
+                    useStore.getState().clearSystemLogs();
+                    addToast("Системные логи очищены", "info");
+                }}
+                title="Очистить системные логи?"
+                description="Все записи о выполненных действиях ИИ будут удалены из истории чата."
+            />
+
+            <ConfirmModal
+                isOpen={showConfirmChat}
+                onClose={() => setShowConfirmChat(false)}
+                onConfirm={() => {
+                    clearMessages();
+                    addToast("Чат успешно очищен", "success");
+                }}
+                title="Очистить чат с Nova?"
+                description="Вся история переписки будет безвозвратно удалена. Будет начат новый диалог."
+            />
         </div>
     );
 }

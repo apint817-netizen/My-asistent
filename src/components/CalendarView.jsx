@@ -194,21 +194,25 @@ const CalendarView = () => {
                                 {totalCount > 0 && (
                                     <div className="mt-auto w-full flex flex-col items-center gap-1 md:gap-1.5 relative z-10">
                                         {/* Task Indicators */}
-                                        <div className="flex gap-1 justify-center flex-wrap max-w-full px-1">
-                                            {Array.from({ length: Math.min(completedCount, 4) }).map((_, i) => (
-                                                <div key={`c-${i}`} className="w-1.5 h-1.5 md:w-2 md:h-2 rounded-full bg-success shadow-[0_0_5px_rgba(34,197,94,0.6)]"></div>
+                                        <div className="flex gap-1 justify-center items-center max-w-full px-1">
+                                            {Array.from({ length: Math.min(completedCount, 3) }).map((_, i) => (
+                                                <div key={`c-${i}`} className="w-1.5 h-1.5 md:w-2 md:h-2 rounded-full bg-success shadow-[0_0_5px_rgba(34,197,94,0.6)] shrink-0"></div>
                                             ))}
-                                            {Array.from({ length: Math.min(uncompletedCount, 4) }).map((_, i) => (
-                                                <div key={`u-${i}`} className={`w-1.5 h-1.5 md:w-2 md:h-2 rounded-full ${points >= 80 ? 'bg-error shadow-[0_0_5px_rgba(239,68,68,0.6)]' : points >= 40 ? 'bg-warning shadow-[0_0_5px_rgba(245,158,11,0.6)]' : 'bg-accent shadow-[0_0_5px_rgba(var(--color-accent),0.6)]'}`}></div>
+                                            {Array.from({ length: Math.min(uncompletedCount, Math.max(0, 3 - completedCount)) }).map((_, i) => (
+                                                <div key={`u-${i}`} className={`w-1.5 h-1.5 md:w-2 md:h-2 rounded-full ${points >= 80 ? 'bg-error shadow-[0_0_5px_rgba(239,68,68,0.6)]' : points >= 40 ? 'bg-warning shadow-[0_0_5px_rgba(245,158,11,0.6)]' : 'bg-accent shadow-[0_0_5px_rgba(var(--color-accent),0.6)]'} shrink-0`}></div>
                                             ))}
-                                            {(completedCount + uncompletedCount) > 8 && (
-                                                <div className="w-1.5 h-1.5 md:w-2 md:h-2 rounded-full bg-white/40"></div>
+                                            {totalCount > 3 && (
+                                                <span className="text-[7px] md:text-[8px] font-bold text-white/80 ml-0.5 leading-none">+{totalCount - 3}</span>
                                             )}
                                         </div>
                                         {/* Points Badge */}
-                                        <div className="flex flex-col items-center leading-none mt-1">
-                                            <span className="text-[8px] md:text-[9px] font-black tracking-wider px-1 text-white opacity-90">{totalCount} {totalCount === 1 ? 'задача' : (totalCount > 1 && totalCount < 5) ? 'задачи' : 'задач'}</span>
-                                            <span className={`text-[7px] md:text-[8px] tracking-wide px-1 md:px-1.5 py-0.5 rounded-sm bg-black/50 backdrop-blur-md mt-0.5 whitespace-nowrap ${points >= 80 ? 'text-error' : points >= 40 ? 'text-warning' : 'text-accent'}`}>Выполнено {tasksForDay.filter(t => t.completed).reduce((s, t) => s + t.value, 0)} из {points} очк</span>
+                                        <div className="flex flex-col items-center justify-center leading-none mt-1 w-[90%] mx-auto">
+                                            <span className="text-[8px] md:text-[9px] font-black tracking-wider text-white opacity-90 truncate w-full text-center">
+                                                {totalCount} {totalCount === 1 ? 'задача' : (totalCount % 10 >= 2 && totalCount % 10 <= 4 && (totalCount % 100 < 10 || totalCount % 100 >= 20)) ? 'задачи' : 'задач'}
+                                            </span>
+                                            <span className={`text-[7px] md:text-[8px] tracking-wide py-[2px] px-1 md:px-1.5 rounded bg-black/60 shadow-inner mt-[3px] w-full text-center truncate ${points >= 80 ? 'text-error' : points >= 40 ? 'text-warning' : 'text-accent'}`}>
+                                                {tasksForDay.filter(t => t.completed).reduce((s, t) => s + t.value, 0)} / {points} очк
+                                            </span>
                                         </div>
                                     </div>
                                 )}
@@ -260,11 +264,22 @@ const CalendarView = () => {
                                             </div>
                                         </div>
                                     </div>
-                                    {task.source === 'calendar' && (
+                                    {task.source === 'calendar' ? (
                                         <button
                                             onClick={() => deleteCalendarTask(selectedDate, task.id)}
                                             className="text-text-secondary hover:text-error transition-all duration-300 p-2 opacity-0 group-hover:opacity-100 bg-white/5 hover:bg-error/20 rounded-xl ml-2 shrink-0"
-                                            title="Удалить задачу"
+                                            title="Удалить задачу из календаря"
+                                        >
+                                            <Trash2 size={16} />
+                                        </button>
+                                    ) : (
+                                        <button
+                                            onClick={() => {
+                                                useStore.getState().deleteTaskWithReason(task.id, 'Удалено из календаря');
+                                                useStore.getState().addToast('Задача удалена с главного экрана', 'info');
+                                            }}
+                                            className="text-text-secondary hover:text-error transition-all duration-300 p-2 opacity-0 group-hover:opacity-100 bg-white/5 hover:bg-error/20 rounded-xl ml-2 shrink-0"
+                                            title="Удалить основную задачу"
                                         >
                                             <Trash2 size={16} />
                                         </button>

@@ -13,6 +13,7 @@ export default function RewardStore() {
     const refundPurchase = useStore(state => state.refundPurchase);
     const usePurchase = useStore(state => state.usePurchase);
     const addMessage = useStore(state => state.addChatMessage);
+    const addToast = useStore(state => state.addToast);
 
     const [newRewardTitle, setNewRewardTitle] = useState('');
     const [newRewardCost, setNewRewardCost] = useState(100);
@@ -64,6 +65,7 @@ export default function RewardStore() {
                 role: 'system',
                 content: `Вы потратили ${reward.cost} очков на "${reward.title}". Наслаждайтесь!`
             });
+            addToast(`Награда "${reward.title}" куплена!`, "success");
             // Optionally switch to history tab so they see their purchase
             // setActiveTab('history');
         } else {
@@ -81,6 +83,7 @@ export default function RewardStore() {
             role: 'system',
             content: `Покупка отменена. Причина: "${finalReason}". Очки возвращены на баланс.`
         });
+        addToast(`Очки за покупку возвращены`, "info");
 
         setRefundModal({ isOpen: false, purchaseId: null, reason: '' });
     };
@@ -281,6 +284,7 @@ export default function RewardStore() {
                             e.preventDefault();
                             deleteRewardWithReason(deleteRewardModal.reward.id, deleteRewardModal.reason.trim() || 'Без причины');
                             setDeleteRewardModal({ isOpen: false, reward: null, reason: '' });
+                            addToast(`Награда удалена из магазина`, "info");
                         }}>
                             <textarea
                                 className="w-full bg-black/40 border border-border rounded-lg p-3 text-sm text-white focus:border-red-500 focus:ring-1 focus:ring-red-500 outline-none mb-4 resize-none h-24"
