@@ -284,7 +284,10 @@ ${availableRewards}
             // DELETE_REWARD
             while ((match = deleteRewardRegex.exec(responseText)) !== null) {
                 const reward = findReward(match[1]);
-                if (reward) useStore.getState().deleteRewardWithReason(reward.id, 'Удалено по запросу через Nova');
+                if (reward) {
+                    useStore.getState().deleteRewardWithReason(reward.id, 'Удалено по запросу через Nova');
+                    useStore.getState().addToast(`Награда "${reward.title}" удалена`, 'info');
+                }
             }
 
             // BUY_REWARD

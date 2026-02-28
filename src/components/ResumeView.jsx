@@ -3,6 +3,10 @@ import { useStore } from '../store/useStore';
 import { Upload, FileText, Loader, CheckCircle, AlertCircle, Send, Briefcase, Brain, Zap, Heart, GraduationCap, Flame } from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
 import { callAI } from '../utils/geminiApi';
+import * as pdfjsLib from 'pdfjs-dist';
+import pdfjsWorker from 'pdfjs-dist/build/pdf.worker.mjs?url';
+
+pdfjsLib.GlobalWorkerOptions.workerSrc = pdfjsWorker;
 
 const STATUS_OPTIONS = [
     { id: 'job_search', label: 'Ищу работу', icon: Briefcase, color: 'text-blue-400' },
@@ -131,22 +135,36 @@ export default function ResumeView() {
             let parsedText = textInput.trim();
 
             if (file) {
-                const buffer = await file.arrayBuffer();
-                const base64 = btoa(
-                    new Uint8Array(buffer).reduce((data, byte) => data + String.fromCharCode(byte), '')
-                );
+                if (file.type === 'application/pdf') {
+                    // Локальный парсинг PDF через pdfjs-dist
+                    const arrayBuffer = await file.arrayBuffer();
+                    const pdf = await pdfjsLib.getDocument({ data: arrayBuffer }).promise;
+                    let text = '';
+                    for (let i = 1; i <= pdf.numPages; i++) {
+                        const page = await pdf.getPage(i);
+                        const textContent = await page.getTextContent();
+                        text += textContent.items.map(s => s.str).join(' ') + '\n';
+                    }
+                    parsedText = text || parsedText;
+                } else {
+                    // Отправляем на сервер другие форматы (DOCX, RTF)
+                    const buffer = await file.arrayBuffer();
+                    const base64 = btoa(
+                        new Uint8Array(buffer).reduce((data, byte) => data + String.fromCharCode(byte), '')
+                    );
 
-                const resp = await fetch('/api/resume', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ fileContent: base64, fileType: file.type || 'application/octet-stream' })
-                });
+                    const resp = await fetch('/api/resume', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ fileContent: base64, fileType: file.type || 'application/octet-stream' })
+                    });
 
-                const data = await resp.json();
-                if (!resp.ok) {
-                    throw new Error(data.error || 'Ошибка загрузки/парсинга файла');
+                    const data = await resp.json();
+                    if (!resp.ok) {
+                        throw new Error(data.error || 'Ошибка загрузки/парсинга файла');
+                    }
+                    parsedText = data.parsedText || parsedText;
                 }
-                parsedText = data.parsedText || parsedText;
             }
 
             const statusMap = {
