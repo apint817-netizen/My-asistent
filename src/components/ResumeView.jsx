@@ -19,6 +19,10 @@ const STATUS_OPTIONS = [
 
 // Same parser as AnalysisView
 const parseResumeCommands = (text, addTask, addReward, addCalendarTask) => {
+    if (!text || typeof text !== 'string') {
+        return { cleanText: '', tasks: [], habits: [], calendarTasks: [], rewards: [] };
+    }
+
     const taskRegex = /\[TASK:\s*"([^"]+)"\s*\|\s*(\d+)\]/g;
     const futureRegex = /\[CALENDAR_TASK:\s*"([^"]+)"\s*\|\s*(\d+)\s*\|\s*([^\]]+)\]/g;
     const habitRegex = /\[HABIT:\s*"([^"]+)"\s*\|\s*(\d+)\]/g;
@@ -31,16 +35,20 @@ const parseResumeCommands = (text, addTask, addReward, addCalendarTask) => {
     const rewards = [];
 
     while ((match = taskRegex.exec(text)) !== null) {
-        tasks.push({ title: match[1], points: parseInt(match[2], 10) });
+        const pts = parseInt(match[2], 10);
+        tasks.push({ title: match[1], points: isNaN(pts) ? 10 : pts });
     }
     while ((match = futureRegex.exec(text)) !== null) {
-        calendarTasks.push({ title: match[1], points: parseInt(match[2], 10), date: match[3].trim() });
+        const pts = parseInt(match[2], 10);
+        calendarTasks.push({ title: match[1], points: isNaN(pts) ? 10 : pts, date: match[3].trim() });
     }
     while ((match = habitRegex.exec(text)) !== null) {
-        habits.push({ title: match[1], points: parseInt(match[2], 10) });
+        const pts = parseInt(match[2], 10);
+        habits.push({ title: match[1], points: isNaN(pts) ? 10 : pts });
     }
     while ((match = rewardRegex.exec(text)) !== null) {
-        rewards.push({ title: match[1], cost: parseInt(match[2], 10) });
+        const cst = parseInt(match[2], 10);
+        rewards.push({ title: match[1], cost: isNaN(cst) ? 50 : cst });
     }
 
     let cleanText = text
@@ -136,16 +144,24 @@ export default function ResumeView() {
 
             if (file) {
                 if (file.type === 'application/pdf') {
-                    // Локальный парсинг PDF через pdfjs-dist
-                    const arrayBuffer = await file.arrayBuffer();
-                    const pdf = await pdfjsLib.getDocument({ data: arrayBuffer }).promise;
-                    let text = '';
-                    for (let i = 1; i <= pdf.numPages; i++) {
-                        const page = await pdf.getPage(i);
-                        const textContent = await page.getTextContent();
-                        text += textContent.items.map(s => s.str).join(' ') + '\n';
+                    try {
+                        // Локальный парсинг PDF через pdfjs-dist
+                        const arrayBuffer = await file.arrayBuffer();
+                        const pdf = await pdfjsLib.getDocument({ data: arrayBuffer }).promise;
+                        let text = '';
+                        for (let i = 1; i <= pdf.numPages; i++) {
+                            const page = await pdf.getPage(i);
+                            const textContent = await page.getTextContent();
+                            text += textContent.items.map(s => s.str).join(' ') + '\n';
+                        }
+                        if (!text.trim()) {
+                            throw new Error("Не удалось извлечь текст из PDF. Возможно, это скан без текстового слоя.");
+                        }
+                        parsedText = text;
+                    } catch (pdfErr) {
+                        console.error("Ошибка чтения PDF:", pdfErr);
+                        throw new Error(`Не удалось прочитать PDF: ${pdfErr.message}`);
                     }
-                    parsedText = text || parsedText;
                 } else {
                     // Отправляем на сервер другие форматы (DOCX, RTF)
                     const buffer = await file.arrayBuffer();
@@ -194,7 +210,7 @@ export default function ResumeView() {
 Отвечай по-русски. Будь конкретным и полезным. Не лей воду.`;
 
             let textToSend = parsedText;
-            const SAFE_LIMIT = 8000;
+            const SAFE_LIMIT = 4500;
             if (textToSend.length > SAFE_LIMIT) {
                 textToSend = textToSend.substring(0, SAFE_LIMIT) + '\n...[Текст обрезан для экономии ИИ-ресурсов. Основная суть сохранена]';
                 console.warn(`Text truncated from ${parsedText.length} to ${SAFE_LIMIT} chars`);
@@ -206,7 +222,6 @@ export default function ResumeView() {
             const model = aiProvider === 'google' ? (googleModel || 'gemini-2.0-flash') : (proxyParams.model || 'gemini-2.0-flash');
             const aiResponse = await callAI({
                 baseUrl: aiProvider === 'google' ? 'https://generativelanguage.googleapis.com/v1beta/openai' : proxyParams.url,
-                // Форсируем пустой ключ для google, чтобы использовался серверный ключ из Vercel
                 apiKey: key,
                 model: model,
                 systemPrompt,

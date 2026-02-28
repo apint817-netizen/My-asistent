@@ -396,13 +396,6 @@ ${calendarStr}
                                 <Search size={16} />
                             </button>
                         )}
-                        <button
-                            onClick={() => setShowConfirmChat(true)}
-                            className="p-2 rounded-full transition-all text-text-secondary hover:text-danger hover:bg-danger/10 hover:rotate-12 hover:scale-110"
-                            title="Очистить весь чат"
-                        >
-                            <Eraser size={18} />
-                        </button>
                     </div>
                 </div>
 

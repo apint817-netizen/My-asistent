@@ -118,6 +118,8 @@ export default async function handler(req, res) {
                     } else if (resp.status >= 500) {
                         console.warn(`[Gemini] Ошибка сервера 5xx для ${currentModel}, пробуем fallback...`);
                     } else {
+                        console.error(`[Gemini] CRITICAL ${resp.status} on ${currentModel}:`, textError);
+                        console.error(`[Gemini] Payload was:`, JSON.stringify(geminiBody).substring(0, 1000) + '...');
                         const errorMsg = `Google API Error ${resp.status}: ${textError}`;
                         const errorObj = new Error(errorMsg);
                         errorObj.status = resp.status;
