@@ -1,30 +1,36 @@
-export default async function handler(req, res) {
+export const config = {
+    runtime: 'edge',
+};
+
+export default async function handler(req) {
     if (req.method !== 'POST') {
-        return res.status(405).json({ error: 'Method Not Allowed' });
+        return new Response(JSON.stringify({ error: 'Method Not Allowed' }), {
+            status: 405,
+            headers: { 'Content-Type': 'application/json' },
+        });
     }
 
     try {
-        const { model, messages, temperature = 0.9, max_tokens = 2048 } = req.body;
+        const bodyText = await req.text();
+        const requestData = JSON.parse(bodyText);
+        const { model, messages, temperature = 0.9, max_tokens = 2048 } = requestData;
 
-        const authHeader = req.headers.authorization || '';
+        const authHeader = req.headers.get('authorization') || '';
         let clientKey = authHeader.startsWith('Bearer ') ? authHeader.substring(7).trim() : null;
         if (clientKey === 'undefined' || clientKey === 'null' || clientKey === '') {
             clientKey = null;
         }
 
-        // Собираем все доступные ключи (по приоритету):
-        // 1. Ключ пользователя из UI (если есть)
-        // 2. Основной серверный ключ из Vercel ENV
-        // 3. Резервный ключ (fallback_key) из test-real-key.mjs
-        const envKey = process.env.GOOGLE_API_KEY || null;
-        const backupKey = "AIzaSyB9JNryZQwrYw8aNhplNaVz2kB-TnT88Nc";
+        // Ключ пользователя должен быть ТОЛЬКО в переменных окружения (Vercel)
+        // В Edge Runtime иногда process.env не существует напрямую, используется глобальный process
+        const envKey = typeof process !== 'undefined' && process.env ? process.env.GOOGLE_API_KEY : null;
+        const apiKey = clientKey || envKey;
 
-        let validKeys = [clientKey, envKey, backupKey].filter(k => k && k.trim() !== '' && k !== 'undefined' && k !== 'null');
-        // Убираем дубликаты
-        validKeys = [...new Set(validKeys)];
-
-        if (validKeys.length === 0) {
-            return res.status(500).json({ error: 'API Key не настроен. Добавьте GOOGLE_API_KEY в переменные окружения Vercel.' });
+        if (!apiKey) {
+            return new Response(JSON.stringify({ error: 'API Key не настроен. Добавьте GOOGLE_API_KEY в переменные окружения Vercel.' }), {
+                status: 500,
+                headers: { 'Content-Type': 'application/json' },
+            });
         }
 
         let targetModel = model || 'gemini-2.0-flash';
@@ -76,95 +82,72 @@ export default async function handler(req, res) {
         };
 
         // Расширенная fallback-цепочка: от новейших к самым стабильным
-        let fallbackChain = [
-            targetModel,
+        let modelsToTry = [
+            targetModel.startsWith('models/') ? targetModel.replace('models/', '') : targetModel,
             'gemini-2.5-flash',
             'gemini-2.0-flash',
-            'gemini-2.0-flash-lite',
-            'gemini-1.5-flash',
-            'gemini-1.5-pro'
+            'gemini-2.0-flash-lite'
         ];
 
         // Убираем дубликаты
-        fallbackChain = [...new Set(fallbackChain)];
+        modelsToTry = [...new Set(modelsToTry)];
 
-        let errors = [];
+        let result = null;
+        let lastError = null;
 
-        // Внешний цикл по ключам
-        for (let k = 0; k < validKeys.length; k++) {
-            const currentApiKey = validKeys[k];
-            let isKeyExhausted = false;
-
-            // Внутренний цикл по моделям
-            for (let i = 0; i < fallbackChain.length; i++) {
-                if (isKeyExhausted) break; // Если текущий ключ мертв/исчерпан для всех моделей, переходим к следующему
-
-                const currentModel = fallbackChain[i];
-                try {
-                    const resp = await fetch(
-                        `https://generativelanguage.googleapis.com/v1beta/models/${currentModel}:generateContent?key=${currentApiKey}`,
-                        { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(geminiBody) }
-                    );
-
-                    if (resp.ok) {
-                        const data = await resp.json();
-                        if (data.candidates && data.candidates.length > 0 && data.candidates[0].content && data.candidates[0].content.parts && data.candidates[0].content.parts.length > 0) {
-                            return res.status(200).json({
-                                choices: [{ message: { role: 'assistant', content: data.candidates[0].content.parts[0].text } }],
-                                usage: { total_tokens: data.usageMetadata?.totalTokenCount || 0 },
-                                model_used: currentModel
-                            });
-                        } else if (data.error) {
-                            if (data.error.code === 404) {
-                                console.warn(`[Gemini] Модель ${currentModel} не найдена, пробуем следующую...`);
-                                errors.push(`[Key ${k}] 404: Модель ${currentModel} не найдена`);
-                            } else if (data.error.code === 429) {
-                                console.warn(`[Gemini] Лимит запросов (429) для ключа ${k} + модель ${currentModel}`);
-                                errors.push(`[Key ${k}] 429: Лимит запросов для ${currentModel}`);
-                                isKeyExhausted = true; // С одним ключом лимит обычно распространяется на все модели, но можем дать шанс следующему ключу
-                            } else {
-                                throw new Error(data.error.message || JSON.stringify(data.error));
-                            }
-                        } else {
-                            throw new Error('Пустой ответ или неправильный формат от Gemini API: ' + JSON.stringify(data));
-                        }
-                    } else if (!resp.ok) {
-                        const textError = await resp.text();
-
-                        if (resp.status === 404) {
-                            console.warn(`[Gemini] Ошибка 404 для ${currentModel} (Key ${k})`);
-                            errors.push(`[Key ${k}] 404 для ${currentModel}: ${textError}`);
-                        } else if (resp.status === 429) {
-                            console.warn(`[Gemini] Лимит 429 для ${currentModel} (Key ${k})`);
-                            errors.push(`[Key ${k}] 429 для ${currentModel}: ${textError}`);
-                            isKeyExhausted = true; // Переключаемся на следующий ключ
-                        } else if (resp.status >= 500) {
-                            console.warn(`[Gemini] Ошибка сервера 5xx для ${currentModel} (Key ${k})`);
-                            errors.push(`[Key ${k}] 5xx для ${currentModel}: ${textError}`);
-                        } else {
-                            console.error(`[Gemini] CRITICAL ${resp.status} on ${currentModel} (Key ${k}):`, textError);
-                            errors.push(`[Key ${k}] CRITICAL ${resp.status} для ${currentModel}: ${textError}`);
-                            const errorObj = new Error(`Google API Error ${resp.status}: ${textError}`);
-                            errorObj.status = resp.status;
-                            throw errorObj;
-                        }
-                    }
-
-                } catch (err) {
-                    console.warn(`[Gemini] Исключение при вызове ${currentModel} на Key ${k}: ${err.message}`);
-                    errors.push(`[Key ${k}] ${currentModel} -> ${err.message || JSON.stringify(err)}`);
-
-                    if (err.status === 400 || err.status === 403) {
-                        isKeyExhausted = true; // Ключ невалидный, сразу переходим к следующему ключу
-                    }
-                }
+        for (const m of modelsToTry) {
+            try {
+                result = await callGemini(m);
+                break;
+            } catch (e) {
+                lastError = e;
+                // Только при 401/403 (неверный ключ) нет смысла пробовать другие модели
+                if (e.status === 401 || e.status === 403) break;
+                console.warn(`Fallback: Model ${m} failed:`, e.message);
+                continue;
             }
         }
 
-        return res.status(500).json({ error: `Все модели fallback-цепочки недоступны. Ошибки: ${errors.join(', ')}` });
+        // Крайний случай - пробуем найти доступную модель программно
+        if (!result) {
+            try {
+                const listRes = await fetch(`https://generativelanguage.googleapis.com/v1beta/models?key=${apiKey}`);
+                if (listRes.ok) {
+                    const listData = await listRes.json();
+                    const available = (listData.models || [])
+                        .filter(m => m.supportedGenerationMethods?.includes('generateContent'))
+                        .map(m => m.name.replace('models/', ''));
 
-    } catch (err) {
-        console.error('Chat API Error:', err);
-        return res.status(500).json({ error: 'Ошибка сервера: ' + err.message });
+                    const bestModel = available.find(m => m.includes('flash')) || available[0];
+                    if (bestModel) {
+                        result = await callGemini(bestModel);
+                    }
+                }
+            } catch (e) {
+                console.warn('Dynamic lookup failed');
+            }
+        }
+
+        if (!result) {
+            throw lastError || new Error('All models failed');
+        }
+
+        const text = result.data.candidates?.[0]?.content?.parts?.[0]?.text || '';
+
+        return new Response(JSON.stringify({
+            choices: [{ message: { role: 'assistant', content: text } }],
+            usage: { total_tokens: result.data.usageMetadata?.totalTokenCount || 0 },
+            model_used: result.model
+        }), {
+            status: 200,
+            headers: { 'Content-Type': 'application/json' },
+        });
+
+    } catch (error) {
+        console.error('AI Error:', error.message);
+        return new Response(JSON.stringify({ error: error.message || 'Internal error' }), {
+            status: 500,
+            headers: { 'Content-Type': 'application/json' },
+        });
     }
 }

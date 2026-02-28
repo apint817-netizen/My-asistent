@@ -1,38 +1,50 @@
-export default async function handler(req, res) {
+export const config = {
+    runtime: 'edge',
+};
+
+export default async function handler(req) {
     if (req.method !== 'POST') {
-        return res.status(405).json({ error: 'Method Not Allowed' });
+        return new Response(JSON.stringify({ error: 'Method Not Allowed' }), {
+            status: 405,
+            headers: { 'Content-Type': 'application/json' },
+        });
     }
 
     try {
-        const { text, type } = req.body; // type: 'task' | 'reward'
+        const { text, type } = await req.json(); // type: 'task' | 'reward'
 
         // Получаем ключ от клиента (если пользователь ввел его в настройках)
-        const authHeader = req.headers.authorization || '';
+        const authHeader = req.headers.get('authorization') || '';
         let clientKey = authHeader.startsWith('Bearer ') ? authHeader.substring(7).trim() : null;
         if (clientKey === 'undefined' || clientKey === 'null' || clientKey === '') {
             clientKey = null;
         }
 
-        // Собираем все доступные ключи (по приоритету)
-        const envKey = process.env.GOOGLE_API_KEY || null;
-        const backupKey = "AIzaSyB9JNryZQwrYw8aNhplNaVz2kB-TnT88Nc";
+        const envKey = typeof process !== 'undefined' && process.env ? process.env.GOOGLE_API_KEY : null;
+        const apiKey = clientKey || envKey;
 
-        let validKeys = [clientKey, envKey, backupKey].filter(k => k && k.trim() !== '' && k !== 'undefined' && k !== 'null');
-        validKeys = [...new Set(validKeys)];
-
-        if (validKeys.length === 0) {
-            // Нет ключей — пропускаем валидацию, не блокируем пользователя
-            return res.status(200).json({ valid: true });
+        if (!apiKey) {
+            // Нет ключа — пропускаем валидацию, не блокируем пользователя
+            return new Response(JSON.stringify({ valid: true }), {
+                status: 200,
+                headers: { 'Content-Type': 'application/json' },
+            });
         }
 
         if (!text || !text.trim()) {
-            return res.status(200).json({ valid: false, reason: 'Текст не может быть пустым' });
+            return new Response(JSON.stringify({ valid: false, reason: 'Текст не может быть пустым' }), {
+                status: 200,
+                headers: { 'Content-Type': 'application/json' },
+            });
         }
 
         // Быстрая локальная проверка на мусор (до обращения к ИИ)
         const cleaned = text.trim();
         if (cleaned.length < 2) {
-            return res.status(200).json({ valid: false, reason: 'Слишком короткий текст' });
+            return new Response(JSON.stringify({ valid: false, reason: 'Слишком короткий текст' }), {
+                status: 200,
+                headers: { 'Content-Type': 'application/json' },
+            });
         }
 
         // Проверка на случайные буквы/цифры
@@ -41,33 +53,34 @@ export default async function handler(req, res) {
         const keyboardSmashPattern = /^(qwe|asd|zxc|йцу|фыв|ячс|123|qwer|asdf|zxcv)/i;
 
         if (allSymbolsPattern.test(cleaned) || repeatingPattern.test(cleaned) || keyboardSmashPattern.test(cleaned)) {
-            return res.status(200).json({
+            return new Response(JSON.stringify({
                 valid: false,
                 reason: 'Похоже на случайный набор символов. Введите осмысленное название.'
+            }), {
+                status: 200,
+                headers: { 'Content-Type': 'application/json' },
             });
         }
 
-        const model = 'gemini-2.0-flash';
-        const systemPrompt = `Ты строгий модератор для приложения-планировщика.
-Пользователь пытается добавить новый элемент типа: "${type === 'task' ? 'Задача' : 'Награда'}".
-Название: "${text}"
+        const prompt = `Ты строгий валидатор ввода. Пользователь вводит название для ${type === 'reward' ? 'награды' : 'задачи'}.
 
-Твоя цель: оценить адекватность, безопасность и осмысленность этого названия.
+Текст: "${cleaned}"
 
-Не пропускай:
-1. Бессмысленный набор букв (например, "asdasd", "123123", "ghj").
-2. Оскорбления, мат, деструктивный или опасный контент.
-3. Слишком короткие неясные слова (например, просто "а", "й").
+Ответь СТРОГО в JSON формате:
+{"valid": true} — если текст осмысленный (названия действий, предметов, целей, даже из 1 слова, например "Кофе", "Сон", "Книга").
+{"valid": false, "reason": "причина"} — если это случайный набор букв ("asdasd", "ghjghj", "пвкпв", "вфыв"), цифр, мусор или оскорбление.
 
-Формат ответа СТРОГО JSON:
-{"valid": true|false, "reason": "Краткая причина отказа, если valid=false, иначе пустая строка"}
-Отвечай только JSON-ом, без пояснений.`;
+КРИТИЧЕСКИ ВАЖНО: 
+- Отсекай любой текст, который выглядит как случайные нажатия по клавиатуре (keyboard smash). 
+- Если это не существующее слово или не аббревиатура - отклоняй.
+- Короткие реальные слова ("чай", "бег") - одобряй.
+- Отвечай ТОЛЬКО JSON объектом, без лишнего текста.`;
 
         const body = {
             contents: [
                 {
                     role: 'user',
-                    parts: [{ text: systemPrompt }]
+                    parts: [{ text: prompt }]
                 }
             ],
             generationConfig: {
@@ -76,78 +89,75 @@ export default async function handler(req, res) {
             }
         };
 
-        const fallbackChain = ['gemini-1.5-flash-latest', 'gemini-1.5-pro-latest', 'gemini-pro'];
-
-        let errors = [];
-
-        // Внешний цикл по ключам
-        for (let k = 0; k < validKeys.length; k++) {
-            const currentApiKey = validKeys[k];
-            let isKeyExhausted = false;
-
-            for (let i = 0; i < fallbackChain.length; i++) {
-                if (isKeyExhausted) break;
-
-                const currentModel = fallbackChain[i];
-                try {
-                    const resp = await fetch(
-                        `https://generativelanguage.googleapis.com/v1beta/models/${currentModel}:generateContent?key=${currentApiKey}`,
-                        {
-                            method: 'POST',
-                            headers: { 'Content-Type': 'application/json' },
-                            body: JSON.stringify(body)
-                        }
-                    );
-
-                    if (resp.ok) {
-                        const data = await resp.json();
-                        const aiText = data.candidates?.[0]?.content?.parts?.[0]?.text || '';
-                        const jsonMatch = aiText.match(/\{([^}]+)\}/);
-
-                        return res.status(200).json(jsonMatch ? JSON.parse(jsonMatch[0]) : { valid: false, reason: 'Ошибка валидации (неверный формат)' });
-                    } else {
-                        const errorData = await resp.json();
-                        if (errorData.error) {
-                            if (errorData.error.code === 404) {
-                                console.warn(`[Gemini-Validate] Модель ${currentModel} не найдена, пробуем следующую...`);
-                                errors.push(`[Key ${k}] 404: Модель не найдена`);
-                            } else if (errorData.error.code === 429) {
-                                console.warn(`[Gemini-Validate] Лимит запросов (429) для ключа ${k}, пробуем следующий ключ...`);
-                                errors.push(`[Key ${k}] 429: Лимит запросов`);
-                                isKeyExhausted = true;
-                            } else if (errorData.error.code >= 500) {
-                                console.warn(`[Gemini-Validate] Ошибка сервера 5xx для ${currentModel}, пробуем следующую...`);
-                                errors.push(`[Key ${k}] 5xx: Ошибка сервера`);
-                            } else {
-                                const errorMsg = errorData.error.message || JSON.stringify(errorData.error);
-                                const errorObj = new Error(errorMsg);
-                                errorObj.status = errorData.error.code; // code contains HTTP status like 400
-                                throw errorObj;
-                            }
-                        } else {
-                            const errorMsg = `Google API Error ${resp.status}: ${JSON.stringify(errorData)}`;
-                            const errorObj = new Error(errorMsg);
-                            errorObj.status = resp.status;
-                            throw errorObj;
-                        }
-                    }
-
-                } catch (err) {
-                    console.warn(`[Gemini-Validate] Исключение при вызове ${currentModel}: ${err.message}`);
-                    errors.push(`[Key ${k}] ${err.message || JSON.stringify(err)}`);
-
-                    if (err.status === 400 || err.status === 403) {
-                        isKeyExhausted = true;
-                    }
+        // Функция вызова модели
+        const callGemini = async (modelName) => {
+            const clean = modelName.startsWith('models/') ? modelName.replace('models/', '') : modelName;
+            const resp = await fetch(
+                `https://generativelanguage.googleapis.com/v1beta/models/${clean}:generateContent?key=${apiKey}`,
+                {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(body)
                 }
+            );
+            if (!resp.ok) {
+                const text = await resp.text();
+                const status = resp.status;
+                const err = new Error(`${status} on ${clean}: ${text.substring(0, 200)}`);
+                err.status = status;
+                throw err;
+            }
+            return resp.json();
+        };
+
+        // Fallback-цепочка моделей
+        const modelsToTry = ['gemini-2.0-flash', 'gemini-2.5-flash', 'gemini-2.0-flash-lite'];
+        let data = null;
+        let lastError = null;
+
+        for (const m of modelsToTry) {
+            try {
+                data = await callGemini(m);
+                break;
+            } catch (e) {
+                lastError = e;
+                if (e.status === 401 || e.status === 403) break; // Неверный ключ
+                console.warn(`Validate fallback: Model ${m} failed:`, e.message);
+                continue;
             }
         }
 
-        return res.status(500).json({ error: `Все модели fallback-цепочки недоступны. Ошибки: ${errors.join(', ')}` });
+        if (!data) {
+            // При ошибке — пропускаем валидацию, не блокируем пользователя
+            console.warn('All validation models failed, passing through');
+            return new Response(JSON.stringify({ valid: true }), {
+                status: 200,
+                headers: { 'Content-Type': 'application/json' },
+            });
+        }
 
-    } catch (err) {
-        console.error('Validate API Error:', err);
-        // При ошибке валидатора просто разрешаем создание, чтобы не блокировать UI намертво
-        return res.status(200).json({ valid: true });
+        const aiText = data.candidates?.[0]?.content?.parts?.[0]?.text || '';
+
+        // Извлекаем JSON из ответа
+        const jsonMatch = aiText.match(/\{[^}]+\}/);
+        if (jsonMatch) {
+            const result = JSON.parse(jsonMatch[0]);
+            return new Response(JSON.stringify(result), {
+                status: 200,
+                headers: { 'Content-Type': 'application/json' },
+            });
+        }
+
+        return new Response(JSON.stringify({ valid: true }), {
+            status: 200,
+            headers: { 'Content-Type': 'application/json' },
+        });
+
+    } catch (error) {
+        console.warn('Validation error with AI fallback to valid=true:', error.message);
+        return new Response(JSON.stringify({ valid: true }), {
+            status: 200,
+            headers: { 'Content-Type': 'application/json' },
+        });
     }
 }
