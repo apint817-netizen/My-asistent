@@ -69,6 +69,7 @@ export default function ResumeView() {
     const aiProvider = useStore(state => state.aiProvider);
     const proxyParams = useStore(state => state.proxyParams);
     const apiKey = useStore(state => state.apiKey);
+    const aiTokensUsed = useStore(state => state.aiTokensUsed);
 
     const [file, setFile] = useState(null);
     const [textInput, setTextInput] = useState('');
@@ -278,6 +279,12 @@ export default function ResumeView() {
                     <div>
                         <h3 className="font-bold text-white">Анализ резюме</h3>
                         <p className="text-xs text-text-secondary">Загрузите резюме и получите план действий</p>
+                    </div>
+                    <div className="ml-auto">
+                        <div className="bg-white/5 border border-white/10 px-3 py-1.5 rounded-lg flex flex-col items-center">
+                            <span className="text-[10px] text-text-secondary uppercase font-bold tracking-wider mb-0.5">Токены ИИ</span>
+                            <span className="text-sm font-bold text-emerald-400 font-mono tracking-tight">{aiTokensUsed?.toLocaleString() || 0}</span>
+                        </div>
                     </div>
                 </div>
 

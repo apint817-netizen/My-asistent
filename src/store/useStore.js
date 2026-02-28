@@ -5,6 +5,7 @@ export const useStore = create(
   persist(
     (set) => ({
       tokens: 0,
+      aiTokensUsed: 0,
       streak: 0,
       lastActiveDate: null,
       tasks: [
@@ -59,6 +60,7 @@ export const useStore = create(
         }, 3000);
       },
       removeToast: (id) => set(state => ({ toasts: state.toasts.filter(t => t.id !== id) })),
+      addAiTokensUsed: (amount) => set((state) => ({ aiTokensUsed: (state.aiTokensUsed || 0) + amount })),
       addTokens: (amount, title = 'Выполнение задачи') => set((state) => ({
         tokens: state.tokens + amount,
         pointsHistory: [{

@@ -4,6 +4,7 @@
  * При локальной разработке (`npm run dev`) делаем прямой запрос в Google, 
  * так как локального Vercel сервера под `/api` нет.
  */
+import { useStore } from '../store/useStore';
 
 const GOOGLE_OPENAI_BASE = 'https://generativelanguage.googleapis.com/v1beta/openai';
 
@@ -129,20 +130,31 @@ export async function callAI({ baseUrl, apiKey, model, systemPrompt, history, us
             }
 
             const data = await res.json();
+
+            if (data.usageMetadata?.totalTokenCount) {
+                useStore.getState().addAiTokensUsed(data.usageMetadata.totalTokenCount);
+            }
+
             const textResponse = data.candidates?.[0]?.content?.parts?.[0]?.text;
             if (!textResponse) throw new Error('Пустой ответ от ИИ');
             return textResponse;
         } catch (err) {
             console.warn("Локальный Google API недоступен или исчерпан лимит:", err.message);
-            console.warn("🔄 Переключаемся на локальный Antigravity Fallback (127.0.0.1:8045)...");
 
-            const fallbackRes = await fetch(`http://127.0.0.1:8045/v1/chat/completions`, {
+            const proxyConf = useStore.getState().proxyParams;
+            if (!proxyConf || !proxyConf.url) {
+                throw err;
+            }
+
+            console.warn(`🔄 Переключаемся на локальный прокси (${proxyConf.url})...`);
+
+            const fallbackRes = await fetch(`${proxyConf.url.replace(/\/+$/, '')}/chat/completions`, {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
-                    'Authorization': 'Bearer sk-antigravity'
+                    'Authorization': `Bearer ${proxyConf.key || 'sk-antigravity'}`
                 },
-                body: JSON.stringify(body) // proxy понимает OpenAI формат
+                body: JSON.stringify({ ...body, model: proxyConf.model || 'gemini-2.0-flash' })
             });
 
             if (!fallbackRes.ok) {
@@ -151,6 +163,11 @@ export async function callAI({ baseUrl, apiKey, model, systemPrompt, history, us
             }
 
             const fallbackData = await fallbackRes.json();
+
+            if (fallbackData.usage?.total_tokens) {
+                useStore.getState().addAiTokensUsed(fallbackData.usage.total_tokens);
+            }
+
             if (fallbackData.choices && fallbackData.choices[0]?.message?.content) {
                 return fallbackData.choices[0].message.content;
             }
@@ -187,6 +204,10 @@ export async function callAI({ baseUrl, apiKey, model, systemPrompt, history, us
     }
 
     const data = await res.json();
+
+    if (data.usage?.total_tokens) {
+        useStore.getState().addAiTokensUsed(data.usage.total_tokens);
+    }
 
     if (data.choices && data.choices[0]?.message?.content) {
         return data.choices[0].message.content;
