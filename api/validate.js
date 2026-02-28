@@ -74,6 +74,8 @@ export default async function handler(req, res) {
 
         const fallbackChain = ['gemini-1.5-flash-latest', 'gemini-1.5-pro-latest', 'gemini-pro'];
 
+        let lastErrorMsg = '';
+
         for (let i = 0; i < fallbackChain.length; i++) {
             const currentModel = fallbackChain[i];
             try {
@@ -97,10 +99,13 @@ export default async function handler(req, res) {
                     if (errorData.error) {
                         if (errorData.error.code === 404) {
                             console.warn(`[Gemini-Validate] Модель ${currentModel} не найдена, пробуем следующую...`);
+                            lastErrorMsg = `404: Модель не найдена`;
                         } else if (errorData.error.code === 429) {
                             console.warn(`[Gemini-Validate] Лимит запросов (429) для ${currentModel}, пробуем следующую...`);
+                            lastErrorMsg = `429: Лимит запросов`;
                         } else if (errorData.error.code >= 500) {
                             console.warn(`[Gemini-Validate] Ошибка сервера 5xx для ${currentModel}, пробуем следующую...`);
+                            lastErrorMsg = `5xx: Ошибка сервера`;
                         } else {
                             const errorMsg = errorData.error.message || JSON.stringify(errorData.error);
                             const errorObj = new Error(errorMsg);
@@ -117,11 +122,12 @@ export default async function handler(req, res) {
 
             } catch (err) {
                 console.warn(`[Gemini-Validate] Исключение при вызове ${currentModel}: ${err.message}`);
+                lastErrorMsg = err.message || JSON.stringify(err);
                 if (err.status === 400 || err.status === 403 || i === fallbackChain.length - 1) throw err;
             }
         }
 
-        return res.status(500).json({ error: 'Все модели fallback-цепочки недоступны' });
+        return res.status(500).json({ error: `Все модели fallback-цепочки недоступны. Последняя ошибка: ${lastErrorMsg}` });
 
     } catch (err) {
         console.error('Validate API Error:', err);
