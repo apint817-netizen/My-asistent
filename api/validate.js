@@ -20,10 +20,20 @@ export default async function handler(req) {
             clientKey = null;
         }
 
-        const envKey = typeof process !== 'undefined' && process.env ? process.env.GOOGLE_API_KEY : null;
-        const apiKey = clientKey || envKey;
+        const envKeyRaw = typeof process !== 'undefined' && process.env ? process.env.GOOGLE_API_KEY : null;
 
-        if (!apiKey) {
+        let validKeys = [];
+        if (clientKey) validKeys.push(clientKey);
+
+        if (envKeyRaw) {
+            // Разделяем по запятым, если в Vercel введено несколько ключей (Multi-Key)
+            const envKeys = envKeyRaw.split(',').map(k => k.trim()).filter(k => k.length > 0);
+            validKeys.push(...envKeys);
+        }
+
+        validKeys = [...new Set(validKeys)];
+
+        if (validKeys.length === 0) {
             // Нет ключа — пропускаем валидацию, не блокируем пользователя
             return new Response(JSON.stringify({ valid: true }), {
                 status: 200,
@@ -90,10 +100,10 @@ export default async function handler(req) {
         };
 
         // Функция вызова модели
-        const callGemini = async (modelName) => {
+        const callGemini = async (modelName, currentKey) => {
             const clean = modelName.startsWith('models/') ? modelName.replace('models/', '') : modelName;
             const resp = await fetch(
-                `https://generativelanguage.googleapis.com/v1beta/models/${clean}:generateContent?key=${apiKey}`,
+                `https://generativelanguage.googleapis.com/v1beta/models/${clean}:generateContent?key=${currentKey}`,
                 {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
@@ -103,7 +113,7 @@ export default async function handler(req) {
             if (!resp.ok) {
                 const text = await resp.text();
                 const status = resp.status;
-                const err = new Error(`${status} on ${clean}: ${text.substring(0, 200)}`);
+                const err = new Error(`HTTP ${status}: ${text.substring(0, 300)}`);
                 err.status = status;
                 throw err;
             }
@@ -111,25 +121,35 @@ export default async function handler(req) {
         };
 
         // Fallback-цепочка моделей
-        const modelsToTry = ['gemini-2.0-flash', 'gemini-2.5-flash', 'gemini-2.0-flash-lite'];
+        const modelsToTry = ['gemini-2.0-flash', 'gemini-1.5-flash', 'gemini-2.0-flash-lite'];
         let data = null;
-        let lastError = null;
+        let errors = [];
 
-        for (const m of modelsToTry) {
-            try {
-                data = await callGemini(m);
-                break;
-            } catch (e) {
-                lastError = e;
-                if (e.status === 401 || e.status === 403) break; // Неверный ключ
-                console.warn(`Validate fallback: Model ${m} failed:`, e.message);
-                continue;
+        for (let k = 0; k < validKeys.length; k++) {
+            const currentKey = validKeys[k];
+            let isKeyExhausted = false;
+
+            for (const m of modelsToTry) {
+                if (isKeyExhausted) break;
+
+                try {
+                    data = await callGemini(m, currentKey);
+                    break;
+                } catch (e) {
+                    errors.push(`[Key ${k} - ${m}] ${e.message}`);
+                    if (e.status === 400 || e.status === 401 || e.status === 403 || e.status === 429) {
+                        isKeyExhausted = true; // Неверный ключ или лимиты исчерпаны
+                    }
+                    console.warn(`Validate fallback: Model ${m} with Key ${k} failed:`, e.message);
+                    continue;
+                }
             }
+            if (data) break;
         }
 
         if (!data) {
             // При ошибке — пропускаем валидацию, не блокируем пользователя
-            console.warn('All validation models failed, passing through');
+            console.warn(`All validation models failed, passing through. Last Error: ${errors[errors.length - 1]}`);
             return new Response(JSON.stringify({ valid: true }), {
                 status: 200,
                 headers: { 'Content-Type': 'application/json' },

@@ -23,11 +23,22 @@ export default async function handler(req) {
 
         // Ключ пользователя должен быть ТОЛЬКО в переменных окружения (Vercel)
         // В Edge Runtime иногда process.env не существует напрямую, используется глобальный process
-        const envKey = typeof process !== 'undefined' && process.env ? process.env.GOOGLE_API_KEY : null;
-        const apiKey = clientKey || envKey;
+        const envKeyRaw = typeof process !== 'undefined' && process.env ? process.env.GOOGLE_API_KEY : null;
 
-        if (!apiKey) {
-            return new Response(JSON.stringify({ error: 'API Key не настроен. Добавьте GOOGLE_API_KEY в переменные окружения Vercel.' }), {
+        let validKeys = [];
+        if (clientKey) validKeys.push(clientKey);
+
+        if (envKeyRaw) {
+            // Разделяем по запятым, если в Vercel введено несколько ключей (Multi-Key)
+            const envKeys = envKeyRaw.split(',').map(k => k.trim()).filter(k => k.length > 0);
+            validKeys.push(...envKeys);
+        }
+
+        // Убираем дубликаты
+        validKeys = [...new Set(validKeys)];
+
+        if (validKeys.length === 0) {
+            return new Response(JSON.stringify({ error: 'API Key не настроен. Добавьте GOOGLE_API_KEY в переменные окружения Vercel (можно несколько через запятую).' }), {
                 status: 500,
                 headers: { 'Content-Type': 'application/json' },
             });
@@ -65,16 +76,16 @@ export default async function handler(req) {
             geminiBody.system_instruction = { parts: [{ text: systemInstruction }] };
         }
 
-        const callGemini = async (modelName) => {
+        const callGemini = async (modelName, currentKey) => {
             const clean = modelName.startsWith('models/') ? modelName.replace('models/', '') : modelName;
             const resp = await fetch(
-                `https://generativelanguage.googleapis.com/v1beta/models/${clean}:generateContent?key=${apiKey}`,
+                `https://generativelanguage.googleapis.com/v1beta/models/${clean}:generateContent?key=${currentKey}`,
                 { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(geminiBody) }
             );
             if (!resp.ok) {
                 const text = await resp.text();
                 const status = resp.status;
-                const err = new Error(`${status} on ${clean}: ${text.substring(0, 200)}`);
+                const err = new Error(`HTTP ${status}: ${text.substring(0, 300)}`);
                 err.status = status;
                 throw err;
             }
@@ -86,32 +97,48 @@ export default async function handler(req) {
             targetModel.startsWith('models/') ? targetModel.replace('models/', '') : targetModel,
             'gemini-2.5-flash',
             'gemini-2.0-flash',
-            'gemini-2.0-flash-lite'
+            'gemini-2.0-flash-lite',
+            'gemini-1.5-flash',
+            'gemini-1.5-pro'
         ];
 
         // Убираем дубликаты
         modelsToTry = [...new Set(modelsToTry)];
 
         let result = null;
-        let lastError = null;
+        let errors = [];
 
-        for (const m of modelsToTry) {
-            try {
-                result = await callGemini(m);
-                break;
-            } catch (e) {
-                lastError = e;
-                // Только при 401/403 (неверный ключ) нет смысла пробовать другие модели
-                if (e.status === 401 || e.status === 403) break;
-                console.warn(`Fallback: Model ${m} failed:`, e.message);
-                continue;
+        // Внешний цикл по ключам
+        for (let k = 0; k < validKeys.length; k++) {
+            const currentKey = validKeys[k];
+            let isKeyExhausted = false;
+
+            // Внутренний цикл по моделям
+            for (const m of modelsToTry) {
+                if (isKeyExhausted) break; // Ключ мертв, переходим к следующему ключу
+
+                try {
+                    result = await callGemini(m, currentKey);
+                    break; // Успех! Выходим из цикла моделей
+                } catch (e) {
+                    errors.push(`[Key ${k} - ${m}] ${e.message}`);
+
+                    // Если ключ неверный (400, 401, 403) или лимиты полностью исчерпаны (429)
+                    if (e.status === 400 || e.status === 401 || e.status === 403 || e.status === 429) {
+                        isKeyExhausted = true;
+                    }
+                    console.warn(`Fallback: Model ${m} with Key ${k} failed:`, e.message);
+                    continue;
+                }
             }
+            if (result) break; // Успех! Выходим из цикла ключей
         }
 
-        // Крайний случай - пробуем найти доступную модель программно
-        if (!result) {
+        // Крайний случай - пробуем найти доступную модель программно (используя первый рабочий ключ, если он есть, иначе пропускаем)
+        if (!result && validKeys.length > 0) {
             try {
-                const listRes = await fetch(`https://generativelanguage.googleapis.com/v1beta/models?key=${apiKey}`);
+                // Пробуем первый ключ для поиска моделей
+                const listRes = await fetch(`https://generativelanguage.googleapis.com/v1beta/models?key=${validKeys[0]}`);
                 if (listRes.ok) {
                     const listData = await listRes.json();
                     const available = (listData.models || [])
@@ -120,7 +147,7 @@ export default async function handler(req) {
 
                     const bestModel = available.find(m => m.includes('flash')) || available[0];
                     if (bestModel) {
-                        result = await callGemini(bestModel);
+                        result = await callGemini(bestModel, validKeys[0]);
                     }
                 }
             } catch (e) {
@@ -129,7 +156,7 @@ export default async function handler(req) {
         }
 
         if (!result) {
-            throw lastError || new Error('All models failed');
+            throw new Error(`Все аккаунты исчерпаны. Последняя ошибка: ${errors[errors.length - 1]}`);
         }
 
         const text = result.data.candidates?.[0]?.content?.parts?.[0]?.text || '';
