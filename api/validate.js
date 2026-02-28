@@ -111,7 +111,7 @@ export default async function handler(req) {
         };
 
         // Fallback-цепочка моделей
-        const modelsToTry = ['gemini-2.0-flash', 'gemini-2.5-flash', 'gemini-1.5-flash', 'gemini-pro'];
+        const modelsToTry = ['gemini-2.0-flash', 'gemini-2.5-flash', 'gemini-2.0-flash-lite'];
         let data = null;
         let lastError = null;
 

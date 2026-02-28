@@ -198,8 +198,8 @@ export async function callAI({ baseUrl, apiKey, model, systemPrompt, history, us
 export const GOOGLE_MODELS = [
     { id: 'gemini-2.0-flash', name: 'Gemini 2.0 Flash', description: 'Быстрая, стабильная' },
     { id: 'gemini-2.5-flash', name: 'Gemini 2.5 Flash', description: 'Мощная (с thinking)' },
-    { id: 'gemini-1.5-flash', name: 'Gemini 1.5 Flash', description: 'Проверенная, надёжная' },
-    { id: 'gemini-pro', name: 'Gemini Pro', description: 'Самая стабильная' }
+    { id: 'gemini-2.5-pro', name: 'Gemini 2.5 Pro', description: 'Продвинутая модель' },
+    { id: 'gemini-2.0-flash-lite', name: 'Gemini 2.0 Flash-Lite', description: 'Быстрая и легкая' }
 ];
 
 export const PROXY_MODELS = [

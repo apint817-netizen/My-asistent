@@ -86,8 +86,7 @@ export default async function handler(req) {
             targetModel.startsWith('models/') ? targetModel.replace('models/', '') : targetModel,
             'gemini-2.5-flash',
             'gemini-2.0-flash',
-            'gemini-1.5-flash',
-            'gemini-pro'
+            'gemini-2.0-flash-lite'
         ];
 
         // Убираем дубликаты
