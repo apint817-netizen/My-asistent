@@ -8,7 +8,7 @@ import ReactMarkdown from 'react-markdown';
 const parseAnalysisCommands = (text, currentDraft, updateDraftPlan) => {
     const taskRegex = /\[TASK:\s*"([^"]+)"\s*\|\s*(\d+)\]/g;
     const futureRegex = /\[CALENDAR_TASK:\s*"([^"]+)"\s*\|\s*(\d+)\s*\|\s*([^\]]+)\]/g;
-    const regularRegex = /\[HABIT:\s*"([^"]+)"\s*\|\s*(\d+)\]/g;
+    const regularRegex = /\[HABIT:\s*"([^"]+)"\s*\|\s*(\d+)(?:\s*\|\s*"([^"]+)")?\]/g;
     const rewardRegex = /\[REWARD:\s*"([^"]+)"\s*\|\s*(\d+)\]/g;
 
     let match;
@@ -29,7 +29,7 @@ const parseAnalysisCommands = (text, currentDraft, updateDraftPlan) => {
     }
 
     while ((match = regularRegex.exec(text)) !== null) {
-        newRegular.push({ title: match[1], points: parseInt(match[2], 10) });
+        newRegular.push({ title: match[1], points: parseInt(match[2], 10), days: match[3] || 'everyday' });
         addedAnything = true;
     }
 
@@ -150,6 +150,7 @@ export default function AnalysisView() {
 Сегодня: ${todayDate}. Очки для задач: от 5 до 100. Стоимость наград: от 20 до 500.
 
 КОНТЕКСТ ПОЛЬЗОВАТЕЛЯ:
+- Активная серия дней (streak): ${useStore.getState().streak}
 - Баланс очков: ${tokens}
 - Выполнено сегодня: ${completedTasks}
 - Невыполненные задачи (ссылайся по номеру #N, названию или ID):
@@ -162,7 +163,7 @@ ${calendarStr}
 ТЕГИ ДЛЯ ЧЕРНОВИКА (добавляют в план справа):
 1. Задача на сегодня: [TASK: "Название" | Очки]
 2. Задача на дату: [CALENDAR_TASK: "Название" | Очки | YYYY-MM-DD]
-3. Привычка: [HABIT: "Название" | Очки]
+3. Регулярная привычка: [HABIT: "Название" | Очки | "Дни недели (например 1,3,5 для Пн,Ср,Пт или everyday)"]
 4. Награда: [REWARD: "Название" | Стоимость]
 
 ТЕГИ ДЛЯ ПРЯМОГО УПРАВЛЕНИЯ (выполняются немедленно):
@@ -383,7 +384,11 @@ ${calendarStr}
                                 <Search size={16} />
                             </button>
                         )}
-                        <button onClick={handleClearChat} className="p-2 text-text-secondary hover:text-danger bg-white/5 rounded-lg transition-colors">
+                        <button onClick={() => {
+                            if (window.confirm('Очистить историю чата со Стратегом?')) {
+                                useStore.getState().setAnalysisChat([]);
+                            }
+                        }} className="p-2 text-text-secondary hover:text-danger bg-white/5 rounded-lg transition-colors" title="Очистить чат">
                             <Trash2 size={16} />
                         </button>
                     </div>
@@ -490,30 +495,28 @@ ${calendarStr}
                     <div ref={messagesEndRef} />
                 </div>
 
-                {/* Quick action buttons - show when user hasn't sent any messages yet */}
-                {messages.filter(m => m.role === 'user').length === 0 && (
-                    <div className="px-4 pb-2 flex flex-wrap gap-2">
-                        {[
-                            { text: '📋 Распланировать день', msg: 'Помоги распланировать мой день' },
-                            { text: '💥 Завал задач', msg: 'У меня накопилось много дел и я не знаю за что взяться' },
-                            { text: '🌱 Новая привычка', msg: 'Хочу выработать новую полезную привычку' },
-                            { text: '🎁 Придумать награды', msg: 'Помоги придумать мотивирующие награды за выполнение задач' },
-                            { text: '✅ Проверить задачи', msg: 'Проверь мои текущие задачи — какие стоит изменить или добавить?' },
-                        ].map((btn, i) => (
-                            <button
-                                key={i}
-                                onClick={() => {
-                                    addMessage({ role: 'user', content: btn.msg });
-                                    setIsTyping(true);
-                                    generateAIResponse(btn.msg);
-                                }}
-                                className="px-3 py-2 bg-accent/10 border border-accent/20 rounded-xl text-xs text-accent hover:bg-accent/20 hover:border-accent/40 transition-all"
-                            >
-                                {btn.text}
-                            </button>
-                        ))}
-                    </div>
-                )}
+                {/* Quick action buttons - show always */}
+                <div className="px-4 pb-2 flex flex-wrap gap-2">
+                    {[
+                        { text: '📊 Оценка продуктивности', msg: 'Оцени мою продуктивность. Учти текущий стрик (серию дней), количество заработанных очков и выполненные сегодня задачи. Дай короткий вердикт и совет.' },
+                        { text: '📝 План на сегодня', msg: 'Помоги составить сбалансированный план задач на сегодня. Учти текущие невыполненные дела и календарь. Предложи 3-5 оптимальных задач.' },
+                        { text: '🎁 Идеи для наград', msg: 'Предложи 5 креативных и мотивирующих наград, которые я могу добавить в свой магазин наград. Укажи адекватную стоимость в очках для каждой.' },
+                        { text: '⚖️ Баланс цен', msg: 'Посмотри на текущие стоимости моих задач и наград. Справедливы ли цены нагрaд относительно получаемых очков за задачи? Дай честный аудит 1-2 предложениями.' },
+                        { text: '💥 Завал задач', msg: 'У меня накопилось много дел и я не знаю за что взяться. Помоги расставить приоритеты.' }
+                    ].map((btn, i) => (
+                        <button
+                            key={i}
+                            onClick={() => {
+                                addMessage({ role: 'user', content: btn.msg });
+                                setIsTyping(true);
+                                generateAIResponse(btn.msg);
+                            }}
+                            className="px-3 py-2 bg-accent/10 border border-accent/20 rounded-xl text-xs text-accent hover:bg-accent/20 hover:border-accent/40 transition-all font-medium"
+                        >
+                            {btn.text}
+                        </button>
+                    ))}
+                </div>
 
                 <form onSubmit={handleSend} className="p-4 border-t border-border bg-black/20">
                     <div className="relative flex items-end">
@@ -651,6 +654,6 @@ ${calendarStr}
                     </div>
                 )}
             </div>
-        </div>
+        </div >
     );
 }

@@ -161,32 +161,55 @@ const CalendarView = () => {
                     ))}
                 </div>
 
-                <div className="grid grid-cols-7 gap-2">
+                <div className="grid grid-cols-7 gap-2 md:gap-3">
                     {days.map((day, index) => {
-                        if (!day) return <div key={`empty-${index}`} className="h-14"></div>;
+                        if (!day) return <div key={`empty-${index}`} className="h-16 md:h-24"></div>;
 
                         const dayStr = formatDateString(currentDate.getFullYear(), currentDate.getMonth(), day);
                         const isSelected = selectedDate === dayStr;
                         const isToday = dayStr === new Date().toISOString().split('T')[0];
-                        const points = getDayWorkload(dayStr);
-                        const hasTasks = points > 0;
+
+                        const tasksForDay = getTasksForDate(dayStr);
+                        const totalCount = tasksForDay.length;
+                        const completedCount = tasksForDay.filter(t => t.completed).length;
+                        const uncompletedCount = totalCount - completedCount;
+                        const points = tasksForDay.reduce((sum, task) => sum + task.value, 0);
 
                         return (
                             <button
                                 key={index}
                                 onClick={() => handleDayClick(dayStr)}
-                                className={`h-14 md:h-20 rounded-xl flex flex-col items-center justify-start p-2 text-sm transition-all border
-                            ${isSelected ? 'bg-accent/10 border-accent text-accent shadow-[0_0_15px_rgba(var(--color-accent),0.2)]' :
-                                        hasTasks ? getWorkloadColor(points) + ' hover:border-accent/40 text-text-primary' :
-                                            'bg-bg-secondary border-border hover:border-white/20 text-text-secondary'
+                                className={`h-16 md:h-24 rounded-2xl flex flex-col items-center justify-start p-1.5 md:p-3 text-sm transition-all duration-300 border relative group overflow-hidden
+                            ${isSelected ? 'bg-accent/20 border-accent/50 text-accent shadow-[0_0_20px_rgba(var(--color-accent),0.3)] scale-[1.02] z-10' :
+                                        totalCount > 0 ? 'bg-bg-primary/60 border-accent/20 hover:border-accent/50 text-text-primary hover:-translate-y-1 hover:shadow-[0_4px_15px_rgba(var(--color-accent),0.1)]' :
+                                            'bg-bg-secondary/40 border-border/50 hover:border-white/20 text-text-secondary hover:bg-bg-secondary/80'
                                     }
-                            ${isToday && !isSelected ? 'ring-1 ring-white/30' : ''}`}
+                            ${isToday && !isSelected ? 'ring-2 ring-white/20 bg-white/5' : ''}`}
                             >
-                                <span className={`font-semibold ${isToday ? 'text-white' : ''} ${isSelected ? 'text-accent' : ''}`}>{day}</span>
-                                {hasTasks && (
-                                    <div className="mt-1 flex items-center gap-1 opacity-80">
-                                        <div className={`w-1.5 h-1.5 rounded-full ${points >= 80 ? 'bg-error' : points >= 30 ? 'bg-warning' : 'bg-accent'}`}></div>
-                                        <span className="text-[10px] font-bold">{points}</span>
+                                {/* Glow effect on hover */}
+                                <div className="absolute inset-0 bg-gradient-to-b from-white/5 to-transparent opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none"></div>
+
+                                <span className={`font-bold text-lg md:text-xl relative z-10 ${isToday ? 'text-white drop-shadow-md' : ''} ${isSelected ? 'text-accent drop-shadow-[0_0_8px_rgba(var(--color-accent),0.8)]' : ''}`}>{day}</span>
+
+                                {totalCount > 0 && (
+                                    <div className="mt-auto w-full flex flex-col items-center gap-1 md:gap-1.5 relative z-10">
+                                        {/* Task Indicators */}
+                                        <div className="flex gap-1 justify-center flex-wrap max-w-full px-1">
+                                            {Array.from({ length: Math.min(completedCount, 4) }).map((_, i) => (
+                                                <div key={`c-${i}`} className="w-1.5 h-1.5 md:w-2 md:h-2 rounded-full bg-success shadow-[0_0_5px_rgba(34,197,94,0.6)]"></div>
+                                            ))}
+                                            {Array.from({ length: Math.min(uncompletedCount, 4) }).map((_, i) => (
+                                                <div key={`u-${i}`} className={`w-1.5 h-1.5 md:w-2 md:h-2 rounded-full ${points >= 80 ? 'bg-error shadow-[0_0_5px_rgba(239,68,68,0.6)]' : points >= 40 ? 'bg-warning shadow-[0_0_5px_rgba(245,158,11,0.6)]' : 'bg-accent shadow-[0_0_5px_rgba(var(--color-accent),0.6)]'}`}></div>
+                                            ))}
+                                            {(completedCount + uncompletedCount) > 8 && (
+                                                <div className="w-1.5 h-1.5 md:w-2 md:h-2 rounded-full bg-white/40"></div>
+                                            )}
+                                        </div>
+                                        {/* Points Badge */}
+                                        <div className="flex flex-col items-center leading-none mt-1">
+                                            <span className="text-[8px] md:text-[9px] font-black tracking-wider px-1 text-white opacity-90">{totalCount} {totalCount === 1 ? 'задача' : (totalCount > 1 && totalCount < 5) ? 'задачи' : 'задач'}</span>
+                                            <span className={`text-[7px] md:text-[8px] tracking-wide px-1 md:px-1.5 py-0.5 rounded-sm bg-black/50 backdrop-blur-md mt-0.5 whitespace-nowrap ${points >= 80 ? 'text-error' : points >= 40 ? 'text-warning' : 'text-accent'}`}>Выполнено {tasksForDay.filter(t => t.completed).reduce((s, t) => s + t.value, 0)} из {points} очк</span>
+                                        </div>
                                     </div>
                                 )}
                             </button>
@@ -196,40 +219,43 @@ const CalendarView = () => {
             </div>
 
             {selectedDate && (
-                <div className="md:w-1/3 flex flex-col bg-bg-secondary/50 rounded-2xl border border-border p-5 border-l-2 border-l-accent animate-fade-in relative">
+                <div className="md:w-1/3 flex flex-col bg-bg-secondary/60 backdrop-blur-xl rounded-3xl border border-white/5 shadow-2xl p-5 md:p-6 border-l-2 border-l-accent animate-fade-in relative overflow-hidden">
+                    {/* Background glow in the panel */}
+                    <div className="absolute top-0 right-0 w-32 h-32 bg-accent/10 rounded-full blur-3xl pointer-events-none -mt-10 -mr-10"></div>
 
-                    <div className="flex justify-between items-center mb-4">
-                        <h3 className="font-bold text-lg text-white">Список {selectedDate}</h3>
+                    <div className="flex justify-between items-center mb-6 relative z-10">
+                        <h3 className="font-bold text-xl md:text-2xl text-white tracking-tight">Список <span className="text-accent">{selectedDate.split('-').reverse().join('.')}</span></h3>
                     </div>
 
-                    <div className="flex-1 overflow-y-auto pr-2 custom-scrollbar space-y-3 mb-4 min-h-[150px] max-h-[300px]">
+                    <div className="flex-1 overflow-y-auto pr-3 custom-scrollbar space-y-3 md:space-y-4 mb-4 min-h-[200px] max-h-[400px] relative z-10">
                         {selectedDateTasks.length === 0 ? (
-                            <div className="text-center text-text-secondary italic text-sm mt-10">
-                                Нет запланированных задач на этот день.
+                            <div className="h-full flex flex-col items-center justify-center text-text-secondary opacity-60 mt-12 space-y-4">
+                                <CalendarIcon size={40} className="text-accent/40" />
+                                <span className="italic text-sm text-center">Нет запланированных задач.<br />Добавьте новую снизу.</span>
                             </div>
                         ) : (
                             selectedDateTasks.map(task => (
-                                <div key={task.id + task.source} className={`bg-bg-primary border p-3 rounded-xl flex items-center justify-between group ${task.source === 'main' ? 'border-blue-500/30 bg-blue-500/5' : 'border-border'}`}>
-                                    <div className="flex items-center gap-3">
+                                <div key={task.id + task.source} className={`bg-bg-primary/80 backdrop-blur-sm border p-3 md:p-4 rounded-2xl flex items-center justify-between group transition-all duration-300 hover:shadow-lg hover:-translate-y-0.5 ${task.source === 'main' ? 'border-blue-500/30 bg-blue-500/10 hover:border-blue-500/60 hover:shadow-[0_0_15px_rgba(59,130,246,0.15)] = hover:bg-blue-500/20' : 'border-white/5 hover:border-accent/40 hover:shadow-[0_0_15px_rgba(var(--color-accent),0.1)] hover:bg-bg-primary'}`}>
+                                    <div className="flex items-start gap-4 flex-1">
                                         <button
                                             onClick={() => task.source === 'calendar'
                                                 ? toggleCalendarTask(selectedDate, task.id)
                                                 : useStore.getState().toggleTask(task.id)
                                             }
-                                            className={`w-5 h-5 rounded-full border-2 flex items-center justify-center transition-colors 
-                                            ${task.completed ? 'bg-success border-success text-black' : 'border-text-secondary hover:border-success'}`}
+                                            className={`mt-0.5 w-6 h-6 rounded-full border-2 flex items-center justify-center transition-all duration-300 shrink-0
+                                            ${task.completed ? 'bg-success border-success text-black scale-110 shadow-[0_0_10px_rgba(34,197,94,0.4)]' : 'border-text-secondary hover:border-success hover:scale-110'}`}
                                         >
-                                            {task.completed && <CheckCircle size={12} strokeWidth={3} />}
+                                            {task.completed && <CheckCircle size={14} strokeWidth={3} className="animate-fade-in" />}
                                         </button>
-                                        <div className="flex flex-col">
-                                            <span className={`text-sm ${task.completed ? 'line-through text-text-secondary' : 'text-text-primary'}`}>
-                                                {task.source === 'main' && <span className="text-blue-400 mr-1">📋</span>}
+                                        <div className="flex flex-col flex-1 pb-1">
+                                            <span className={`text-sm md:text-base font-medium transition-colors ${task.completed ? 'line-through text-text-secondary' : 'text-gray-100'}`}>
+                                                {task.source === 'main' && <span className="text-blue-400 mr-2 drop-shadow-md">📋</span>}
                                                 {task.title}
                                             </span>
-                                            <div className="flex items-center gap-2">
-                                                <span className="text-[10px] text-accent font-bold">+{task.value} ОЧКОВ</span>
+                                            <div className="flex items-center gap-3 mt-1.5">
+                                                <span className="text-[10px] md:text-xs text-accent font-black tracking-widest bg-accent/10 px-2 py-0.5 rounded text-glow">+{task.value} ОЧКОВ</span>
                                                 {task.source === 'main' && (
-                                                    <span className="text-[9px] text-blue-400/70 font-medium">Основной список</span>
+                                                    <span className="text-[10px] text-blue-400/80 font-semibold tracking-wide uppercase">Основной список</span>
                                                 )}
                                             </div>
                                         </div>
@@ -237,9 +263,10 @@ const CalendarView = () => {
                                     {task.source === 'calendar' && (
                                         <button
                                             onClick={() => deleteCalendarTask(selectedDate, task.id)}
-                                            className="text-text-secondary hover:text-error transition-colors p-1 opacity-0 group-hover:opacity-100"
+                                            className="text-text-secondary hover:text-error transition-all duration-300 p-2 opacity-0 group-hover:opacity-100 bg-white/5 hover:bg-error/20 rounded-xl ml-2 shrink-0"
+                                            title="Удалить задачу"
                                         >
-                                            <Trash2 size={14} />
+                                            <Trash2 size={16} />
                                         </button>
                                     )}
                                 </div>
@@ -247,8 +274,12 @@ const CalendarView = () => {
                         )}
                     </div>
 
-                    <form onSubmit={handleAddTask} className="flex flex-col gap-3 mt-auto pt-4 border-t border-border">
-                        <label className="text-xs text-text-secondary font-bold uppercase tracking-wider">Запланировать задачу</label>
+                    <form onSubmit={handleAddTask} className="flex flex-col gap-3 md:gap-4 mt-auto pt-6 border-t border-white/5 relative z-10">
+                        <div className="absolute top-0 left-1/2 -translate-x-1/2 w-1/2 h-px bg-gradient-to-r from-transparent via-accent/30 to-transparent"></div>
+                        <label className="text-xs text-text-secondary font-black uppercase tracking-widest flex items-center gap-2">
+                            <Plus size={14} className="text-accent" />
+                            Добавить задачу
+                        </label>
                         <input
                             type="text"
                             placeholder="Название задачи..."

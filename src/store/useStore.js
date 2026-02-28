@@ -47,6 +47,8 @@ export const useStore = create(
       setProxyParams: (params) => set((state) => ({ proxyParams: { ...state.proxyParams, ...params } })),
       addTokens: (amount) => set((state) => ({ tokens: state.tokens + amount })),
       spendTokens: (amount) => set((state) => ({ tokens: Math.max(0, state.tokens - amount) })),
+      resetTokens: () => set({ tokens: 0 }),
+      clearSystemLogs: () => set(state => ({ chatMessages: state.chatMessages.filter(m => m.role !== 'system') })),
 
       toggleTask: (taskId) => set((state) => {
         const tasks = state.tasks.map(t => {
@@ -232,7 +234,18 @@ export const useStore = create(
       }),
       deleteCalendarTask: (dateStr, taskId) => set((state) => {
         const tasksForDate = state.calendarTasks[dateStr] || [];
+        // Находим задачу, чтобы извлечь оригинальный Title или ID (если это связано с глобальными тасками)
+        const taskToDelete = tasksForDate.find(t => t.id === taskId);
+
+        let newTasks = state.tasks;
+        // Если у нас в tasks есть задача с таким же названием, удаляем её тоже (связность)
+        // Либо, если taskId совпадает (хотя для календаря генерятся свои ID, но мы попытаемся по названию)
+        if (taskToDelete) {
+          newTasks = state.tasks.filter(t => t.id !== taskId && t.title !== taskToDelete.title);
+        }
+
         return {
+          tasks: newTasks,
           calendarTasks: {
             ...state.calendarTasks,
             [dateStr]: tasksForDate.filter(t => t.id !== taskId)
@@ -296,14 +309,48 @@ export const useStore = create(
           });
         });
 
-        // For regular habits -> right now we just append them to today as a simplicity,
-        // or we could add a new 'habits' concept. We'll add them to today.
-        const newHabits = state.draftPlan.regular.map(r => ({
-          id: Date.now().toString() + Math.random(),
-          title: r.title + " 🔄",
-          completed: false,
-          value: r.points || 5
-        }));
+        // For regular habits -> distribute to calendar based on days
+        const newHabitsForToday = [];
+        const todayStr = new Date().toISOString().split('T')[0];
+
+        state.draftPlan.regular.forEach(r => {
+          const title = r.title + " 🔄";
+          const value = r.points || 5;
+          const daysStr = String(r.days || 'everyday').toLowerCase();
+
+          let targetDays = [];
+          if (daysStr.includes('everyday') || daysStr.includes('кажд')) {
+            targetDays = [1, 2, 3, 4, 5, 6, 7];
+          } else {
+            targetDays = daysStr.split(',').map(d => parseInt(d.trim(), 10)).filter(n => !isNaN(n) && n >= 1 && n <= 7);
+            if (targetDays.length === 0) targetDays = [1, 2, 3, 4, 5, 6, 7];
+          }
+
+          // Add to next 30 days
+          for (let i = 0; i < 30; i++) {
+            const trackDate = new Date();
+            trackDate.setDate(trackDate.getDate() + i);
+            const isoDay = trackDate.getDay() === 0 ? 7 : trackDate.getDay(); // 1=Mon, 7=Sun
+
+            if (targetDays.includes(isoDay)) {
+              const dateStr = trackDate.toISOString().split('T')[0];
+              const habitTask = {
+                id: Date.now().toString() + Math.random() + i,
+                title,
+                completed: false,
+                value,
+                isHabit: true
+              };
+
+              if (dateStr === todayStr) {
+                newHabitsForToday.push({ ...habitTask });
+              } else {
+                if (!newCalendarTasks[dateStr]) newCalendarTasks[dateStr] = [];
+                newCalendarTasks[dateStr].push({ ...habitTask });
+              }
+            }
+          }
+        });
 
         // For rewards -> state.rewards
         const newRewards = (state.draftPlan.rewards || []).map(r => ({
@@ -313,7 +360,7 @@ export const useStore = create(
         }));
 
         return {
-          tasks: [...state.tasks, ...newTasks, ...newHabits],
+          tasks: [...state.tasks, ...newTasks, ...newHabitsForToday],
           rewards: [...state.rewards, ...newRewards],
           calendarTasks: newCalendarTasks,
           draftPlan: { today: [], future: [], regular: [], rewards: [] }

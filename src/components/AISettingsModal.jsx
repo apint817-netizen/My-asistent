@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useStore } from '../store/useStore';
-import { Settings, Bot, X, Link as LinkIcon, Zap, HelpCircle, ChevronDown, Sparkles, Heart, Code } from 'lucide-react';
+import { Settings, Bot, X, Link as LinkIcon, Zap, HelpCircle, ChevronDown, Sparkles, Heart, Code, Trash2 } from 'lucide-react';
 import { PROXY_MODELS } from '../utils/geminiApi';
 
 export default function AISettingsModal({ isOpen, onClose }) {
@@ -17,6 +17,7 @@ export default function AISettingsModal({ isOpen, onClose }) {
     const [tempProxy, setTempProxy] = useState(proxyParams);
     const [customProxyModel, setCustomProxyModel] = useState(false);
     const [activeSection, setActiveSection] = useState('ai'); // 'ai' | 'about' | 'guide'
+    const [showConfirmReset, setShowConfirmReset] = useState(false);
 
     useEffect(() => {
         if (isOpen) {
@@ -205,11 +206,56 @@ export default function AISettingsModal({ isOpen, onClose }) {
                                         </div>
                                     </div>
                                 )}
+                                {/* Danger Zone */}
+                                <div className="mt-6 pt-4 border-t border-error/20">
+                                    <h4 className="text-error font-bold text-sm mb-2">Опасная зона</h4>
+                                    <button
+                                        type="button"
+                                        onClick={() => setShowConfirmReset(true)}
+                                        className="w-full bg-error text-white hover:bg-red-600 px-4 py-2.5 rounded-xl text-sm transition-colors font-medium text-left flex items-center justify-between group shadow-lg shadow-error/20"
+                                    >
+                                        Сбросить баланс очков (ОБНУЛЕНИЕ)
+                                        <Trash2 size={16} className="opacity-80 group-hover:opacity-100 transition-opacity" />
+                                    </button>
+                                </div>
 
                                 <button type="submit" className="w-full bg-accent text-white px-4 py-3 rounded-xl text-sm hover:bg-accent-hover transition-colors font-semibold shadow-lg shadow-accent/20">
                                     Сохранить настройки
                                 </button>
                             </form>
+                        </div>
+                    )}
+
+                    {/* Кастомное модальное окно подтверждения сброса */}
+                    {showConfirmReset && (
+                        <div className="fixed inset-0 bg-black/80 backdrop-blur-md z-[60] flex items-center justify-center p-4 animate-fade-in" onClick={() => setShowConfirmReset(false)}>
+                            <div className="bg-bg-secondary border border-error/30 rounded-2xl p-6 max-w-sm w-full shadow-[0_0_40px_rgba(239,68,68,0.15)] animate-scale-in" onClick={e => e.stopPropagation()}>
+                                <div className="w-12 h-12 rounded-full bg-error/20 flex items-center justify-center mb-4 mx-auto">
+                                    <Trash2 size={24} className="text-error" />
+                                </div>
+                                <h3 className="text-xl font-bold text-white text-center mb-2">Обнулить баланс?</h3>
+                                <p className="text-text-secondary text-sm text-center mb-6">
+                                    Вы уверены, что хотите сбросить <strong>все ваши заработанные очки (токены)</strong> до нуля? Это действие нельзя отменить.
+                                </p>
+                                <div className="flex gap-3">
+                                    <button
+                                        onClick={() => setShowConfirmReset(false)}
+                                        className="flex-1 px-4 py-2.5 bg-white/5 hover:bg-white/10 text-white rounded-xl text-sm font-medium transition-colors"
+                                    >
+                                        Отмена
+                                    </button>
+                                    <button
+                                        onClick={() => {
+                                            useStore.getState().resetTokens();
+                                            setShowConfirmReset(false);
+                                            onClose();
+                                        }}
+                                        className="flex-1 px-4 py-2.5 bg-error hover:bg-red-600 text-white rounded-xl text-sm font-bold transition-colors shadow-lg shadow-error/20"
+                                    >
+                                        Да, сбросить
+                                    </button>
+                                </div>
+                            </div>
                         </div>
                     )}
 

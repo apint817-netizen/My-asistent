@@ -1,6 +1,6 @@
 import { useState, useRef, useEffect, useMemo } from 'react';
 import { useStore } from '../store/useStore';
-import { Send, Bot, User, MessageSquare, Eraser, Settings, Zap, Link as LinkIcon, HelpCircle, ChevronDown, Check, Copy, Edit2, X, Search, Paperclip, FileText, Image as ImageIcon } from 'lucide-react';
+import { Send, Bot, User, MessageSquare, Eraser, Settings, Zap, Link as LinkIcon, HelpCircle, ChevronDown, Check, Copy, Edit2, X, Search, Paperclip, FileText, Image as ImageIcon, Trash2 } from 'lucide-react';
 import { callAI, GOOGLE_OPENAI_BASE } from '../utils/geminiApi';
 import ReactMarkdown from 'react-markdown';
 
@@ -143,7 +143,8 @@ export default function AIAssistant() {
 - Использовать покупку: [USE_PURCHASE: "id_покупки"]
 
 ВАЖНО: Ты можешь находить задачу по номеру в списке (#2), по названию или по ID. Используй ЛЮБОЙ метод, который понятнее по контексту. 
-*Если пользователь просит поставить задачу "на завтра", "на дату" или "каждый день" — используй [ADD_CALENDAR_TASK: "Название" | Очки | "YYYY-MM-DD"] с вычисленной датой в формате YYYY-MM-DD (например 2026-03-01). Если на несколько дней — используй тег несколько раз.*
+*КРИТИЧЕСКИ ВАЖНО ПРО УДАЛЕНИЕ: Если пользователь просит удалить задачу (или цель/привычку), и ты соглашаешься её удалить, ты ОБЯЗАН в конце своего текстового ответа прикрепить точный тег [DELETE_TASK: "ID задачи"]. Если ты ответишь просто согласием без тега, задача НЕ УДАЛИТСЯ, и система сломается!*
+*Раскидывание на дни: Если просят на завтра/послезавтра/дату — используй [ADD_CALENDAR_TASK] с вычисленным YYYY-MM-DD. На несколько дней — несколько тегов.*
 
 Сегодня: ${todayDate} (${todayDayOfWeek})
 
@@ -579,9 +580,20 @@ ${availableRewards}
                         </button>
                     )}
                     <button
+                        onClick={() => {
+                            if (window.confirm('Удалить все системные логи из этого чата?')) {
+                                useStore.getState().clearSystemLogs();
+                            }
+                        }}
+                        className="p-2 rounded-full transition-all text-text-secondary hover:text-warning hover:bg-warning/10 hover:scale-110"
+                        title="Очистить системные логи"
+                    >
+                        <Trash2 size={18} />
+                    </button>
+                    <button
                         onClick={clearMessages}
                         className="p-2 rounded-full transition-all text-text-secondary hover:text-danger hover:bg-danger/10 hover:rotate-12 hover:scale-110"
-                        title="Очистить чат"
+                        title="Очистить весь чат"
                     >
                         <Eraser size={18} />
                     </button>
