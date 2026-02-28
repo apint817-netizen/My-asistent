@@ -2,7 +2,7 @@ import React, { useState, useRef } from 'react';
 import { useStore } from '../store/useStore';
 import { Upload, FileText, Loader, CheckCircle, AlertCircle, Send, Briefcase, Brain, Zap, Heart, GraduationCap, Flame } from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
-import { callAI } from '../utils/geminiApi';
+import { callAI, GOOGLE_OPENAI_BASE } from '../utils/geminiApi';
 import * as pdfjsLib from 'pdfjs-dist';
 import pdfjsWorker from 'pdfjs-dist/build/pdf.worker.mjs?url';
 
@@ -221,7 +221,7 @@ export default function ResumeView() {
             const key = aiProvider === 'google' ? '' : proxyParams.key;
             const model = aiProvider === 'google' ? (googleModel || 'gemini-2.0-flash') : (proxyParams.model || 'gemini-2.0-flash');
             const aiResponse = await callAI({
-                baseUrl: aiProvider === 'google' ? 'https://generativelanguage.googleapis.com/v1beta/openai' : proxyParams.url,
+                baseUrl: aiProvider === 'google' ? GOOGLE_OPENAI_BASE : proxyParams.url,
                 apiKey: key,
                 model: model,
                 systemPrompt,
