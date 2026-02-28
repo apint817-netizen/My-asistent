@@ -17,7 +17,7 @@ export default async function handler(req) {
 
         const authHeader = req.headers.get('authorization') || '';
         let clientKey = authHeader.startsWith('Bearer ') ? authHeader.substring(7).trim() : null;
-        if (clientKey === 'undefined' || clientKey === 'null' || clientKey === '' || clientKey === 'AIzaSyB9JNryZQwrYw8aNhplNaVz2kB-TnT88Nc') {
+        if (clientKey === 'undefined' || clientKey === 'null' || clientKey === '') {
             clientKey = null;
         }
 
@@ -27,7 +27,7 @@ export default async function handler(req) {
         const apiKey = clientKey || envKey;
 
         if (!apiKey) {
-            return new Response(JSON.stringify({ error: 'API Key не настроен' }), {
+            return new Response(JSON.stringify({ error: 'API Key не настроен. Добавьте GOOGLE_API_KEY в переменные окружения Vercel.' }), {
                 status: 500,
                 headers: { 'Content-Type': 'application/json' },
             });
@@ -73,17 +73,21 @@ export default async function handler(req) {
             );
             if (!resp.ok) {
                 const text = await resp.text();
-                throw new Error(`${resp.status} on ${clean}: ${text.substring(0, 200)}`);
+                const status = resp.status;
+                const err = new Error(`${status} on ${clean}: ${text.substring(0, 200)}`);
+                err.status = status;
+                throw err;
             }
             return { data: await resp.json(), model: clean };
         };
 
-        // Запрашиваемая модель первой, затем самые надежные варианты для этого ключа
+        // Расширенная fallback-цепочка: от новейших к самым стабильным
         let modelsToTry = [
             targetModel.startsWith('models/') ? targetModel.replace('models/', '') : targetModel,
             'gemini-2.5-flash',
             'gemini-2.0-flash',
-            'gemini-2.0-flash-lite'
+            'gemini-1.5-flash',
+            'gemini-pro'
         ];
 
         // Убираем дубликаты
@@ -98,7 +102,8 @@ export default async function handler(req) {
                 break;
             } catch (e) {
                 lastError = e;
-                if (e.message.includes('400')) break; // Ошибка ключа или параметров, нет смысла пробовать другие
+                // Только при 401/403 (неверный ключ) нет смысла пробовать другие модели
+                if (e.status === 401 || e.status === 403) break;
                 console.warn(`Fallback: Model ${m} failed:`, e.message);
                 continue;
             }

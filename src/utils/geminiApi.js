@@ -81,8 +81,8 @@ export async function callAI({ baseUrl, apiKey, model, systemPrompt, history, us
         // Локальная разработка: бьем НАПРЯМУЮ в Native REST API 구гла (так как OpenAI endpoint глючит с длинными текстами)
         // Чтобы не залипал демо-ключ, фильтруем его
         let keyToUse = apiKey;
-        if (keyToUse === 'AIzaSyB9JNryZQwrYw8aNhplNaVz2kB-TnT88Nc' || !keyToUse) {
-            console.warn("ВНИМАНИЕ: Используется пустой или демо-ключ локально. Запросы могут упасть по квоте 429.");
+        if (!keyToUse) {
+            console.warn("ВНИМАНИЕ: Используется пустой ключ локально. Запросы могут упасть.");
         }
 
         // Формируем payload в нативном формате Google:
@@ -197,7 +197,9 @@ export async function callAI({ baseUrl, apiKey, model, systemPrompt, history, us
 
 export const GOOGLE_MODELS = [
     { id: 'gemini-2.0-flash', name: 'Gemini 2.0 Flash', description: 'Быстрая, стабильная' },
-    { id: 'gemini-2.5-flash', name: 'Gemini 2.5 Flash', description: 'Мощная (с thinking)' }
+    { id: 'gemini-2.5-flash', name: 'Gemini 2.5 Flash', description: 'Мощная (с thinking)' },
+    { id: 'gemini-1.5-flash', name: 'Gemini 1.5 Flash', description: 'Проверенная, надёжная' },
+    { id: 'gemini-pro', name: 'Gemini Pro', description: 'Самая стабильная' }
 ];
 
 export const PROXY_MODELS = [
