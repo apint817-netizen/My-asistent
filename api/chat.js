@@ -81,7 +81,7 @@ export default async function handler(req, res) {
         // Убираем дубликаты
         fallbackChain = [...new Set(fallbackChain)];
 
-        let lastErrorMsg = '';
+        let errors = [];
 
         for (let i = 0; i < fallbackChain.length; i++) {
             const currentModel = fallbackChain[i];
@@ -102,10 +102,10 @@ export default async function handler(req, res) {
                     } else if (data.error) {
                         if (data.error.code === 404) {
                             console.warn(`[Gemini] Модель ${currentModel} не найдена, пробуем следующую...`);
-                            lastErrorMsg = `404: Модель ${currentModel} не найдена`;
+                            errors.push(`404: Модель ${currentModel} не найдена`);
                         } else if (data.error.code === 429) {
                             console.warn(`[Gemini] Лимит запросов (429) для ${currentModel}, пробуем следующую...`);
-                            lastErrorMsg = `429: Лимит запросов для ${currentModel}`;
+                            errors.push(`429: Лимит запросов для ${currentModel}`);
                         } else {
                             throw new Error(data.error.message || JSON.stringify(data.error));
                         }
@@ -117,13 +117,13 @@ export default async function handler(req, res) {
 
                     if (resp.status === 404) {
                         console.warn(`[Gemini] Ошибка 404 для ${currentModel}, пробуем fallback...`);
-                        lastErrorMsg = `HTTP 404 для ${currentModel}: ${textError}`;
+                        errors.push(`HTTP 404 для ${currentModel}: ${textError}`);
                     } else if (resp.status === 429) {
                         console.warn(`[Gemini] Лимит 429 для ${currentModel}, пробуем fallback...`);
-                        lastErrorMsg = `HTTP 429 (Лимит) для ${currentModel}: ${textError}`;
+                        errors.push(`HTTP 429 (Лимит) для ${currentModel}: ${textError}`);
                     } else if (resp.status >= 500) {
                         console.warn(`[Gemini] Ошибка сервера 5xx для ${currentModel}, пробуем fallback...`);
-                        lastErrorMsg = `HTTP ${resp.status} для ${currentModel}: ${textError}`;
+                        errors.push(`HTTP ${resp.status} для ${currentModel}: ${textError}`);
                     } else {
                         console.error(`[Gemini] CRITICAL ${resp.status} on ${currentModel}:`, textError);
                         console.error(`[Gemini] Payload was:`, JSON.stringify(geminiBody).substring(0, 1000) + '...');
@@ -136,12 +136,12 @@ export default async function handler(req, res) {
 
             } catch (err) {
                 console.warn(`[Gemini] Исключение при вызове ${currentModel}: ${err.message}`);
-                lastErrorMsg = err.message || JSON.stringify(err);
+                errors.push(`${currentModel} -> ${err.message || JSON.stringify(err)}`);
                 if (err.status === 400 || err.status === 403 || i === fallbackChain.length - 1) throw err;
             }
         }
 
-        return res.status(500).json({ error: `Все модели fallback-цепочки недоступны. Последняя ошибка: ${lastErrorMsg}` });
+        return res.status(500).json({ error: `Все модели fallback-цепочки недоступны. Ошибки: ${errors.join(', ')}` });
 
     } catch (err) {
         console.error('Chat API Error:', err);
