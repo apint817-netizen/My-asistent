@@ -184,10 +184,13 @@ export default function ResumeView() {
 
             const userMessage = `ТЕКУЩЕЕ СОСТОЯНИЕ: ${statusText}\n\nРЕЗЮМЕ:\n${textToSend}`;
 
+            const key = aiProvider === 'google' ? '' : proxyParams.key;
+            const model = aiProvider === 'google' ? (googleModel || 'gemini-2.0-flash') : (proxyParams.model || 'gemini-2.0-flash');
             const aiResponse = await callAI({
                 baseUrl: aiProvider === 'google' ? 'https://generativelanguage.googleapis.com/v1beta/openai' : proxyParams.url,
-                apiKey: aiProvider === 'google' ? apiKey : proxyParams.key,
-                model: aiProvider === 'google' ? googleModel : proxyParams.model,
+                // Форсируем пустой ключ для google, чтобы использовался серверный ключ из Vercel
+                apiKey: key,
+                model: model,
                 systemPrompt,
                 history: [],
                 userMessage,
