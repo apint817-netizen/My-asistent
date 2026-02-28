@@ -10,6 +10,7 @@ export default function AIAssistant() {
     const addMessage = useStore(state => state.addChatMessage);
     const clearMessages = useStore(state => state.clearChatMessages);
     const tokens = useStore(state => state.tokens);
+    const tasks = useStore(state => state.tasks);
     const rewards = useStore(state => state.rewards);
     const purchaseHistory = useStore(state => state.purchaseHistory);
     const addCalendarTask = useStore(state => state.addCalendarTask);
