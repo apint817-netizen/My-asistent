@@ -309,6 +309,10 @@ ${availableRewards}
                 .replace(buyRewardRegex, '').replace(usePurchaseRegex, '')
                 .trim();
 
+            if (!cleanResponse) {
+                cleanResponse = "✅ Выполнено";
+            }
+
             addMessage({ role: 'assistant', content: cleanResponse });
         } catch (error) {
             console.error("AI Error:", error);

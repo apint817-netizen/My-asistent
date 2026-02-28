@@ -115,14 +115,19 @@ export default async function handler(req, res) {
                         console.warn(`[Gemini] Ошибка 404 для ${currentModel}, пробуем fallback...`);
                     } else if (resp.status === 429) {
                         console.warn(`[Gemini] Лимит 429 для ${currentModel}, пробуем fallback...`);
+                    } else if (resp.status >= 500) {
+                        console.warn(`[Gemini] Ошибка сервера 5xx для ${currentModel}, пробуем fallback...`);
                     } else {
-                        throw new Error(`Google API Error ${resp.status}: ${textError}`);
+                        const errorMsg = `Google API Error ${resp.status}: ${textError}`;
+                        const errorObj = new Error(errorMsg);
+                        errorObj.status = resp.status;
+                        throw errorObj;
                     }
                 }
 
             } catch (err) {
                 console.warn(`[Gemini] Исключение при вызове ${currentModel}: ${err.message}`);
-                if (i === fallbackChain.length - 1) throw err;
+                if (err.status === 400 || err.status === 403 || i === fallbackChain.length - 1) throw err;
             }
         }
 

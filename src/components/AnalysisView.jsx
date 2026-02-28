@@ -271,7 +271,10 @@ ${calendarStr}
 
             let finalMessage = cleanText;
             if (addedAnything) {
-                finalMessage += `\n\n * (Система: Черновик плана обновлен.Проверьте панель справа)* `;
+                finalMessage += `\n\n*(Система: Черновик плана обновлен)*\n`;
+            }
+            if (!finalMessage.trim()) {
+                finalMessage = "✅ Выполнено";
             }
 
             addAnalysisMessage({ role: 'assistant', content: finalMessage });

@@ -99,17 +99,25 @@ export default async function handler(req, res) {
                             console.warn(`[Gemini-Validate] Модель ${currentModel} не найдена, пробуем следующую...`);
                         } else if (errorData.error.code === 429) {
                             console.warn(`[Gemini-Validate] Лимит запросов (429) для ${currentModel}, пробуем следующую...`);
+                        } else if (errorData.error.code >= 500) {
+                            console.warn(`[Gemini-Validate] Ошибка сервера 5xx для ${currentModel}, пробуем следующую...`);
                         } else {
-                            throw new Error(errorData.error.message || JSON.stringify(errorData.error));
+                            const errorMsg = errorData.error.message || JSON.stringify(errorData.error);
+                            const errorObj = new Error(errorMsg);
+                            errorObj.status = errorData.error.code; // code contains HTTP status like 400
+                            throw errorObj;
                         }
                     } else {
-                        throw new Error('Пустой ответ или неверный формат от Gemini API: ' + JSON.stringify(errorData));
+                        const errorMsg = `Google API Error ${resp.status}: ${JSON.stringify(errorData)}`;
+                        const errorObj = new Error(errorMsg);
+                        errorObj.status = resp.status;
+                        throw errorObj;
                     }
                 }
 
             } catch (err) {
                 console.warn(`[Gemini-Validate] Исключение при вызове ${currentModel}: ${err.message}`);
-                if (i === fallbackChain.length - 1) throw err;
+                if (err.status === 400 || err.status === 403 || i === fallbackChain.length - 1) throw err;
             }
         }
 
