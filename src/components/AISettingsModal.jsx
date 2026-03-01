@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useStore } from '../store/useStore';
-import { Settings, Bot, X, Link as LinkIcon, Zap, HelpCircle, ChevronDown, Sparkles, Heart, Code, Trash2 } from 'lucide-react';
+import { Settings, Bot, X, Link as LinkIcon, Zap, HelpCircle, ChevronDown, Sparkles, Heart, Code, Trash2, User } from 'lucide-react';
 import { PROXY_MODELS } from '../utils/geminiApi';
 
 export default function AISettingsModal({ isOpen, onClose }) {
@@ -12,18 +12,22 @@ export default function AISettingsModal({ isOpen, onClose }) {
     const setAiProvider = useStore(state => state.setAiProvider);
     const proxyParams = useStore(state => state.proxyParams);
     const setProxyParams = useStore(state => state.setProxyParams);
+    const userProfile = useStore(state => state.userProfile) || { bio: '', goals: '', interests: '' };
+    const updateUserProfile = useStore(state => state.updateUserProfile);
 
     const [tempKey, setTempKey] = useState(apiKey || '');
     const [tempProxy, setTempProxy] = useState(proxyParams);
+    const [tempProfile, setTempProfile] = useState(userProfile);
     const [customProxyModel, setCustomProxyModel] = useState(false);
-    const [activeSection, setActiveSection] = useState('ai'); // 'ai' | 'about' | 'guide'
+    const [activeSection, setActiveSection] = useState('ai'); // 'ai' | 'profile' | 'about' | 'guide'
 
     useEffect(() => {
         if (isOpen) {
             setTempKey(apiKey || '');
             setTempProxy(proxyParams);
+            setTempProfile(userProfile || { bio: '', goals: '', interests: '' });
         }
-    }, [isOpen, apiKey, proxyParams]);
+    }, [isOpen, apiKey, proxyParams, userProfile]);
 
     if (!isOpen) return null;
 
@@ -31,6 +35,7 @@ export default function AISettingsModal({ isOpen, onClose }) {
         e.preventDefault();
         setApiKey(tempKey.trim());
         setProxyParams(tempProxy);
+        updateUserProfile(tempProfile);
         onClose();
     };
 
@@ -60,22 +65,28 @@ export default function AISettingsModal({ isOpen, onClose }) {
                     </div>
 
                     {/* Section Tabs */}
-                    <div className="flex bg-black/40 rounded-lg p-1">
+                    <div className="flex flex-wrap bg-black/40 rounded-lg p-1 gap-1">
                         <button
                             onClick={() => setActiveSection('ai')}
-                            className={`flex-1 flex justify-center items-center gap-2 py-2 text-sm rounded-md transition-all font-medium ${activeSection === 'ai' ? 'bg-accent text-white shadow-md' : 'text-text-secondary hover:text-white'}`}
+                            className={`flex flex-1 justify-center items-center gap-2 py-2 px-1 text-xs sm:text-sm rounded-md transition-all font-medium ${activeSection === 'ai' ? 'bg-accent text-white shadow-md' : 'text-text-secondary hover:text-white'}`}
                         >
-                            <Bot size={14} /> Настройки ИИ
+                            <Bot size={14} /> ИИ
+                        </button>
+                        <button
+                            onClick={() => setActiveSection('profile')}
+                            className={`flex flex-1 justify-center items-center gap-2 py-2 px-1 text-xs sm:text-sm rounded-md transition-all font-medium ${activeSection === 'profile' ? 'bg-accent text-white shadow-md' : 'text-text-secondary hover:text-white'}`}
+                        >
+                            <User size={14} /> Профиль
                         </button>
                         <button
                             onClick={() => setActiveSection('guide')}
-                            className={`flex-1 flex justify-center items-center gap-2 py-2 text-sm rounded-md transition-all font-medium ${activeSection === 'guide' ? 'bg-accent text-white shadow-md' : 'text-text-secondary hover:text-white'}`}
+                            className={`flex flex-1 justify-center items-center gap-2 py-2 px-1 text-xs sm:text-sm rounded-md transition-all font-medium ${activeSection === 'guide' ? 'bg-accent text-white shadow-md' : 'text-text-secondary hover:text-white'}`}
                         >
-                            <HelpCircle size={14} /> Как подключить
+                            <HelpCircle size={14} /> Гайд
                         </button>
                         <button
                             onClick={() => setActiveSection('about')}
-                            className={`flex-1 flex justify-center items-center gap-2 py-2 text-sm rounded-md transition-all font-medium ${activeSection === 'about' ? 'bg-accent text-white shadow-md' : 'text-text-secondary hover:text-white'}`}
+                            className={`flex flex-1 justify-center items-center gap-2 py-2 px-1 text-xs sm:text-sm rounded-md transition-all font-medium ${activeSection === 'about' ? 'bg-accent text-white shadow-md' : 'text-text-secondary hover:text-white'}`}
                         >
                             <Heart size={14} /> О сервисе
                         </button>
@@ -207,6 +218,52 @@ export default function AISettingsModal({ isOpen, onClose }) {
                                 )}
                                 <button type="submit" className="w-full bg-accent text-white px-4 py-3 mt-4 rounded-xl text-sm hover:bg-accent-hover transition-colors font-semibold shadow-lg shadow-accent/20">
                                     Сохранить настройки
+                                </button>
+                            </form>
+                        </div>
+                    )}
+
+                    {/* ===== Profile Section ===== */}
+                    {activeSection === 'profile' && (
+                        <div className="space-y-5 animate-fade-in">
+                            <div className="bg-blue-500/10 border border-blue-500/20 rounded-xl p-4 text-sm text-text-secondary flex items-start gap-3">
+                                <User size={16} className="text-blue-400 mt-0.5 shrink-0" />
+                                <div>
+                                    <p className="font-medium text-white mb-1">О вас</p>
+                                    <p className="text-xs leading-relaxed">Заполните эти поля, чтобы ИИ лучше понимал ваш контекст, ваши интересы и глобальные цели при планировании. Эти данные передаются в системный промпт помощника.</p>
+                                </div>
+                            </div>
+
+                            <form onSubmit={saveSettings} className="space-y-4">
+                                <div className="space-y-1">
+                                    <label className="text-sm text-text-secondary font-medium block">ℹ️ Краткое био / Кто вы</label>
+                                    <textarea
+                                        placeholder="Напр.: Я QA Engineer уровня Middle, люблю автоматизацию на Python, но сейчас выгораю от рутины..."
+                                        className="w-full bg-black/40 border border-border rounded-md px-3 py-2 text-sm outline-none focus:border-accent focus:ring-1 focus:ring-accent transition-all resize-none h-20"
+                                        value={tempProfile.bio}
+                                        onChange={(e) => setTempProfile({ ...tempProfile, bio: e.target.value })}
+                                    />
+                                </div>
+                                <div className="space-y-1">
+                                    <label className="text-sm text-text-secondary font-medium block">🎯 Главные цели (на квартал/год)</label>
+                                    <textarea
+                                        placeholder="Напр.: 1. Выйти на доход 300к. 2. Прочитать 12 книг по процессам. 3. Начать бегать."
+                                        className="w-full bg-black/40 border border-border rounded-md px-3 py-2 text-sm outline-none focus:border-accent focus:ring-1 focus:ring-accent transition-all resize-none h-20"
+                                        value={tempProfile.goals}
+                                        onChange={(e) => setTempProfile({ ...tempProfile, goals: e.target.value })}
+                                    />
+                                </div>
+                                <div className="space-y-1">
+                                    <label className="text-sm text-text-secondary font-medium block">⭐ Интересы и хобби (в качестве наград)</label>
+                                    <textarea
+                                        placeholder="Напр.: Люблю играть в Доту 2, заказывать пиццу Пепперони, гулять по лесу, смотреть аниме."
+                                        className="w-full bg-black/40 border border-border rounded-md px-3 py-2 text-sm outline-none focus:border-accent focus:ring-1 focus:ring-accent transition-all resize-none h-20"
+                                        value={tempProfile.interests}
+                                        onChange={(e) => setTempProfile({ ...tempProfile, interests: e.target.value })}
+                                    />
+                                </div>
+                                <button type="submit" className="w-full bg-accent text-white px-4 py-3 mt-4 rounded-xl text-sm hover:bg-accent-hover transition-colors font-semibold shadow-lg shadow-accent/20">
+                                    Сохранить профиль
                                 </button>
                             </form>
                         </div>

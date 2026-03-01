@@ -55,6 +55,13 @@ const CalendarView = () => {
     ];
 
     const weekDays = ['Пн', 'Вт', 'Ср', 'Чт', 'Пт', 'Сб', 'Вс'];
+    const fullWeekDays = ['Воскресенье', 'Понедельник', 'Вторник', 'Среда', 'Четверг', 'Пятница', 'Суббота'];
+
+    const getWeekdayName = (dateStr) => {
+        if (!dateStr) return '';
+        const d = new Date(dateStr);
+        return fullWeekDays[d.getDay()];
+    };
 
     const handleDayClick = (dayStr) => {
         if (selectedDate === dayStr) {
@@ -228,7 +235,7 @@ const CalendarView = () => {
                     <div className="absolute top-0 right-0 w-32 h-32 bg-accent/10 rounded-full blur-3xl pointer-events-none -mt-10 -mr-10"></div>
 
                     <div className="flex justify-between items-center mb-6 relative z-10">
-                        <h3 className="font-bold text-xl md:text-2xl text-white tracking-tight">Список <span className="text-accent">{selectedDate.split('-').reverse().join('.')}</span></h3>
+                        <h3 className="font-bold text-xl md:text-2xl text-white tracking-tight">Список <span className="text-accent">{selectedDate.split('-').reverse().join('.')}</span> <span className="text-text-secondary md:text-lg text-base font-medium ml-1">({getWeekdayName(selectedDate)})</span></h3>
                     </div>
 
                     <div className="flex-1 overflow-y-auto pr-3 custom-scrollbar space-y-3 md:space-y-4 mb-4 min-h-[200px] max-h-[400px] relative z-10">

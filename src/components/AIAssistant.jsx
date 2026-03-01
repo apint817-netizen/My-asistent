@@ -15,11 +15,14 @@ export default function AIAssistant() {
     const purchaseHistory = useStore(state => state.purchaseHistory);
     const addCalendarTask = useStore(state => state.addCalendarTask);
     const addToast = useStore(state => state.addToast);
+    const [isThinking, setIsThinking] = useState(false);
 
     const apiKey = useStore(state => state.apiKey);
     const googleModel = useStore(state => state.googleModel);
     const aiProvider = useStore(state => state.aiProvider);
     const proxyParams = useStore(state => state.proxyParams);
+    const aiTokensUsed = useStore(state => state.aiTokensUsed);
+    const userProfile = useStore(state => state.userProfile) || { bio: '', goals: '', interests: '' };
     const calendarTasks = useStore(state => state.calendarTasks);
 
     // Подключаем черновик из стейта
@@ -159,18 +162,27 @@ export default function AIAssistant() {
 - Выполнено сегодня: ${completedTasks}
 - Невыполненные задачи (ссылайся по номеру #N, названию или ID):
 ${pendingTasks}
-- Календарь:
+- Календарь (формат YYYY-MM-DD: задачи):
 ${calendarStr}
+
+ОТВЕТЫ ИЗ ПРОФИЛЯ ПОЛЬЗОВАТЕЛЯ ДЛЯ ПЕРСОНАЛИЗАЦИИ:
+- Краткое био / Кто вы: ${userProfile.bio || 'Не указано'}
+- Главные цели (на квартал/год): ${userProfile.goals || 'Не указано'}
+- Интересы и хобби: ${userProfile.interests || 'Не указано'}
+Учитывай эту информацию при формировании ответов, чтобы они были максимально релевантны для пользователя!
+
+ДОСТУПНЫЕ ДЕЙСТВИЯ (ТЕГИ):
 - Награды (ссылайся по номеру, названию или ID):
 ${availableRewards}
 - Последние покупки: ${recentPurchases}`;
 
             const baseUrl = aiProvider === 'google' ? GOOGLE_OPENAI_BASE : proxyParams.url;
             // Форсируем пустой ключ для google, чтобы использовался серверный ключ (Vercel)
+            // Для обычного ассистента используем flash версию
+            const model = aiProvider === 'google' ? (googleModel || 'gemini-2.5-flash') : (proxyParams.model || 'gemini-2.5-flash');
             const key = aiProvider === 'google' ? '' : proxyParams.key;
-            const model = aiProvider === 'google' ? (googleModel || 'gemini-2.0-flash') : (proxyParams.model || 'gemini-2.0-flash');
 
-            const history = messages.filter(m => m.role !== 'system');
+            const history = messages.filter(m => m.role !== 'system').slice(-6); // Экономия токенов: берем только последние 6 сообщений
 
             // Если есть вложения, передаем их в callAI
             const responseText = await callAI({
@@ -184,16 +196,16 @@ ${availableRewards}
             });
 
             // --- Обработка всех тегов ---
-            const completeRegex = /\[COMPLETE_TASK:\s*"([^"]+)"\]/g;
-            const editRegex = /\[EDIT_TASK_POINTS:\s*"([^"]+)"\s*\|\s*(\d+)\]/g;
-            const addTaskRegex = /\[ADD_TASK:\s*"([^"]+)"\s*\|\s*(\d+)\]/g;
-            const addCalendarTaskRegex = /\[ADD_CALENDAR_TASK:\s*"([^"]+)"\s*\|\s*(\d+)\s*\|\s*"([^"]+)"\]/g;
-            const addRegularTaskRegex = /\[ADD_REGULAR_TASK:\s*"([^"]+)"\s*\|\s*(\d+)\s*\|\s*"([^"]+)"\]/g;
-            const deleteTaskRegex = /\[DELETE_TASK:\s*"([^"]+)"\]/g;
-            const addRewardRegex = /\[ADD_REWARD:\s*"([^"]+)"\s*\|\s*(\d+)\]/g;
-            const deleteRewardRegex = /\[DELETE_REWARD:\s*"([^"]+)"\]/g;
-            const buyRewardRegex = /\[BUY_REWARD:\s*"([^"]+)"\]/g;
-            const usePurchaseRegex = /\[USE_PURCHASE:\s*"([^"]+)"\]/g;
+            const completeRegex = /\[COMPLETE_TASK:\s*"?([^"\]]+?)"?\s*\]/g;
+            const editRegex = /\[EDIT_TASK_POINTS:\s*"?([^"\|]+?)"?\s*\|\s*(\d+)\]/g;
+            const addTaskRegex = /\[ADD_TASK:\s*"?([^"\|]+?)"?\s*\|\s*(\d+)\]/g;
+            const addCalendarTaskRegex = /\[ADD_CALENDAR_TASK:\s*"?([^"\|]+?)"?\s*\|\s*(\d+)\s*\|\s*"?([^"\]]+?)"?\s*\]/g;
+            const addRegularTaskRegex = /\[ADD_REGULAR_TASK:\s*"?([^"\|]+?)"?\s*\|\s*(\d+)\s*\|\s*"?([^"\]]+?)"?\s*\]/g;
+            const deleteTaskRegex = /\[DELETE_TASK:\s*"?([^"\]]+?)"?\s*\]/g;
+            const addRewardRegex = /\[ADD_REWARD:\s*"?([^"\|]+?)"?\s*\|\s*(\d+)\]/g;
+            const deleteRewardRegex = /\[DELETE_REWARD:\s*"?([^"\]]+?)"?\s*\]/g;
+            const buyRewardRegex = /\[BUY_REWARD:\s*"?([^"\]]+?)"?\s*\]/g;
+            const usePurchaseRegex = /\[USE_PURCHASE:\s*"?([^"\]]+?)"?\s*\]/g;
 
             let cleanResponse = responseText;
             let match;
@@ -236,7 +248,7 @@ ${availableRewards}
 
             // COMPLETE_TASK
             while ((match = completeRegex.exec(responseText)) !== null) {
-                const task = findTask(match[1]);
+                const task = findTask(match[1].trim());
                 if (task && !task.completed) {
                     useStore.getState().toggleTask(task.id);
                     useStore.getState().addTokens(task.value);
@@ -245,45 +257,45 @@ ${availableRewards}
 
             // EDIT_TASK_POINTS
             while ((match = editRegex.exec(responseText)) !== null) {
-                const task = findTask(match[1]);
+                const task = findTask(match[1].trim());
                 if (task) useStore.getState().editTaskPoints(task.id, parseInt(match[2], 10));
             }
 
             // ADD_TASK
             while ((match = addTaskRegex.exec(responseText)) !== null) {
-                useStore.getState().addProposal(match[1], parseInt(match[2], 10));
+                useStore.getState().addProposal(match[1].trim(), parseInt(match[2], 10));
             }
 
             // ADD_CALENDAR_TASK
             while ((match = addCalendarTaskRegex.exec(responseText)) !== null) {
-                const title = match[1];
+                const title = match[1].trim();
                 const pts = parseInt(match[2], 10);
-                const dateStr = match[3];
+                const dateStr = match[3] ? match[3].trim() : '';
                 useStore.getState().addCalendarTask(dateStr, title, pts);
             }
 
             // ADD_REGULAR_TASK
             while ((match = addRegularTaskRegex.exec(responseText)) !== null) {
-                const title = match[1];
+                const title = match[1].trim();
                 const pts = parseInt(match[2], 10);
-                const period = match[3];
+                const period = match[3] ? match[3].trim() : 'everyday';
                 useStore.getState().addRegularTask(title, pts, period);
             }
 
             // DELETE_TASK
             while ((match = deleteTaskRegex.exec(responseText)) !== null) {
-                const task = findTask(match[1]);
+                const task = findTask(match[1].trim());
                 if (task) useStore.getState().deleteTaskWithReason(task.id, 'Удалено по запросу через Nova');
             }
 
             // ADD_REWARD
             while ((match = addRewardRegex.exec(responseText)) !== null) {
-                useStore.getState().addRewardProposal(match[1], parseInt(match[2], 10));
+                useStore.getState().addRewardProposal(match[1].trim(), parseInt(match[2], 10));
             }
 
             // DELETE_REWARD
             while ((match = deleteRewardRegex.exec(responseText)) !== null) {
-                const reward = findReward(match[1]);
+                const reward = findReward(match[1].trim());
                 if (reward) {
                     useStore.getState().deleteRewardWithReason(reward.id, 'Удалено по запросу через Nova');
                     useStore.getState().addToast(`Награда "${reward.title}" удалена`, 'info');
@@ -292,13 +304,13 @@ ${availableRewards}
 
             // BUY_REWARD
             while ((match = buyRewardRegex.exec(responseText)) !== null) {
-                const reward = findReward(match[1]);
+                const reward = findReward(match[1].trim());
                 if (reward) useStore.getState().buyRewardById(reward.id);
             }
 
             // USE_PURCHASE
             while ((match = usePurchaseRegex.exec(responseText)) !== null) {
-                useStore.getState().usePurchase(match[1]);
+                useStore.getState().usePurchase(match[1].trim());
             }
 
             cleanResponse = cleanResponse
@@ -378,8 +390,6 @@ ${availableRewards}
             // Assuming we have a setChatMessages function, if not, we'd need to add it to useStore
             // For now, let's just update via store if we had the method. Since we don't, we'll
             // mutate state directly in a hacky way or just use a new action.
-            // Let's assume useStore doesn't have an update message method yet. 
-            // We will need to create one, or just skip full edit persistence for this specific example if not available.
             // Actually, let's add updateChatMessage to useStore in a separate step or just do what's possible.
             // *Wait, I only have addMessage. I'll need to dispatch an update function or just modify the array.*
             useStore.setState(state => {
@@ -569,16 +579,18 @@ ${availableRewards}
                     <div className="w-10 h-10 rounded-full bg-gradient-to-br from-accent to-accent-hover flex items-center justify-center border border-accent/50 shadow-[0_0_15px_rgba(109,40,217,0.4)]">
                         <MessageSquare size={20} className="text-white" />
                     </div>
-                    <div>
-                        <h3 className="font-bold text-white tracking-wide">Ассистент Nova</h3>
-                        <p className="text-xs text-success flex items-center gap-1.5 font-medium mt-0.5">
-                            <span className="w-2 h-2 rounded-full bg-success animate-pulse"></span> В сети
-                        </p>
+                    <div className="flex-1 min-w-0">
+                        <h2 className="font-bold text-white text-base leading-tight">Nova</h2>
+                        <p className="text-xs text-accent">Базовый ассистент</p>
                     </div>
                 </div>
                 <div className="flex items-center gap-2">
+                    <div className="flex flex-col items-end sm:flex-row sm:items-center gap-1.5 px-2.5 py-1 bg-accent/10 border border-accent/20 rounded-xl sm:rounded-full text-[10px] font-medium text-accent/80 shrink-0">
+                        <span>Лимит ИИ:</span>
+                        <span>{aiTokensUsed.toLocaleString('ru-RU')} / 100 000</span>
+                    </div>
                     {isSearching ? (
-                        <div className="flex items-center bg-black/40 border border-border rounded-full px-3 py-1 animate-fade-in w-48">
+                        <div className="flex items-center bg-black/40 border border-border rounded-full px-3 py-1 flex-1 sm:flex-none w-full sm:w-48 animate-fade-in">
                             <Search size={14} className="text-text-secondary mr-2 shrink-0" />
                             <input
                                 type="text"

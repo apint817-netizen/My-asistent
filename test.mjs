@@ -1,0 +1,1 @@
+const r = await fetch('https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=AIzaSyB9JNryZQwrYw8aNhplNaVz2kB-TnT88Nc', {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({contents:[{parts:[{text:'hi'}]}]})}); console.log(await r.json());

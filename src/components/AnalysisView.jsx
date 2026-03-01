@@ -7,10 +7,10 @@ import ConfirmModal from './ConfirmModal';
 
 // Парсер тегов для формирования черновика
 const parseAnalysisCommands = (text, currentDraft, updateDraftPlan) => {
-    const taskRegex = /\[TASK:\s*"([^"]+)"\s*\|\s*(\d+)\]/g;
-    const futureRegex = /\[CALENDAR_TASK:\s*"([^"]+)"\s*\|\s*(\d+)\s*\|\s*([^\]]+)\]/g;
-    const regularRegex = /\[HABIT:\s*"([^"]+)"\s*\|\s*(\d+)(?:\s*\|\s*"([^"]+)")?\]/g;
-    const rewardRegex = /\[REWARD:\s*"([^"]+)"\s*\|\s*(\d+)\]/g;
+    const taskRegex = /\[TASK:\s*"?([^"\|]+?)"?\s*\|\s*(\d+)\]/g;
+    const futureRegex = /\[CALENDAR_TASK:\s*"?([^"\|]+?)"?\s*\|\s*(\d+)\s*\|\s*"?([^"\]]+?)"?\s*\]/g;
+    const regularRegex = /\[HABIT:\s*"?([^"\|]+?)"?\s*\|\s*(\d+)(?:\s*\|\s*"?([^"\]]+?)"?)?\s*\]/g;
+    const rewardRegex = /\[REWARD:\s*"?([^"\|]+?)"?\s*\|\s*(\d+)\]/g;
 
     let match;
     let newToday = [...currentDraft.today];
@@ -20,22 +20,22 @@ const parseAnalysisCommands = (text, currentDraft, updateDraftPlan) => {
     let addedAnything = false;
 
     while ((match = taskRegex.exec(text)) !== null) {
-        newToday.push({ title: match[1], points: parseInt(match[2], 10) });
+        newToday.push({ title: match[1].trim(), points: parseInt(match[2], 10) });
         addedAnything = true;
     }
 
     while ((match = futureRegex.exec(text)) !== null) {
-        newFuture.push({ title: match[1], points: parseInt(match[2], 10), date: match[3].trim() });
+        newFuture.push({ title: match[1].trim(), points: parseInt(match[2], 10), date: match[3].trim() });
         addedAnything = true;
     }
 
     while ((match = regularRegex.exec(text)) !== null) {
-        newRegular.push({ title: match[1], points: parseInt(match[2], 10), days: match[3] || 'everyday' });
+        newRegular.push({ title: match[1].trim(), points: parseInt(match[2], 10), days: match[3] ? match[3].trim() : 'everyday' });
         addedAnything = true;
     }
 
     while ((match = rewardRegex.exec(text)) !== null) {
-        newRewards.push({ title: match[1], cost: parseInt(match[2], 10) });
+        newRewards.push({ title: match[1].trim(), cost: parseInt(match[2], 10) });
         addedAnything = true;
     }
 
@@ -59,9 +59,11 @@ export default function AnalysisView() {
     const clearDraftPlan = useStore(state => state.clearDraftPlan);
     const commitDraftPlan = useStore(state => state.commitDraftPlan);
 
+    const userProfile = useStore(state => state.userProfile) || { bio: '', goals: '', interests: '' };
     const apiKey = useStore(state => state.apiKey);
     const googleModel = useStore(state => state.googleModel);
     const aiProvider = useStore(state => state.aiProvider);
+    const aiTokensUsed = useStore(state => state.aiTokensUsed);
     const proxyParams = useStore(state => state.proxyParams);
     const tasks = useStore(state => state.tasks);
     const tokens = useStore(state => state.tokens);
@@ -165,6 +167,12 @@ ${availableRewards}
 - Календарь:
 ${calendarStr}
 
+ОТВЕТЫ ИЗ ПРОФИЛЯ ПОЛЬЗОВАТЕЛЯ ДЛЯ ПЕРСОНАЛИЗАЦИИ:
+- Краткое био / Кто вы: ${userProfile.bio || 'Не указано'}
+- Главные цели (на квартал/год): ${userProfile.goals || 'Не указано'}
+- Интересы и хобби: ${userProfile.interests || 'Не указано'}
+Учитывай эту информацию при формировании задач и наставлений!
+
 ТЕГИ ДЛЯ ЧЕРНОВИКА(добавляют в план справа):
 1. Задача на сегодня: [TASK: "Название" | Очки]
 2. Задача на дату: [CALENDAR_TASK: "Название" | Очки | YYYY - MM - DD]
@@ -182,17 +190,19 @@ ${calendarStr}
             const baseUrl = aiProvider === 'google' ? GOOGLE_OPENAI_BASE : proxyParams.url;
             // Форсируем пустой ключ для google, чтобы использовался серверный ключ из Vercel
             const key = aiProvider === 'google' ? '' : proxyParams.key;
-            const model = aiProvider === 'google' ? (googleModel || 'gemini-2.0-flash') : (proxyParams.model || 'gemini-2.0-flash');
+            // Для Стратега запрашиваем более "умную" модель по умолчанию, например gemini-1.5-pro, 
+            // так как тут сложная логика планирования
+            const model = aiProvider === 'google' ? 'gemini-1.5-pro' : (proxyParams.model || 'gemini-1.5-pro');
 
-            const history = messages.filter(m => m.role !== 'system');
+            const history = messages.filter(m => m.role !== 'system').slice(-6); // Экономия токенов: берем последние 6 сообщений
             const responseText = await callAI({ baseUrl, apiKey: key, model, systemPrompt: systemInstruction, history, userMessage });
 
             // --- Обработка тегов прямого управления ---
-            const completeRegex = /\[COMPLETE_TASK:\s*"([^"]+)"\]/g;
-            const editRegex = /\[EDIT_TASK_POINTS:\s*"([^"]+)"\s*\|\s*(\d+)\]/g;
-            const deleteTaskRegex = /\[DELETE_TASK:\s*"([^"]+)"\]/g;
-            const buyRewardRegex = /\[BUY_REWARD:\s*"([^"]+)"\]/g;
-            const deleteRewardRegex = /\[DELETE_REWARD:\s*"([^"]+)"\]/g;
+            const completeRegex = /\[COMPLETE_TASK:\s*"?([^"\]]+?)"?\s*\]/g;
+            const editRegex = /\[EDIT_TASK_POINTS:\s*"?([^"\|]+?)"?\s*\|\s*(\d+)\]/g;
+            const deleteTaskRegex = /\[DELETE_TASK:\s*"?([^"\]]+?)"?\s*\]/g;
+            const buyRewardRegex = /\[BUY_REWARD:\s*"?([^"\]]+?)"?\s*\]/g;
+            const deleteRewardRegex = /\[DELETE_REWARD:\s*"?([^"\]]+?)"?\s*\]/g;
 
             let processedText = responseText;
             let match;
@@ -230,7 +240,7 @@ ${calendarStr}
             };
 
             while ((match = completeRegex.exec(responseText)) !== null) {
-                const task = findTask(match[1]);
+                const task = findTask(match[1].trim());
                 if (task && !task.completed) {
                     useStore.getState().toggleTask(task.id);
                     useStore.getState().addTokens(task.value);
@@ -238,22 +248,22 @@ ${calendarStr}
             }
 
             while ((match = editRegex.exec(responseText)) !== null) {
-                const task = findTask(match[1]);
+                const task = findTask(match[1].trim());
                 if (task) useStore.getState().editTaskPoints(task.id, parseInt(match[2], 10));
             }
 
             while ((match = deleteTaskRegex.exec(responseText)) !== null) {
-                const task = findTask(match[1]);
+                const task = findTask(match[1].trim());
                 if (task) useStore.getState().deleteTaskWithReason(task.id, 'Удалено через Стратег Nova');
             }
 
             while ((match = buyRewardRegex.exec(responseText)) !== null) {
-                const reward = findReward(match[1]);
+                const reward = findReward(match[1].trim());
                 if (reward) useStore.getState().buyRewardById(reward.id);
             }
 
             while ((match = deleteRewardRegex.exec(responseText)) !== null) {
-                const reward = findReward(match[1]);
+                const reward = findReward(match[1].trim());
                 if (reward) {
                     useStore.getState().deleteRewardWithReason(reward.id, 'Удалено через Стратег Nova');
                     useStore.getState().addToast(`Награда "${reward.title}" удалена`, 'info');
@@ -372,6 +382,10 @@ ${calendarStr}
                     </div>
 
                     <div className="flex items-center gap-2">
+                        <div className="flex items-center gap-1.5 px-2.5 py-1 bg-accent/10 border border-accent/20 rounded-full text-[10px] font-medium text-accent/80 shrink-0">
+                            <span>Лимит ИИ:</span>
+                            <span>{aiTokensUsed.toLocaleString('ru-RU')} / 100 000</span>
+                        </div>
                         {isSearching ? (
                             <div className="flex items-center bg-black/40 border border-border rounded-full px-3 py-1 animate-fade-in w-48">
                                 <Search size={14} className="text-text-secondary mr-2 shrink-0" />
@@ -396,6 +410,13 @@ ${calendarStr}
                                 <Search size={16} />
                             </button>
                         )}
+                        <button
+                            onClick={() => setShowConfirmChat(true)}
+                            className="p-2 rounded-full transition-all text-text-secondary hover:text-danger hover:bg-danger/10 hover:rotate-12 hover:scale-110"
+                            title="Очистить весь чат"
+                        >
+                            <Eraser size={16} />
+                        </button>
                     </div>
                 </div>
 
@@ -449,12 +470,12 @@ ${calendarStr}
                                             </div>
                                         ) : (
                                             <>
-                                                <div className={`p - 3 rounded - 2xl text - sm shadow - sm ${msg.role === 'user'
-                                                    ? 'bg-blue-600/20 border border-blue-500/30 text-white rounded-tr-none whitespace-pre-wrap'
+                                                <div className={`p-3 rounded-2xl text-sm shadow-sm ${msg.role === 'user'
+                                                    ? 'bg-blue-600/20 border border-blue-500/30 text-white rounded-tr-none whitespace-pre-wrap flex-1 min-w-[50px] break-words'
                                                     : msg.role === 'system'
                                                         ? 'bg-black/30 border border-border text-text-secondary text-sm italic w-full text-center'
-                                                        : 'bg-bg-primary border border-border text-text-primary rounded-tl-none prose prose-invert max-w-none'
-                                                    } `}>
+                                                        : 'bg-accent/10 border border-accent/20 text-text-primary rounded-tl-none prose prose-invert max-w-none flex-1 min-w-[50px] markdown-content break-words'
+                                                    }`}>
                                                     {msg.role === 'user' || msg.role === 'system' ? (
                                                         <p className="whitespace-pre-wrap leading-relaxed">{msg.content}</p>
                                                     ) : (
@@ -516,15 +537,15 @@ ${calendarStr}
                                 setIsTyping(true);
                                 generateAIResponse(btn.msg);
                             }}
-                            className="px-3 py-2 bg-accent/10 border border-accent/20 rounded-xl text-xs text-accent hover:bg-accent/20 hover:border-accent/40 transition-all font-medium"
+                            className="px-3 py-2 bg-accent/10 border border-accent/20 rounded-xl text-xs text-accent hover:bg-accent/20 hover:border-accent/40 transition-all font-medium whitespace-nowrap"
                         >
                             {btn.text}
                         </button>
                     ))}
                 </div>
 
-                <form onSubmit={handleSend} className="p-4 border-t border-border bg-black/20">
-                    <div className="relative flex items-end">
+                <form onSubmit={handleSend} className="p-4 pt-2 relative z-10 w-full">
+                    <div className="relative flex items-end bg-[#13131a] border border-border/70 rounded-2xl pl-2 pr-14 py-1 focus-within:border-accent/50 focus-within:ring-1 focus-within:ring-accent/30 transition-all shadow-inner">
                         <textarea
                             value={input}
                             onChange={(e) => setInput(e.target.value)}
@@ -535,7 +556,7 @@ ${calendarStr}
                                 }
                             }}
                             placeholder="Опиши свои цели или проблемы..."
-                            className="w-full bg-bg-primary border border-border rounded-xl pl-4 pr-12 py-3 outline-none focus:border-accent focus:ring-1 focus:ring-accent transition-all text-sm resize-none custom-scrollbar"
+                            className="w-full bg-transparent border-none pl-2 pr-2 py-3 outline-none text-white transition-all text-sm resize-none custom-scrollbar placeholder:text-text-secondary"
                             disabled={isTyping}
                             rows={1}
                             style={{ maxHeight: '120px', minHeight: '44px', height: 'auto', overflowY: input.split('\n').length > 3 ? 'auto' : 'hidden' }}
@@ -544,8 +565,7 @@ ${calendarStr}
                         <button
                             type="submit"
                             disabled={!input.trim() || isTyping}
-                            className={`absolute right - 2 bottom - 2 p - 2 rounded - lg transition - all ${input.trim() && !isTyping ? 'bg-accent text-white hover:bg-accent-hover' : 'text-text-secondary'
-                                } `}
+                            className={`absolute right-2 bottom-2 p-2 rounded-lg transition-all ${input.trim() && !isTyping ? 'bg-accent text-white hover:bg-accent-hover' : 'text-text-secondary hover:text-white/50'}`}
                         >
                             <Send size={16} />
                         </button>

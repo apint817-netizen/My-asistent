@@ -40,6 +40,11 @@ export const useStore = create(
         model: 'gemini-2.0-flash',
         key: 'sk-9c00aee346154596bda23aa319d6cbf1'
       },
+      userProfile: {
+        bio: '',
+        goals: '',
+        interests: ''
+      },
       calendarTasks: {},
       version: 2,
       showMobileMenu: false,
@@ -51,6 +56,7 @@ export const useStore = create(
       setGoogleModel: (model) => set({ googleModel: model }),
       setAiProvider: (provider) => set({ aiProvider: provider }),
       setProxyParams: (params) => set((state) => ({ proxyParams: { ...state.proxyParams, ...params } })),
+      updateUserProfile: (profile) => set((state) => ({ userProfile: { ...state.userProfile, ...profile } })),
       setShowMobileMenu: (show) => set({ showMobileMenu: show }),
       addToast: (message, type = 'success') => {
         const id = Date.now().toString() + Math.random();

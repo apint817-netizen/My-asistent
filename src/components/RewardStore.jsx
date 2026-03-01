@@ -24,14 +24,55 @@ export default function RewardStore() {
 
     const deleteRewardWithReason = useStore(state => state.deleteRewardWithReason);
 
-    const [validationError, setValidationError] = useState('');
-    const [isValidating, setIsValidating] = useState(false);
+    const validateInput = (text) => {
+        const cleaned = text.trim();
+        if (cleaned.length < 2) return 'Слишком короткое название';
+
+        if (/^[^a-zA-Zа-яА-ЯёЁ0-9]+$/.test(cleaned)) {
+            return 'Пожалуйста, введите осмысленное название';
+        }
+
+        if (/^\d+$/.test(cleaned)) {
+            if (cleaned.length > 4 && !/00$/.test(cleaned)) {
+                return 'Слишком много случайных цифр';
+            }
+        }
+
+        if (/(.)\1{3,}/.test(cleaned)) {
+            return 'Слишком много повторяющихся символов';
+        }
+
+        const smashPattern = /^(asdf|qwer|zxcv|фыва|йцук|ячсм|asd|qwe|zxc|йцу|фыв|ячс)[a-zа-яё]*$/i;
+        const manyConsonantsEn = /[bcdfghjklmnpqrstvwxz]{5,}/i;
+        const manyConsonantsRu = /[бвгджзйклмнпрстфхцчшщ]{5,}/i; // Уменьшил до 5 для лучшего отлова
+
+        if (smashPattern.test(cleaned) || manyConsonantsEn.test(cleaned) || manyConsonantsRu.test(cleaned)) {
+            return 'Пожалуйста, введите без случайных наборов букв';
+        }
+
+        const uniqueChars = new Set(cleaned.toLowerCase().replace(/\s/g, '').split('')).size;
+        if (cleaned.length >= 5 && uniqueChars <= 2) {
+            return 'Пожалуйста, введите осмысленное название';
+        }
+
+        return null; // Валидно
+    };
+
+    const [error, setError] = useState('');
+    const [isAdding, setIsAdding] = useState(false);
 
     const handleAddReward = async (e) => {
         e.preventDefault();
-        if (!newRewardTitle.trim() || newRewardCost <= 0) return;
-        setValidationError('');
-        setIsValidating(true);
+        if (!newRewardTitle.trim() || newRewardCost <= 0 || isAdding) return;
+
+        const localError = validateInput(newRewardTitle);
+        if (localError) {
+            setError(localError);
+            return;
+        }
+
+        setIsAdding(true);
+        setError('');
         try {
             const apiKey = useStore.getState().apiKey;
             const headers = { 'Content-Type': 'application/json' };
@@ -44,14 +85,14 @@ export default function RewardStore() {
             });
             const data = await resp.json();
             if (!data.valid) {
-                setValidationError(data.reason || 'Некорректный ввод');
-                setIsValidating(false);
+                setError(data.reason || 'Некорректный ввод');
+                setIsAdding(false);
                 return;
             }
         } catch (err) {
             // При ошибке сети — пропускаем
         }
-        setIsValidating(false);
+        setIsAdding(false);
         addReward({ title: newRewardTitle, cost: Number(newRewardCost) });
         setNewRewardTitle('');
         setNewRewardCost(100);
@@ -210,9 +251,9 @@ export default function RewardStore() {
                         <input
                             type="text"
                             placeholder="Новая награда..."
-                            className={`flex-1 bg-black/40 border rounded-lg px-4 py-2 text-sm outline-none focus:border-warning focus:ring-1 focus:ring-warning transition-all placeholder:text-text-secondary ${validationError ? 'border-danger' : 'border-border'}`}
+                            className={`flex-1 bg-black/40 border rounded-lg px-4 py-2 text-sm outline-none focus:border-warning focus:ring-1 focus:ring-warning transition-all placeholder:text-text-secondary ${error ? 'border-danger' : 'border-border'}`}
                             value={newRewardTitle}
-                            onChange={(e) => { setNewRewardTitle(e.target.value); setValidationError(''); }}
+                            onChange={(e) => { setNewRewardTitle(e.target.value); setError(''); }}
                         />
                         <input
                             type="number"
@@ -223,14 +264,14 @@ export default function RewardStore() {
                         />
                         <button
                             type="submit"
-                            disabled={!newRewardTitle.trim() || isValidating}
+                            disabled={!newRewardTitle.trim() || isAdding}
                             className="bg-bg-primary border border-border text-white px-3 sm:px-4 py-2 rounded-lg hover:bg-black/60 hover:text-warning hover:border-warning/50 transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center"
                         >
-                            {isValidating ? <span className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" /> : <Plus size={20} />}
+                            {isAdding ? <span className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" /> : <Plus size={20} />}
                         </button>
                     </div>
-                    {validationError && (
-                        <p className="text-xs text-danger animate-fade-in">{validationError}</p>
+                    {error && (
+                        <p className="text-xs text-danger animate-fade-in">{error}</p>
                     )}
                 </form>
             )}
