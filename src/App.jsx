@@ -13,6 +13,8 @@ import HelpView from './components/HelpView';
 import AISettingsModal from './components/AISettingsModal';
 import PointsHistoryModal from './components/PointsHistoryModal';
 import AuthView from './components/AuthView';
+import OnboardingView from './components/OnboardingView';
+import DashboardTour from './components/DashboardTour';
 import Tooltip from './components/Tooltip';
 import { supabase, isSupabaseConfigured } from './lib/supabase';
 import ToastContainer from './components/ToastContainer';
@@ -22,17 +24,24 @@ function App() {
   const streak = useStore(state => state.streak);
   const updateActivity = useStore(state => state.updateActivity);
 
-  const [activeTab, setActiveTab] = useState('dashboard');
-  const [isRewardStoreOpen, setIsRewardStoreOpen] = useState(true);
+  const activeTab = useStore(state => state.activeTab);
+  const setActiveTab = useStore(state => state.setActiveTab);
+  const isRewardStoreOpen = useStore(state => state.isRewardStoreOpen);
+  const setIsRewardStoreOpen = useStore(state => state.setIsRewardStoreOpen);
+  const showAISettings = useStore(state => state.showAISettings);
+  const setShowAISettings = useStore(state => state.setShowAISettings);
+  const showAnalysisModal = useStore(state => state.showAnalysisModal);
+  const setShowAnalysisModal = useStore(state => state.setShowAnalysisModal);
+  const showPointsHistory = useStore(state => state.showPointsHistory);
+  const setShowPointsHistory = useStore(state => state.setShowPointsHistory);
+
   const [showHelp, setShowHelp] = useState(false);
-  const [showAISettings, setShowAISettings] = useState(false);
-  const [showAnalysisModal, setShowAnalysisModal] = useState(false);
-  const [showPointsHistory, setShowPointsHistory] = useState(false);
 
   // Auth state
   const [user, setUser] = useState(null);
   const [authLoading, setAuthLoading] = useState(true);
   const [authSkipped, setAuthSkipped] = useState(() => localStorage.getItem('nova-auth-skipped') === 'true');
+  const hasCompletedOnboarding = useStore(state => state.hasCompletedOnboarding);
 
   useEffect(() => {
     updateActivity();
@@ -76,6 +85,11 @@ function App() {
     return <AuthView onSkip={handleSkipAuth} />;
   }
 
+  // Show onboarding if logged in but hasn't completed it
+  if (isSupabaseConfigured() && user && !authSkipped && !hasCompletedOnboarding) {
+    return <OnboardingView />;
+  }
+
   // Loading
   if (authLoading && isSupabaseConfigured()) {
     return (
@@ -90,6 +104,7 @@ function App() {
       <ToastContainer />
       <TaskProposalModal />
       <RewardProposalModal />
+      <DashboardTour />
       <HelpView isOpen={showHelp} onClose={() => setShowHelp(false)} />
       <AISettingsModal isOpen={showAISettings} onClose={() => setShowAISettings(false)} />
       <PointsHistoryModal isOpen={showPointsHistory} onClose={() => setShowPointsHistory(false)} />
@@ -113,6 +128,7 @@ function App() {
 
         <div className="flex items-center gap-3 self-start md:self-auto relative z-10">
           <button
+            id="tour-settings"
             onClick={() => setShowAISettings(true)}
             className="w-10 h-10 rounded-full bg-white/5 border border-border flex items-center justify-center text-text-secondary hover:text-accent hover:border-accent/50 transition-all hover:scale-110"
             title="Настройки ИИ"
@@ -136,6 +152,7 @@ function App() {
             <HelpCircle size={18} />
           </button>
           <button
+            id="tour-points"
             onClick={() => setShowPointsHistory(true)}
             className="bg-bg-primary/50 backdrop-blur-md border border-border pl-4 pr-6 py-3 rounded-2xl flex items-center gap-4 shadow-lg shadow-black/20 hover:bg-bg-primary hover:border-warning/30 transition-all text-left group"
           >
@@ -153,7 +170,7 @@ function App() {
         </div>
       </header>
 
-      <div className="flex bg-black/40 p-1 rounded-2xl border border-border w-fit shadow-inner z-10 relative">
+      <div id="tour-summary" className="flex bg-black/40 p-1 rounded-2xl border border-border w-fit shadow-inner z-10 relative">
         <Tooltip text="Добавляйте задачи на сегодня и обменивайте очки на награды" position="bottom">
           <button
             onClick={() => setActiveTab('dashboard')}
@@ -165,6 +182,7 @@ function App() {
         </Tooltip>
         <Tooltip text="Планируйте задачи на будущие дни и следите за нагрузкой" position="bottom">
           <button
+            id="tour-calendar-tab"
             onClick={() => setActiveTab('calendar')}
             className={`px-5 py-2.5 rounded-xl flex items-center gap-2 text-sm font-semibold transition-all ${activeTab === 'calendar' ? 'bg-accent/20 text-accent shadow-[0_0_15px_rgba(var(--color-accent),0.2)]' : 'text-text-secondary hover:text-white hover:bg-white/5'}`}
           >
@@ -174,6 +192,7 @@ function App() {
         </Tooltip>
         <Tooltip text="Загрузите резюме и получите персональный план задач от ИИ" position="bottom">
           <button
+            id="tour-resume-tab"
             onClick={() => setActiveTab('resume')}
             className={`px-5 py-2.5 rounded-xl flex items-center gap-2 text-sm font-semibold transition-all ${activeTab === 'resume' ? 'bg-accent/20 text-accent shadow-[0_0_15px_rgba(var(--color-accent),0.2)]' : 'text-text-secondary hover:text-white hover:bg-white/5'}`}
           >
@@ -200,6 +219,7 @@ function App() {
                         Цели и Привычки
                       </h2>
                       <button
+                        id="tour-analysis-btn"
                         onClick={() => setShowAnalysisModal(true)}
                         className="ml-auto flex items-center gap-2 text-sm font-bold bg-gradient-to-r from-indigo-500 to-purple-600 text-white hover:from-indigo-400 hover:to-purple-500 px-4 py-2 rounded-xl transition-all shadow-[0_0_15px_rgba(99,102,241,0.4)] hover:shadow-[0_0_25px_rgba(99,102,241,0.6)] hover:-translate-y-0.5"
                         title="Открыть стратегический анализ"
@@ -210,7 +230,7 @@ function App() {
                     <TaskManager />
                   </section>
 
-                  <section className="glass-panel p-6 flex flex-col transition-all duration-300 shrink-0">
+                  <section id="tour-rewards" className="glass-panel p-6 flex flex-col transition-all duration-300 shrink-0">
                     <div
                       className="flex justify-between items-center cursor-pointer group select-none mb-0"
                       onClick={() => setIsRewardStoreOpen(!isRewardStoreOpen)}
@@ -244,7 +264,7 @@ function App() {
             </div>
 
             {/* Right Column: AI Mentorship */}
-            <div className="lg:col-span-2 flex flex-col gap-6 animate-fade-in lg:sticky lg:top-6" style={{ animationDelay: '0.2s' }}>
+            <div id="tour-ai" className="lg:col-span-2 flex flex-col gap-6 animate-fade-in lg:sticky lg:top-6" style={{ animationDelay: '0.2s' }}>
               <aside className="glass-panel p-0 flex flex-col h-[650px]">
                 <AIAssistant />
               </aside>

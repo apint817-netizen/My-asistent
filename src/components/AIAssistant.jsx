@@ -9,6 +9,8 @@ export default function AIAssistant() {
     const messages = useStore(state => state.chatMessages);
     const addMessage = useStore(state => state.addChatMessage);
     const clearMessages = useStore(state => state.clearChatMessages);
+    const hasCompletedOnboarding = useStore(state => state.hasCompletedOnboarding);
+    const hasSeenTour = useStore(state => state.hasSeenTour);
     const tokens = useStore(state => state.tokens);
     const tasks = useStore(state => state.tasks);
     const rewards = useStore(state => state.rewards);
@@ -83,22 +85,9 @@ export default function AIAssistant() {
         return () => clearTimeout(timeoutId);
     }, [messages, isTyping]);
 
+    // Removed redundant auto-trigger logic, handled explicitly in OnboardingView handleFinish
 
-
-
-    const generateAIResponse = async (userMessage) => {
-        // Для Google: ключ может быть на сервере Vercel (GOOGLE_API_KEY), поэтому НЕ блокируем
-        if (aiProvider === 'proxy' && !proxyParams.url) {
-            setTimeout(() => {
-                addMessage({
-                    role: 'assistant',
-                    content: 'Укажите URL локального прокси в настройках, чтобы я мог ответить!'
-                });
-                setIsTyping(false);
-            }, 500);
-            return;
-        }
-
+    const generateAIResponse = async (userMessage, currentAttachments = []) => {
         try {
             // Нумерованный список задач (ИИ может ссылаться по номеру)
             const pendingTasksList = tasks.filter(t => !t.completed);
@@ -313,12 +302,20 @@ ${availableRewards}
                 useStore.getState().usePurchase(match[1].trim());
             }
 
+            // START_TOUR
+            const startTourRegex = /\[START_TOUR\]/g;
+            if (startTourRegex.test(responseText)) {
+                useStore.getState().setHasSeenTour(false);
+            }
+
             cleanResponse = cleanResponse
                 .replace(completeRegex, '').replace(editRegex, '')
                 .replace(addTaskRegex, '').replace(addCalendarTaskRegex, '')
+                .replace(addRegularTaskRegex, '')
                 .replace(deleteTaskRegex, '')
                 .replace(addRewardRegex, '').replace(deleteRewardRegex, '')
                 .replace(buyRewardRegex, '').replace(usePurchaseRegex, '')
+                .replace(startTourRegex, '')
                 .trim();
 
             if (!cleanResponse) {
@@ -346,11 +343,14 @@ ${availableRewards}
         }
     };
 
-    const handleSend = async (e) => {
+    const handleSend = async (e = null, messageOverride = null, isSilentAutoPrompt = false) => {
         if (e) e.preventDefault();
-        if (!input.trim() && attachments.length === 0) return;
 
-        const userMsg = input.trim();
+        const textToProcess = messageOverride || input;
+
+        if (!textToProcess.trim() && attachments.length === 0) return;
+
+        const userMsg = textToProcess.trim();
         const currentAttachments = [...attachments];
 
         setInput('');
@@ -371,8 +371,11 @@ ${availableRewards}
             displayContent = parts;
         }
 
-        addMessage({ role: 'user', content: displayContent });
-        setIsTyping(true);
+        if (!isSilentAutoPrompt) {
+            addMessage({ role: 'user', content: displayContent });
+        }
+
+        setIsThinking(true);
 
         await generateAIResponse(userMsg, currentAttachments);
     };
@@ -794,8 +797,9 @@ ${availableRewards}
                     <textarea
                         placeholder={attachments.length > 0 ? "Добавить описание..." : "Написать Nova... (или перетащите сюда картинку)"}
                         className="w-full bg-transparent border-none pl-2 pr-2 py-3 text-sm outline-none text-white placeholder:text-text-secondary resize-none custom-scrollbar"
-                        value={input}
+                        value={useStore(state => state.tourDemoAIText) || input}
                         onChange={(e) => setInput(e.target.value)}
+                        readOnly={!!useStore(state => state.tourDemoAIText)}
                         onPaste={handlePaste}
                         onKeyDown={(e) => {
                             if (e.key === 'Enter' && !e.shiftKey) {

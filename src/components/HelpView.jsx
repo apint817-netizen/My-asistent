@@ -1,4 +1,5 @@
 import React from 'react';
+import { useStore } from '../store/useStore';
 import { X, Target, Trophy, Calendar, Brain, Settings, Sparkles } from 'lucide-react';
 
 const sections = [
@@ -80,9 +81,27 @@ export default function HelpView({ isOpen, onClose }) {
                     ))}
                 </div>
 
-                <div className="mt-6 text-center">
+                <div className="mt-6 flex flex-col sm:flex-row gap-3 justify-center">
                     <button
-                        onClick={onClose}
+                        onClick={(e) => {
+                            e.preventDefault();
+                            e.stopPropagation();
+                            onClose();
+                            setTimeout(() => {
+                                useStore.getState().setHasSeenTour(false);
+                            }, 50);
+                        }}
+                        className="px-6 py-2.5 bg-white/10 text-white rounded-xl text-sm font-semibold hover:bg-white/20 transition-colors flex items-center justify-center gap-2"
+                    >
+                        <Sparkles size={16} className="text-accent" />
+                        Перезапустить обучение
+                    </button>
+                    <button
+                        onClick={(e) => {
+                            e.preventDefault();
+                            e.stopPropagation();
+                            onClose();
+                        }}
                         className="px-6 py-2.5 bg-accent text-white rounded-xl text-sm font-semibold hover:bg-accent-hover transition-colors"
                     >
                         Понятно, закрыть

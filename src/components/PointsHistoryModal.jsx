@@ -14,7 +14,7 @@ export default function PointsHistoryModal({ isOpen, onClose }) {
 
     return (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 sm:p-6 animate-fade-in bg-black/60 backdrop-blur-md">
-            <div className="bg-bg-secondary border border-border rounded-2xl w-full max-w-lg shadow-2xl flex flex-col relative overflow-hidden max-h-[90vh]">
+            <div id="tour-points-modal-override" className="bg-bg-secondary border border-border rounded-2xl w-full max-w-lg shadow-2xl flex flex-col relative overflow-hidden max-h-[90vh]">
                 <div className="p-6 border-b border-border flex items-center justify-between relative z-10 bg-bg-secondary/80 backdrop-blur-sm">
                     <div className="flex items-center gap-3">
                         <div className="w-10 h-10 rounded-full bg-warning/20 flex items-center justify-center text-warning shadow-[0_0_15px_rgba(245,158,11,0.2)]">

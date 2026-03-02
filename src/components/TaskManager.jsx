@@ -209,7 +209,7 @@ export default function TaskManager() {
 
     return (
         <div className="flex flex-col h-full relative">
-            <div className="flex-1 overflow-y-auto flex flex-col gap-3 mb-6 pr-2 pb-2">
+            <div id="tour-task-list" className="flex-1 overflow-y-auto flex flex-col gap-3 mb-6 pr-2 pb-2">
                 <DndContext
                     sensors={sensors}
                     collisionDetection={closestCenter}
@@ -252,14 +252,15 @@ export default function TaskManager() {
                 )}
             </div>
 
-            <form onSubmit={handleAddTask} className="mt-auto flex flex-col gap-1">
+            <form id="tour-add-task" onSubmit={handleAddTask} className="mt-auto flex flex-col gap-1">
                 <div className="flex gap-2">
                     <input
                         type="text"
                         placeholder="Новая задача..."
                         className={`flex-1 bg-[rgba(255,255,255,0.05)] border rounded-md px-4 py-2 text-text-primary outline-none focus:border-accent transition-colors ${error ? 'border-danger' : 'border-[rgba(255,255,255,0.1)]'}`}
-                        value={newTaskTitle}
+                        value={useStore(state => state.tourDemoTaskText) || newTaskTitle}
                         onChange={(e) => { setNewTaskTitle(e.target.value); setError(''); }}
+                        readOnly={!!useStore(state => state.tourDemoTaskText)}
                     />
                     <input
                         type="number"

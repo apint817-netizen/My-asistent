@@ -48,10 +48,30 @@ export const useStore = create(
       calendarTasks: {},
       version: 2,
       showMobileMenu: false,
+      // Auth State
+      user: null,
+      session: null,
+      hasCompletedOnboarding: false,
+      hasSeenTour: false,
       // Тосты
       toasts: [],
+      // UI State for Tour Control
+      activeTab: 'dashboard',
+      isRewardStoreOpen: true,
+      showAISettings: false,
+      showAnalysisModal: false,
+      showPointsHistory: false,
+      tourDemoTaskText: '',
+      tourDemoAIText: '',
 
       // Actions
+      setUserSession: (session) => set({
+        session: session,
+        user: session?.user || null
+      }),
+      completeOnboarding: () => set({ hasCompletedOnboarding: true }),
+      completeTour: () => set({ hasSeenTour: true }),
+      setHasSeenTour: (value) => set({ hasSeenTour: value }),
       setApiKey: (key) => set({ apiKey: key }),
       setGoogleModel: (model) => set({ googleModel: model }),
       setAiProvider: (provider) => set({ aiProvider: provider }),
@@ -66,6 +86,16 @@ export const useStore = create(
         }, 3000);
       },
       removeToast: (id) => set(state => ({ toasts: state.toasts.filter(t => t.id !== id) })),
+
+      // UI Control Actions
+      setActiveTab: (tab) => set({ activeTab: tab }),
+      setIsRewardStoreOpen: (open) => set({ isRewardStoreOpen: open }),
+      setShowAISettings: (show) => set({ showAISettings: show }),
+      setShowAnalysisModal: (show) => set({ showAnalysisModal: show }),
+      setShowPointsHistory: (show) => set({ showPointsHistory: show }),
+      setTourDemoTaskText: (text) => set({ tourDemoTaskText: text }),
+      setTourDemoAIText: (text) => set({ tourDemoAIText: text }),
+
       addAiTokensUsed: (amount) => set((state) => ({ aiTokensUsed: (state.aiTokensUsed || 0) + amount })),
       addTokens: (amount, title = 'Выполнение задачи') => set((state) => ({
         tokens: state.tokens + amount,

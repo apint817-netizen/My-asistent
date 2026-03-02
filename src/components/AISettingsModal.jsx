@@ -1,7 +1,8 @@
 import { useState, useEffect } from 'react';
 import { useStore } from '../store/useStore';
-import { Settings, Bot, X, Link as LinkIcon, Zap, HelpCircle, ChevronDown, Sparkles, Heart, Code, Trash2, User } from 'lucide-react';
+import { Settings, Bot, X, Link as LinkIcon, Zap, HelpCircle, ChevronDown, Sparkles, Heart, Code, Trash2, User, LogOut } from 'lucide-react';
 import { PROXY_MODELS } from '../utils/geminiApi';
+import { isSupabaseConfigured, supabase } from '../lib/supabase';
 
 export default function AISettingsModal({ isOpen, onClose }) {
     const apiKey = useStore(state => state.apiKey);
@@ -39,9 +40,18 @@ export default function AISettingsModal({ isOpen, onClose }) {
         onClose();
     };
 
+    const handleLogout = async () => {
+        localStorage.clear();
+        if (isSupabaseConfigured()) {
+            await supabase.auth.signOut();
+        }
+        window.location.reload();
+    };
+
     return (
         <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4 animate-fade-in" onClick={onClose}>
             <div
+                id="tour-settings-modal-override"
                 className="glass-panel w-full max-w-2xl max-h-[85vh] overflow-y-auto p-0 relative animate-fade-in custom-scrollbar"
                 onClick={e => e.stopPropagation()}
             >
@@ -266,6 +276,15 @@ export default function AISettingsModal({ isOpen, onClose }) {
                                     Сохранить профиль
                                 </button>
                             </form>
+
+                            <div className="pt-4 border-t border-white/5">
+                                <button
+                                    onClick={handleLogout}
+                                    className="w-full bg-danger/10 text-danger border border-danger/20 hover:bg-danger/20 px-4 py-3 rounded-xl text-sm transition-colors font-semibold shadow-lg shadow-danger/5 flex items-center justify-center gap-2"
+                                >
+                                    <LogOut size={16} /> Выйти из аккаунта
+                                </button>
+                            </div>
                         </div>
                     )}
 

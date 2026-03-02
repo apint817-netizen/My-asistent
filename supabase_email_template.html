@@ -1,0 +1,68 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Подтверждение регистрации</title>
+</head>
+<body style="margin: 0; padding: 0; background-color: #0d0d12; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; color: #ffffff;">
+    <table width="100%" cellpadding="0" cellspacing="0" border="0" style="background-color: #0d0d12; width: 100%; height: 100%;">
+        <tr>
+            <td align="center" style="padding: 40px 20px;">
+                <table width="100%" max-width="600" cellpadding="0" cellspacing="0" border="0" style="max-width: 600px; background-color: #15151e; border-radius: 20px; border: 1px solid rgba(255, 255, 255, 0.05); overflow: hidden;">
+                    <!-- Header -->
+                    <tr>
+                        <td align="center" style="padding: 40px 0 20px 0;">
+                            <div style="display: inline-block; padding: 16px; background: linear-gradient(135deg, rgba(99, 102, 241, 0.2) 0%, rgba(139, 92, 246, 0.2) 100%); border-radius: 24px; border: 1px solid rgba(99, 102, 241, 0.3);">
+                                <img src="https://api.iconify.design/lucide:sparkles.svg?color=%238b5cf6" alt="Nova" width="48" height="48" style="display: block;">
+                            </div>
+                        </td>
+                    </tr>
+                    
+                    <!-- Content -->
+                    <tr>
+                        <td align="center" style="padding: 0 40px;">
+                            <h1 style="margin: 0 0 20px 0; font-size: 28px; font-weight: 800; background: linear-gradient(to right, #ffffff, #a5a5b0); -webkit-background-clip: text; -webkit-text-fill-color: transparent; letter-spacing: -0.5px;">Добро пожаловать в систему.</h1>
+                            
+                            <p style="margin: 0 0 24px 0; font-size: 16px; line-height: 1.6; color: #a1a1aa;">
+                                Привет. Я <strong>Nova</strong> — твой персональный ИИ-ассистент.<br>
+                                Рада познакомиться. Мы собираемся выстроить мощную систему привычек, которая приведет тебя к твоим целям.
+                            </p>
+                            
+                            <p style="margin: 0 0 32px 0; font-size: 16px; line-height: 1.6; color: #a1a1aa;">
+                                Остался всего один шаг для инициализации моего ядра. Подтверди свой доступ:
+                            </p>
+                        </td>
+                    </tr>
+                    
+                    <!-- Button -->
+                    <tr>
+                        <td align="center" style="padding: 0 40px 40px 40px;">
+                            <table cellpadding="0" cellspacing="0" border="0">
+                                <tr>
+                                    <td align="center" bgcolor="#6366f1" style="border-radius: 12px; box-shadow: 0 4px 14px 0 rgba(99, 102, 241, 0.39);">
+                                        <!-- ВАЖНО: href="{{ .ConfirmationURL }}" — это переменная Supabase. Не удаляйте её. -->
+                                        <a href="{{ .ConfirmationURL }}" target="_blank" style="display: inline-block; padding: 16px 32px; font-size: 16px; font-weight: 600; color: #ffffff; text-decoration: none; border: 1px solid rgba(0,0,0,0.1); border-radius: 12px; text-transform: uppercase; letter-spacing: 0.5px;">
+                                            Инициализировать Вход
+                                        </a>
+                                    </td>
+                                </tr>
+                            </table>
+                        </td>
+                    </tr>
+
+                    <!-- Footer -->
+                    <tr>
+                        <td align="center" style="padding: 30px 40px; background-color: rgba(0, 0, 0, 0.2); border-top: 1px solid rgba(255, 255, 255, 0.05);">
+                            <p style="margin: 0; font-size: 12px; color: #71717a; line-height: 1.5;">
+                                Если ты получил это письмо по ошибке — просто проигнорируй его.<br>
+                                Твоя Nova OS. Заряжено искусственным интеллектом.
+                            </p>
+                        </td>
+                    </tr>
+                </table>
+            </td>
+        </tr>
+    </table>
+</body>
+</html>
