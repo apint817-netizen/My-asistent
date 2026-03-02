@@ -1,9 +1,4 @@
 {
-    "functions": {
-        "api/**/*.js": {
-            "excludeFiles": "node_modules/{@napi-rs/canvas/**,pdfjs-dist/legacy/**}"
-        }
-    },
     "headers": [
         {
             "source": "/(.*)",
