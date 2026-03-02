@@ -149,6 +149,8 @@ export default function OnboardingView({ onComplete }) {
         });
 
         completeOnboarding();
+        // Reset tour state so DashboardTour auto-starts after onboarding
+        useStore.getState().setHasSeenTour(false);
         if (onComplete) onComplete();
     };
 
