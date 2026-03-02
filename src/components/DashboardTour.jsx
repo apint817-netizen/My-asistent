@@ -169,23 +169,29 @@ export default function DashboardTour() {
     const [currentStep, setCurrentStep] = useState(0);
     const [isActive, setIsActive] = useState(false);
     const [targetRect, setTargetRect] = useState(null);
+    const [showPrompt, setShowPrompt] = useState(false);
 
-    // Trigger tour if not seen
+    // Show prompt (not auto-start tour) if not seen
     useEffect(() => {
         if (!hasSeenTour) {
-            // Immediate trigger if manually activated, delayed if organically onboarding
-            // We can infer a manual trig if `currentStep` is 0 and it's not active, but the app is already loaded so we don't need a huge delay.
-            // A more robust check is if it's the very first load vs later. We'll use a short delay to ensure modal unmounting finishes.
-            const timeout = document.querySelector('.bg-black\\/60') ? 300 : 3000;
-
             const timer = setTimeout(() => {
-                setIsActive(true);
-                setCurrentStep(0);
-                updateSpotlight(steps[0].targetId);
-            }, timeout);
+                setShowPrompt(true);
+            }, 1500);
             return () => clearTimeout(timer);
         }
     }, [hasSeenTour]);
+
+    const startTour = () => {
+        setShowPrompt(false);
+        setIsActive(true);
+        setCurrentStep(0);
+        updateSpotlight(steps[0].targetId);
+    };
+
+    const skipTour = () => {
+        setShowPrompt(false);
+        completeTour();
+    };
 
     // Handle resize and scroll
     useEffect(() => {
@@ -290,6 +296,45 @@ export default function DashboardTour() {
         completeTour();
     };
 
+    // Render Nova prompt if tour hasn't been seen
+    if (showPrompt && !isActive) {
+        return (
+            <div className="fixed inset-0 z-[99990] flex items-center justify-center bg-black/60 backdrop-blur-sm animate-fade-in">
+                <div className="glass-panel border-2 border-accent/40 bg-bg-secondary/95 p-8 max-w-md w-full mx-4 shadow-[0_0_60px_rgba(99,102,241,0.3)] animate-scale-in">
+                    <div className="flex items-center gap-4 mb-6">
+                        <div className="relative">
+                            <div className="absolute inset-0 bg-accent/30 rounded-full blur animate-[pulse_2s_ease-in-out_infinite]" />
+                            <div className="w-14 h-14 rounded-2xl bg-gradient-to-br from-accent to-purple-600 flex items-center justify-center shadow-lg relative z-10">
+                                <Sparkles size={28} className="text-white" />
+                            </div>
+                        </div>
+                        <div>
+                            <span className="text-xs text-accent font-bold uppercase tracking-wider">Nova OS</span>
+                            <h3 className="font-bold text-white text-xl">Экскурсия по интерфейсу</h3>
+                        </div>
+                    </div>
+                    <p className="text-text-secondary text-sm leading-relaxed mb-8">
+                        Хочешь, я проведу тебе короткую экскурсию? Я покажу все ключевые функции и расскажу, как извлечь максимум из системы. Займёт пару минут.
+                    </p>
+                    <div className="flex gap-3">
+                        <button
+                            onClick={skipTour}
+                            className="flex-1 px-5 py-3 bg-white/5 hover:bg-white/10 text-text-secondary hover:text-white font-medium rounded-xl text-sm transition-all"
+                        >
+                            Пропустить
+                        </button>
+                        <button
+                            onClick={startTour}
+                            className="flex-1 px-5 py-3 bg-white text-black font-bold rounded-xl text-sm hover:scale-[1.02] transition-all shadow-lg shadow-white/10 flex items-center justify-center gap-2"
+                        >
+                            <Sparkles size={16} /> Да, давай!
+                        </button>
+                    </div>
+                </div>
+            </div>
+        );
+    }
+
     if (!isActive || !targetRect) return null;
 
     const step = steps[currentStep];
@@ -381,6 +426,12 @@ export default function DashboardTour() {
                     </div>
 
                     <div className="flex gap-2 relative z-10">
+                        <button
+                            onClick={endTour}
+                            className="px-4 py-2 whitespace-nowrap text-text-secondary hover:text-white text-sm font-medium transition-colors"
+                        >
+                            Пропустить
+                        </button>
                         {currentStep > 0 && (
                             <button
                                 onClick={handlePrev}

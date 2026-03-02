@@ -40,7 +40,6 @@ function App() {
   // Auth state
   const [user, setUser] = useState(null);
   const [authLoading, setAuthLoading] = useState(true);
-  const [authSkipped, setAuthSkipped] = useState(() => localStorage.getItem('nova-auth-skipped') === 'true');
   const hasCompletedOnboarding = useStore(state => state.hasCompletedOnboarding);
 
   useEffect(() => {
@@ -70,23 +69,16 @@ function App() {
     if (supabase) {
       await supabase.auth.signOut();
       setUser(null);
-      setAuthSkipped(false);
-      localStorage.removeItem('nova-auth-skipped');
     }
   };
 
-  const handleSkipAuth = () => {
-    setAuthSkipped(true);
-    localStorage.setItem('nova-auth-skipped', 'true');
-  };
-
-  // Show auth screen if Supabase is configured, user is not logged in, and hasn't skipped
-  if (isSupabaseConfigured() && !user && !authSkipped && !authLoading) {
-    return <AuthView onSkip={handleSkipAuth} />;
+  // Show auth screen if Supabase is configured and user is not logged in
+  if (isSupabaseConfigured() && !user && !authLoading) {
+    return <AuthView />;
   }
 
   // Show onboarding if logged in but hasn't completed it
-  if (isSupabaseConfigured() && user && !authSkipped && !hasCompletedOnboarding) {
+  if (isSupabaseConfigured() && user && !hasCompletedOnboarding) {
     return <OnboardingView />;
   }
 

@@ -8,21 +8,11 @@ export const useStore = create(
       aiTokensUsed: 0,
       streak: 0,
       lastActiveDate: null,
-      tasks: [
-        { id: '1', title: 'Выпить стакан воды с утра', completed: false, value: 5 },
-        { id: '2', title: 'Сфокусированная работа (2 часа)', completed: false, value: 50 },
-        { id: '3', title: 'Прочитать 10 страниц', completed: false, value: 15 },
-      ],
-      rewards: [
-        { id: '1', title: 'Поиграть в игры 1 час', cost: 100 },
-        { id: '2', title: 'Заказать любимую еду', cost: 300 },
-        { id: '3', title: 'Вечер отдыха без чувства вины', cost: 500 },
-      ],
+      tasks: [],
+      rewards: [],
       pointsHistory: [],
       purchaseHistory: [],
-      chatMessages: [
-        { role: 'assistant', content: 'Привет! Я Nova, твой личный ИИ-ассистент. Я здесь, чтобы помочь тебе не сбиться с пути и заработать на свои любимые награды. Давай сделаем сегодня отличный день!', timestamp: new Date().toISOString() }
-      ],
+      chatMessages: [],
       analysisMessages: [],
       chatDraft: '',
       analysisDraft: '',
