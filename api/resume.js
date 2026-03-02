@@ -1,5 +1,17 @@
 import mammoth from 'mammoth';
-import pdfParse from 'pdf-parse';
+import { getDocument } from 'pdfjs-dist/legacy/build/pdf.mjs';
+
+// Define a minimal shim for window that pdfjs might rely on
+if (typeof globalThis.window === 'undefined') {
+    globalThis.window = {
+        location: { href: '' },
+        setTimeout: global.setTimeout,
+        clearTimeout: global.clearTimeout,
+    };
+}
+if (typeof globalThis.navigator === 'undefined') {
+    globalThis.navigator = { userAgent: 'node' };
+}
 
 export const config = {
     api: {
@@ -24,8 +36,24 @@ export default async function handler(req, res) {
             const buffer = Buffer.from(fileContent, 'base64');
 
             if (fileType === 'application/pdf') {
-                const pdfData = await pdfParse(buffer);
-                resumeText = pdfData.text;
+                const uint8Array = new Uint8Array(buffer);
+                const loadingTask = getDocument({
+                    data: uint8Array,
+                    useWorkerFetch: false,
+                    isEvalSupported: false,
+                    useSystemFonts: true
+                });
+
+                const pdf = await loadingTask.promise;
+                let fullText = '';
+
+                for (let i = 1; i <= pdf.numPages; i++) {
+                    const page = await pdf.getPage(i);
+                    const textContent = await page.getTextContent();
+                    const pageText = textContent.items.map(item => item.str).join(' ');
+                    fullText += pageText + '\n\n';
+                }
+                resumeText = fullText;
             } else if (fileType === 'application/vnd.openxmlformats-officedocument.wordprocessingml.document' || fileType === 'application/msword') {
                 const result = await mammoth.extractRawText({ buffer });
                 resumeText = result.value;
