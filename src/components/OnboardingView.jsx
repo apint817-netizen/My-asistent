@@ -89,11 +89,6 @@ export default function OnboardingView({ onComplete }) {
         e.preventDefault();
         if (!taskValue.trim()) return;
 
-        // Включаем Fullscreen при первом реальном целевом действии (добавление задачи)
-        if (!document.fullscreenElement) {
-            document.documentElement.requestFullscreen().catch(e => console.log('Fullscreen blocked:', e));
-        }
-
         addTask(taskValue.trim(), 50);
         addTokens(50, 'Стартовый бонус за первую задачу');
         fireConfetti();
@@ -130,10 +125,6 @@ export default function OnboardingView({ onComplete }) {
     };
 
     const handleFinish = () => {
-        // Выходим из Fullscreen при завершении онбординга
-        if (document.fullscreenElement) {
-            document.exitFullscreen().catch(e => console.log('Fullscreen exit error:', e));
-        }
 
         // Переносим контекст в Дашборд
         const store = useStore.getState();
@@ -168,14 +159,14 @@ export default function OnboardingView({ onComplete }) {
     }
 
     return (
-        <div className="fixed inset-0 z-50 bg-bg-primary overflow-hidden flex flex-col transition-colors duration-1000">
+        <div className="fixed inset-0 z-50 bg-bg-primary overflow-y-auto flex flex-col transition-colors duration-1000">
             {/* Background elements to simulate app */}
             <div className="absolute inset-0 opacity-20 pointer-events-none">
-                <div className="w-full h-full flex flex-col p-8 gap-8">
-                    <div className="w-full h-24 bg-white/5 rounded-3xl" />
-                    <div className="flex-1 flex gap-8">
-                        <div className="w-2/3 bg-white/5 rounded-3xl" />
-                        <div className="w-1/3 bg-white/5 rounded-3xl" />
+                <div className="w-full h-full flex flex-col p-4 sm:p-8 gap-4 sm:gap-8">
+                    <div className="w-full h-16 sm:h-24 bg-white/5 rounded-2xl sm:rounded-3xl" />
+                    <div className="flex-1 flex gap-4 sm:gap-8">
+                        <div className="w-2/3 bg-white/5 rounded-2xl sm:rounded-3xl" />
+                        <div className="w-1/3 bg-white/5 rounded-2xl sm:rounded-3xl" />
                     </div>
                 </div>
             </div>
@@ -183,33 +174,34 @@ export default function OnboardingView({ onComplete }) {
             {/* Fog overlay - fades out at phase 5 */}
             <div className={`absolute inset-0 pointer-events-none z-10 transition-opacity duration-[2000ms] ${phase < 5 ? 'backdrop-blur-md bg-black/60 opacity-100' : 'opacity-0'}`} />
 
-            {/* Content Container */}
-            <div className={`relative z-20 flex-1 flex items-center justify-center p-4 transition-all duration-1000 ${phase >= 5 ? 'opacity-20 pointer-events-none' : 'opacity-100'}`}>
+            {/* Content Container — scrollable, centered but safe from keyboard */}
+            <div className={`relative z-20 flex-1 flex items-start sm:items-center justify-center px-4 pt-[18vh] sm:pt-4 pb-8 transition-all duration-1000 ${phase >= 5 ? 'opacity-20 pointer-events-none' : 'opacity-100'}`}>
 
                 {/* Phase 3: Task Input */}
                 {phase === 3 && (
-                    <div className="w-full max-w-lg glass-panel p-8 animate-fade-in-up flex flex-col items-center">
-                        <div className="w-16 h-16 rounded-full bg-accent/20 flex items-center justify-center mb-6 shadow-[0_0_30px_rgba(99,102,241,0.5)]">
-                            <Sparkles size={32} className="text-accent animate-pulse" />
+                    <div className="w-full max-w-lg glass-panel p-6 sm:p-8 animate-fade-in-up flex flex-col items-center">
+                        <div className="w-12 h-12 sm:w-16 sm:h-16 rounded-full bg-accent/20 flex items-center justify-center mb-4 sm:mb-6 shadow-[0_0_30px_rgba(99,102,241,0.5)]">
+                            <Sparkles size={24} className="sm:hidden text-accent animate-pulse" />
+                            <Sparkles size={32} className="hidden sm:block text-accent animate-pulse" />
                         </div>
-                        <h2 className="text-2xl sm:text-3xl font-bold text-white text-center mb-2">Напиши свою первую задачу на сегодня</h2>
-                        <p className="text-text-secondary text-center mb-8">Любое небольшое дело. За старт ты получишь +50 очков.</p>
+                        <h2 className="text-xl sm:text-2xl md:text-3xl font-bold text-white text-center mb-2">Напиши свою первую задачу</h2>
+                        <p className="text-text-secondary text-center text-sm sm:text-base mb-6 sm:mb-8">Любое небольшое дело. За старт ты получишь +50 очков.</p>
 
-                        <form onSubmit={handleTaskSubmit} className="w-full relative">
+                        <form onSubmit={handleTaskSubmit} className="w-full flex flex-col gap-3">
                             <input
                                 autoFocus
                                 type="text"
                                 value={taskValue}
                                 onChange={(e) => setTaskValue(e.target.value)}
                                 placeholder="Например: Выпить стакан воды"
-                                className="w-full bg-black/50 border-2 border-accent/50 rounded-2xl pl-6 pr-14 py-4 text-lg text-white placeholder:text-text-secondary outline-none focus:border-accent focus:shadow-[0_0_20px_rgba(99,102,241,0.3)] transition-all"
+                                className="w-full bg-black/50 border-2 border-accent/50 rounded-2xl px-5 py-4 text-base sm:text-lg text-white placeholder:text-text-secondary outline-none focus:border-accent focus:shadow-[0_0_20px_rgba(99,102,241,0.3)] transition-all"
                             />
                             <button
                                 type="submit"
                                 disabled={!taskValue.trim()}
-                                className="absolute right-3 top-1/2 -translate-y-1/2 w-10 h-10 bg-accent rounded-xl flex items-center justify-center text-white disabled:opacity-50 hover:bg-accent-hover transition-colors"
+                                className="w-full py-4 bg-accent rounded-2xl flex items-center justify-center gap-2 text-white font-bold text-base disabled:opacity-50 hover:bg-accent-hover active:scale-95 transition-all min-h-[48px]"
                             >
-                                <Plus size={24} />
+                                <Plus size={20} /> Добавить задачу
                             </button>
                         </form>
                     </div>
@@ -217,28 +209,29 @@ export default function OnboardingView({ onComplete }) {
 
                 {/* Phase 4: Reward Input */}
                 {phase === 4 && (
-                    <div className="w-full max-w-lg glass-panel p-8 animate-fade-in-up flex flex-col items-center">
-                        <div className="w-16 h-16 rounded-full bg-warning/20 flex items-center justify-center mb-6 shadow-[0_0_30px_rgba(245,158,11,0.5)]">
-                            <Trophy size={32} className="text-warning animate-pulse" />
+                    <div className="w-full max-w-lg glass-panel p-6 sm:p-8 animate-fade-in-up flex flex-col items-center">
+                        <div className="w-12 h-12 sm:w-16 sm:h-16 rounded-full bg-warning/20 flex items-center justify-center mb-4 sm:mb-6 shadow-[0_0_30px_rgba(245,158,11,0.5)]">
+                            <Trophy size={24} className="sm:hidden text-warning animate-pulse" />
+                            <Trophy size={32} className="hidden sm:block text-warning animate-pulse" />
                         </div>
-                        <h2 className="text-2xl sm:text-3xl font-bold text-white text-center mb-2">Отлично!</h2>
-                        <p className="text-text-secondary text-center mb-8">А теперь придумай, чем ты себя наградишь за её выполнение.</p>
+                        <h2 className="text-xl sm:text-2xl md:text-3xl font-bold text-white text-center mb-2">Отлично!</h2>
+                        <p className="text-text-secondary text-center text-sm sm:text-base mb-6 sm:mb-8">А теперь придумай, чем ты себя наградишь за её выполнение.</p>
 
-                        <form onSubmit={handleRewardSubmit} className="w-full relative">
+                        <form onSubmit={handleRewardSubmit} className="w-full flex flex-col gap-3">
                             <input
                                 autoFocus
                                 type="text"
                                 value={rewardValue}
                                 onChange={(e) => setRewardValue(e.target.value)}
                                 placeholder="Например: 15 минут в ТикТок"
-                                className="w-full bg-black/50 border-2 border-warning/50 rounded-2xl pl-6 pr-14 py-4 text-lg text-white placeholder:text-text-secondary outline-none focus:border-warning focus:shadow-[0_0_20px_rgba(245,158,11,0.3)] transition-all"
+                                className="w-full bg-black/50 border-2 border-warning/50 rounded-2xl px-5 py-4 text-base sm:text-lg text-white placeholder:text-text-secondary outline-none focus:border-warning focus:shadow-[0_0_20px_rgba(245,158,11,0.3)] transition-all"
                             />
                             <button
                                 type="submit"
                                 disabled={!rewardValue.trim()}
-                                className="absolute right-3 top-1/2 -translate-y-1/2 w-10 h-10 bg-warning rounded-xl flex items-center justify-center text-black disabled:opacity-50 hover:bg-yellow-400 transition-colors"
+                                className="w-full py-4 bg-warning rounded-2xl flex items-center justify-center gap-2 text-black font-bold text-base disabled:opacity-50 hover:bg-yellow-400 active:scale-95 transition-all min-h-[48px]"
                             >
-                                <Plus size={24} />
+                                <Plus size={20} /> Добавить награду
                             </button>
                         </form>
                     </div>
