@@ -340,6 +340,7 @@ ${availableRewards}
             }
         } finally {
             setIsTyping(false);
+            setIsThinking(false);
         }
     };
 
@@ -740,6 +741,21 @@ ${availableRewards}
                     </div>
                 )}
                 <div ref={messagesEndRef} className="h-1 w-full" />
+
+                {/* Typing indicator */}
+                {isThinking && (
+                    <div className="flex items-center gap-3 px-4 py-3 animate-fade-in">
+                        <div className="w-8 h-8 rounded-full bg-gradient-to-br from-accent to-purple-700 flex items-center justify-center shrink-0">
+                            <Bot size={16} className="text-white" />
+                        </div>
+                        <div className="bg-bg-secondary/80 border border-border rounded-2xl px-4 py-3 flex items-center gap-1.5">
+                            <span className="w-2 h-2 bg-accent rounded-full animate-bounce" style={{ animationDelay: '0ms' }} />
+                            <span className="w-2 h-2 bg-accent rounded-full animate-bounce" style={{ animationDelay: '150ms' }} />
+                            <span className="w-2 h-2 bg-accent rounded-full animate-bounce" style={{ animationDelay: '300ms' }} />
+                            <span className="text-xs text-text-secondary ml-2">Nova печатает...</span>
+                        </div>
+                    </div>
+                )}
             </div>
 
             {/* Input Area */}

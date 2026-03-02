@@ -111,7 +111,7 @@ function App() {
       <AnalysisModal isOpen={showAnalysisModal} onClose={() => setShowAnalysisModal(false)} />
 
       {/* Header Widget */}
-      <header className="glass-panel p-6 sm:p-8 flex flex-col md:flex-row md:items-center justify-between gap-6 animate-fade-in relative overflow-hidden">
+      <header id="tour-header" className="glass-panel p-6 sm:p-8 flex flex-col md:flex-row md:items-center justify-between gap-6 animate-fade-in relative overflow-hidden">
         {/* Decorative background glow */}
         <div className="absolute top-0 right-0 -mt-10 -mr-10 w-40 h-40 bg-accent/20 rounded-full blur-3xl pointer-events-none"></div>
 

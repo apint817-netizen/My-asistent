@@ -110,7 +110,7 @@ const CalendarView = () => {
     };
 
     return (
-        <section className="glass-panel p-6 flex flex-col md:flex-row gap-8 animate-fade-in relative overflow-hidden">
+        <section className="glass-panel p-6 flex flex-col gap-6 animate-fade-in relative overflow-hidden">
             <div className="flex-1">
                 <div className="flex justify-between items-center mb-6">
                     <h2 className="text-xl font-bold flex items-center gap-2">
@@ -230,7 +230,7 @@ const CalendarView = () => {
             </div>
 
             {selectedDate && (
-                <div className="md:w-1/3 flex flex-col bg-bg-secondary/60 backdrop-blur-xl rounded-3xl border border-white/5 shadow-2xl p-5 md:p-6 border-l-2 border-l-accent animate-fade-in relative overflow-hidden">
+                <div className="flex flex-col bg-bg-secondary/60 backdrop-blur-xl rounded-3xl border border-white/5 shadow-2xl p-5 md:p-6 border-t-2 border-t-accent animate-fade-in relative overflow-hidden">
                     {/* Background glow in the panel */}
                     <div className="absolute top-0 right-0 w-32 h-32 bg-accent/10 rounded-full blur-3xl pointer-events-none -mt-10 -mr-10"></div>
 

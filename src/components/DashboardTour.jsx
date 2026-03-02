@@ -5,6 +5,21 @@ import { Target, Sparkles, Navigation, X } from 'lucide-react';
 // Tour steps definition. Every step strictly defines the EXACT state of the entire UI needed for it.
 const steps = [
     {
+        targetId: 'tour-header',
+        title: '👋 Добро пожаловать в Ассистент Nova!',
+        content: 'Это твоя персональная система продуктивности с ИИ-ментором. Давай проведём короткий обзор — я покажу, как извлечь максимум пользы.',
+        position: 'bottom',
+        action: (store) => {
+            store.setActiveTab('dashboard');
+            store.setIsRewardStoreOpen(false);
+            store.setShowAnalysisModal(false);
+            store.setShowPointsHistory(false);
+            store.setShowAISettings(false);
+            store.setTourDemoAIText('');
+            store.setTourDemoTaskText('');
+        }
+    },
+    {
         targetId: 'tour-summary',
         title: 'Управление Вкладками',
         content: 'Это твой пульт управления. Переключайся между текущими задачами, календарем на неделю и загрузкой резюме.',
@@ -268,6 +283,9 @@ export default function DashboardTour() {
         store.setShowAnalysisModal(false);
         store.setIsRewardStoreOpen(true);
         store.setActiveTab('dashboard');
+        // Clear demo text to unblock Nova input
+        store.setTourDemoAIText('');
+        store.setTourDemoTaskText('');
 
         completeTour();
     };
