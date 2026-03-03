@@ -269,10 +269,10 @@ export default function ResumeView() {
         : 0;
 
     return (
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 flex-1" style={{ height: 'calc(100vh - 220px)', minHeight: '500px' }}>
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 flex-1 min-h-[500px] lg:h-[calc(100vh-220px)] flex-col lg:flex-row">
             {/* Left - Upload & Settings */}
-            <div className="glass-panel p-6 flex flex-col h-full overflow-y-auto custom-scrollbar">
-                <div className="flex items-center gap-3 mb-6 pb-4 border-b border-border">
+            <div className="glass-panel p-6 flex flex-col lg:h-full lg:overflow-y-auto custom-scrollbar">
+                <div className="flex flex-wrap sm:flex-nowrap items-center gap-3 mb-6 pb-4 border-b border-border">
                     <div className="w-10 h-10 rounded-full bg-gradient-to-br from-emerald-500 to-teal-600 flex items-center justify-center">
                         <FileText size={20} className="text-white" />
                     </div>

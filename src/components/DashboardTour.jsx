@@ -364,9 +364,9 @@ export default function DashboardTour() {
         tooltipStyle = {
             position: 'fixed',
             bottom: '20px',
-            left: '50%',
-            transform: 'translateX(-50%)',
-            width: 'calc(100% - 40px)',
+            left: '16px',
+            right: '16px',
+            width: 'auto',
             zIndex: 100000
         };
     }
@@ -391,7 +391,7 @@ export default function DashboardTour() {
 
             {/* Tooltip Content */}
             <div
-                className="absolute w-full sm:w-auto sm:min-w-[320px] sm:max-w-[420px] lg:max-w-[500px] glass-panel border-2 border-accent/60 bg-bg-secondary/95 p-4 sm:p-6 animate-fade-in-up shadow-[0_0_40px_rgba(99,102,241,0.5)] z-[99995]"
+                className="absolute w-auto sm:min-w-[320px] sm:max-w-[420px] lg:max-w-[500px] glass-panel border-2 border-accent/60 bg-bg-secondary/95 p-4 sm:p-6 animate-fade-in-up shadow-[0_0_40px_rgba(99,102,241,0.5)] z-[99995]"
                 style={tooltipStyle}
             >
                 <button

@@ -253,23 +253,23 @@ export default function TaskManager() {
             </div>
 
             <form id="tour-add-task" onSubmit={handleAddTask} className="mt-auto flex flex-col gap-1">
-                <div className="flex gap-2">
+                <div className="flex gap-2 items-center">
                     <input
                         type="text"
                         placeholder="Новая задача..."
-                        className={`flex-1 bg-[rgba(255,255,255,0.05)] border rounded-md px-4 py-2 text-text-primary outline-none focus:border-accent transition-colors ${error ? 'border-danger' : 'border-[rgba(255,255,255,0.1)]'}`}
+                        className={`flex-[3] min-w-0 bg-[rgba(255,255,255,0.05)] border rounded-md px-3 sm:px-4 py-2 text-sm sm:text-base text-text-primary outline-none focus:border-accent transition-colors ${error ? 'border-danger' : 'border-[rgba(255,255,255,0.1)]'}`}
                         value={useStore(state => state.tourDemoTaskText) || newTaskTitle}
                         onChange={(e) => { setNewTaskTitle(e.target.value); setError(''); }}
                         readOnly={!!useStore(state => state.tourDemoTaskText)}
                     />
                     <input
                         type="number"
-                        className="w-20 bg-[rgba(255,255,255,0.05)] border border-[rgba(255,255,255,0.1)] rounded-md px-2 py-2 text-text-primary outline-none focus:border-accent transition-colors text-center"
+                        className="flex-shrink-0 w-14 sm:w-20 bg-[rgba(255,255,255,0.05)] border border-[rgba(255,255,255,0.1)] rounded-md px-1 sm:px-2 py-2 text-sm sm:text-base text-text-primary outline-none focus:border-accent transition-colors text-center"
                         value={newTaskValue}
                         onChange={(e) => setNewTaskValue(e.target.value)}
                         min="1"
                     />
-                    <button type="submit" disabled={isAdding} className="btn-primary flex items-center justify-center p-3 rounded-md disabled:opacity-50">
+                    <button type="submit" disabled={isAdding} className="btn-primary flex-shrink-0 flex items-center justify-center p-2 sm:p-3 rounded-md disabled:opacity-50">
                         {isAdding ? <span className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" /> : <Plus size={20} />}
                     </button>
                 </div>

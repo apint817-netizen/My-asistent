@@ -33,9 +33,10 @@ export default function Tooltip({ children, text, position = 'bottom', delay = 3
 
     return (
         <div
-            className="relative inline-flex"
+            className="relative inline-flex transition-all duration-300 transform-gpu"
             onMouseEnter={handleMouseEnter}
             onMouseLeave={handleMouseLeave}
+            onClick={() => setShow(false)}
         >
             {children}
             {show && (
