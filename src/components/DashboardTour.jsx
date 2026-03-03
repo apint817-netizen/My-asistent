@@ -193,20 +193,32 @@ export default function DashboardTour() {
         completeTour();
     };
 
-    // Handle resize and scroll
+    // Handle resize, scroll, and DOM changes
     useEffect(() => {
         if (!isActive) return;
 
-        const handleUpdate = () => {
+        const updatePosition = () => {
             updateSpotlight(steps[currentStep].targetId);
         };
 
-        window.addEventListener('resize', handleUpdate);
-        window.addEventListener('scroll', handleUpdate, true);
+        // Listen for resize events
+        window.addEventListener('resize', updatePosition);
+        // Listen for scroll events on the window and all elements (capture phase)
+        window.addEventListener('scroll', updatePosition, true);
+
+        // Also watch for DOM changes (in case elements appear/disappear or change size)
+        const observer = new MutationObserver(updatePosition);
+        observer.observe(document.body, {
+            attributes: true,
+            childList: true,
+            subtree: true,
+            characterData: true
+        });
 
         return () => {
-            window.removeEventListener('resize', handleUpdate);
-            window.removeEventListener('scroll', handleUpdate, true);
+            window.removeEventListener('resize', updatePosition);
+            window.removeEventListener('scroll', updatePosition, true);
+            observer.disconnect();
         };
     }, [isActive, currentStep]);
 
@@ -375,7 +387,7 @@ export default function DashboardTour() {
         <div className="fixed inset-0 z-[99990] pointer-events-auto">
             {/* Dimmed background using box-shadow around an empty div overlaying the exact target */}
             <div
-                className="fixed pointer-events-none transition-all duration-700 ease-out z-[99990]"
+                className="fixed pointer-events-none transition-all duration-200 ease-out z-[99990]"
                 style={{
                     top: targetRect.top - 8,
                     left: targetRect.left - 8,

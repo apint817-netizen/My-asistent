@@ -246,26 +246,26 @@ export default function RewardStore() {
             </div>
 
             {activeTab === 'store' && (
-                <form onSubmit={handleAddReward} className="mt-6 flex flex-col gap-1">
-                    <div className="flex gap-2">
+                <form onSubmit={handleAddReward} className="mt-6 flex flex-col gap-1 shrink-0 pb-2">
+                    <div className="flex gap-2 items-center">
                         <input
                             type="text"
                             placeholder="Новая награда..."
-                            className={`flex-1 bg-black/40 border rounded-lg px-4 py-2 text-sm outline-none focus:border-warning focus:ring-1 focus:ring-warning transition-all placeholder:text-text-secondary ${error ? 'border-danger' : 'border-border'}`}
+                            className={`flex-[3] min-w-0 bg-black/40 border rounded-lg px-3 sm:px-4 py-2 text-sm sm:text-base outline-none focus:border-warning focus:ring-1 focus:ring-warning transition-all placeholder:text-text-secondary ${error ? 'border-danger' : 'border-border'}`}
                             value={newRewardTitle}
                             onChange={(e) => { setNewRewardTitle(e.target.value); setError(''); }}
                         />
                         <input
                             type="number"
                             min="1"
-                            className="w-20 bg-black/40 border border-border rounded-lg px-2 py-2 text-sm outline-none focus:border-warning focus:ring-1 focus:ring-warning transition-all"
+                            className="flex-shrink-0 w-14 sm:w-20 bg-black/40 border border-border rounded-lg px-1 sm:px-2 py-2 text-sm sm:text-base outline-none focus:border-warning focus:ring-1 focus:ring-warning transition-all"
                             value={newRewardCost}
                             onChange={(e) => setNewRewardCost(e.target.value)}
                         />
                         <button
                             type="submit"
                             disabled={!newRewardTitle.trim() || isAdding}
-                            className="bg-bg-primary border border-border text-white px-3 sm:px-4 py-2 rounded-lg hover:bg-black/60 hover:text-warning hover:border-warning/50 transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center"
+                            className="flex-shrink-0 bg-bg-primary border border-border text-white p-2 sm:p-3 rounded-lg hover:bg-black/60 hover:text-warning hover:border-warning/50 transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center"
                         >
                             {isAdding ? <span className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" /> : <Plus size={20} />}
                         </button>

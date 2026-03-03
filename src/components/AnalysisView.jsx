@@ -367,9 +367,9 @@ ${calendarStr}
     const hasDraftItems = draftPlan.today.length > 0 || draftPlan.future.length > 0 || draftPlan.regular.length > 0 || (draftPlan.rewards || []).length > 0;
 
     return (
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 flex-1 h-full min-h-[500px]">
+        <div className="flex flex-col lg:grid lg:grid-cols-2 gap-6 flex-1 h-full lg:min-h-[500px]">
             {/* Левая колонка - Чат */}
-            <div className="glass-panel p-0 flex flex-col h-full overflow-hidden border-accent/20 max-h-full">
+            <div className="glass-panel p-0 flex flex-col h-[70vh] min-h-[500px] lg:h-full lg:min-h-0 overflow-hidden border-accent/20 shrink-0">
                 <div className="p-4 border-b border-border bg-black/20 flex items-center justify-between">
                     <div className="flex items-center gap-3">
                         <div className="w-10 h-10 rounded-full bg-gradient-to-br from-indigo-500 to-purple-600 flex items-center justify-center">
@@ -574,7 +574,7 @@ ${calendarStr}
             </div>
 
             {/* Правая колонка - Черновик */}
-            <div className="glass-panel p-6 flex flex-col h-full overflow-hidden border-success/20 relative">
+            <div className="glass-panel p-6 flex flex-col h-[60vh] min-h-[400px] lg:h-full lg:min-h-0 overflow-hidden border-success/20 relative shrink-0">
                 <div className="flex items-center justify-between mb-6 pb-4 border-b border-border">
                     <h2 className="text-xl font-bold text-white flex items-center gap-2">
                         <Save size={20} className="text-success" />
