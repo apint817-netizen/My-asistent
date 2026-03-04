@@ -73,15 +73,27 @@ function App() {
         }
       }
 
-      // Then load from Supabase (authoritative)
-      const remoteData = await loadUserData(userId);
-      if (remoteData) {
-        useStore.getState().applyRemoteData(remoteData);
-        console.log('[App] Applied remote data from Supabase');
-      } else if (!localData) {
-        // New user — reset to clean state
-        useStore.getState().resetStoreForNewUser();
-        console.log('[App] New user — clean state');
+      // Then load from Supabase with a timeout (5s max)
+      try {
+        const timeoutPromise = new Promise((_, reject) =>
+          setTimeout(() => reject(new Error('Supabase load timeout')), 5000)
+        );
+        const remoteData = await Promise.race([
+          loadUserData(userId),
+          timeoutPromise
+        ]);
+        if (remoteData) {
+          useStore.getState().applyRemoteData(remoteData);
+          console.log('[App] Applied remote data from Supabase');
+        } else if (!localData) {
+          useStore.getState().resetStoreForNewUser();
+          console.log('[App] New user — clean state');
+        }
+      } catch (timeoutErr) {
+        console.warn('[App] Supabase load timed out, using local data:', timeoutErr.message);
+        if (!localData) {
+          useStore.getState().resetStoreForNewUser();
+        }
       }
     } catch (err) {
       console.error('[App] Error initializing user data:', err);
@@ -105,12 +117,23 @@ function App() {
       return;
     }
 
+    // Auth check with timeout (5s max)
+    const authTimeout = setTimeout(() => {
+      console.warn('[App] Auth check timed out, proceeding without auth');
+      setAuthLoading(false);
+    }, 5000);
+
     supabase.auth.getSession().then(async ({ data: { session } }) => {
+      clearTimeout(authTimeout);
       const currentUser = session?.user ?? null;
       setUser(currentUser);
       if (currentUser) {
         await initUserData(currentUser.id);
       }
+      setAuthLoading(false);
+    }).catch((err) => {
+      clearTimeout(authTimeout);
+      console.error('[App] Auth error:', err);
       setAuthLoading(false);
     });
 
