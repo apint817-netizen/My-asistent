@@ -394,7 +394,7 @@ export default function DashboardTour() {
 
             {/* Tooltip Content */}
             <div
-                className="absolute w-auto sm:min-w-[320px] sm:max-w-[420px] lg:max-w-[500px] glass-panel border-2 border-accent/60 bg-bg-secondary/95 p-4 sm:p-6 animate-fade-in-up shadow-[0_0_40px_rgba(99,102,241,0.5)] z-[99995]"
+                className="absolute min-w-[300px] sm:min-w-[340px] max-w-[90vw] sm:max-w-[420px] lg:max-w-[500px] glass-panel border-2 border-accent/60 bg-bg-secondary/95 p-4 sm:p-6 animate-fade-in-up shadow-[0_0_40px_rgba(99,102,241,0.5)] z-[99995] overflow-hidden"
                 style={tooltipStyle}
             >
                 <button
@@ -404,51 +404,51 @@ export default function DashboardTour() {
                     <X size={16} />
                 </button>
 
-                <div className="flex items-center gap-3 mb-4">
-                    <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-accent to-purple-600 flex items-center justify-center shadow-lg">
+                <div className="flex items-center gap-3 mb-3">
+                    <div className="w-10 h-10 flex-shrink-0 rounded-xl bg-gradient-to-br from-accent to-purple-600 flex items-center justify-center shadow-lg">
                         <Sparkles size={20} className="text-white" />
                     </div>
-                    <div>
+                    <div className="min-w-0">
                         <span className="text-xs text-accent font-bold uppercase tracking-wider">Nova OS</span>
-                        <h3 className="font-bold text-white text-lg leading-tight">{step.title}</h3>
+                        <h3 className="font-bold text-white text-lg leading-tight truncate">{step.title}</h3>
                     </div>
                 </div>
 
-                <p className="text-sm text-text-secondary leading-relaxed mb-6">
+                <p className="text-sm text-text-secondary leading-relaxed mb-4">
                     {step.content}
                 </p>
 
-                <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
-                    <div className="flex gap-1.5 justify-center sm:justify-start">
+                <div className="flex items-center justify-between gap-2">
+                    <div className="flex gap-1 flex-shrink-0">
                         {steps.map((_, idx) => (
                             <div
                                 key={idx}
-                                className={`h-1.5 rounded-full transition-all duration-300 ${idx === currentStep ? 'w-6 bg-accent' : 'w-2 bg-white/20'}`}
+                                className={`h-1.5 rounded-full transition-all duration-300 ${idx === currentStep ? 'w-5 bg-accent' : 'w-1.5 bg-white/20'}`}
                             />
                         ))}
                     </div>
 
-                    <div className="flex gap-2 relative z-10 justify-end">
+                    <div className="flex gap-2 flex-shrink-0">
                         <button
                             onClick={endTour}
-                            className="px-3 sm:px-4 py-2 whitespace-nowrap text-text-secondary hover:text-white text-xs sm:text-sm font-medium transition-colors"
+                            className="px-2 py-1.5 text-text-secondary hover:text-white text-xs font-medium transition-colors"
                         >
                             Пропустить
                         </button>
                         {currentStep > 0 && (
                             <button
                                 onClick={handlePrev}
-                                className="px-3 sm:px-5 py-2 whitespace-nowrap bg-white/10 text-white font-bold rounded-xl text-xs sm:text-sm hover:bg-white/20 transition-colors flex items-center"
+                                className="px-3 py-1.5 bg-white/10 text-white font-bold rounded-lg text-xs hover:bg-white/20 transition-colors"
                             >
                                 Назад
                             </button>
                         )}
                         <button
                             onClick={handleNext}
-                            className="px-4 sm:px-5 py-2 whitespace-nowrap bg-white text-black font-bold rounded-xl text-xs sm:text-sm hover:scale-105 transition-transform flex items-center gap-1 sm:gap-2"
+                            className="px-3 py-1.5 bg-white text-black font-bold rounded-lg text-xs hover:scale-105 transition-transform flex items-center gap-1"
                         >
                             {currentStep === steps.length - 1 ? 'Начать' : 'Далее'}
-                            <Navigation size={14} className="rotate-90" />
+                            <Navigation size={12} className="rotate-90" />
                         </button>
                     </div>
                 </div>
