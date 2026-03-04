@@ -43,7 +43,15 @@ const parseAnalysisCommands = (text, currentDraft, updateDraftPlan) => {
         updateDraftPlan({ today: newToday, future: newFuture, regular: newRegular, rewards: newRewards });
     }
 
-    let cleanText = text.replace(taskRegex, '').replace(futureRegex, '').replace(regularRegex, '').replace(rewardRegex, '').trim();
+    // Also clean up any remaining [TAG: ...] patterns that might be in markdown bullets
+    let cleanText = text
+        .replace(taskRegex, '').replace(futureRegex, '').replace(regularRegex, '').replace(rewardRegex, '')
+        // Clean bullet-wrapped tags: "* [TASK: ...]" or "- [TASK: ...]"
+        .replace(/^\s*[\*\-]\s*\[(?:TASK|CALENDAR_TASK|HABIT|REWARD):[^\]]*\]\s*$/gm, '')
+        // Clean any inline leftover tags
+        .replace(/\[(?:TASK|CALENDAR_TASK|HABIT|REWARD):[^\]]*\]/g, '')
+        .replace(/\n{3,}/g, '\n\n')  // Collapse excessive newlines
+        .trim();
 
     return { cleanText, addedAnything };
 };
@@ -96,15 +104,17 @@ export default function AnalysisView() {
         setAnalysisDraft(input);
     }, [input, setAnalysisDraft]);
 
-    // Initial greeting if empty
+    // Initial greeting if empty — useRef prevents duplicate
+    const hasGreeted = React.useRef(false);
     useEffect(() => {
-        if (messages.length === 0) {
+        if (messages.length === 0 && !hasGreeted.current) {
+            hasGreeted.current = true;
             addAnalysisMessage({
                 role: 'assistant',
                 content: 'Привет! Я Стратег Nova. Моя задача — помочь тебе распланировать день и неделю, чтобы ты не выгорал и двигался к своим целям. Расскажи, какие у тебя главные задачи на ближайшие дни? Есть ли \"хвосты\" или то, что постоянно откладываешь?'
             });
         }
-    }, [messages, addAnalysisMessage]);
+    }, []);  // Empty deps — runs only once on mount
 
     const messagesEndRef = useRef(null);
     const scrollContainerRef = useRef(null);

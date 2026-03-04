@@ -10,7 +10,7 @@ export const setStorageKey = (userId) => {
 
 export const getStorageKey = () => currentStorageKey;
 
-// Initial state factory вЂ” used for resetting store on new user
+// Initial state factory — used for resetting store on new user
 const getInitialState = () => ({
   tokens: 0,
   aiTokensUsed: 0,
@@ -101,7 +101,7 @@ export const useStore = create(
       setTourDemoAIText: (text) => set({ tourDemoAIText: text }),
 
       addAiTokensUsed: (amount) => set((state) => ({ aiTokensUsed: (state.aiTokensUsed || 0) + amount })),
-      addTokens: (amount, title = 'Р’С‹РїРѕР»РЅРµРЅРёРµ Р·Р°РґР°С‡Рё') => set((state) => ({
+      addTokens: (amount, title = 'Выполнение задачи') => set((state) => ({
         tokens: state.tokens + amount,
         pointsHistory: [{
           id: Date.now().toString() + Math.random(),
@@ -111,7 +111,7 @@ export const useStore = create(
           date: new Date().toISOString()
         }, ...state.pointsHistory]
       })),
-      spendTokens: (amount, title = 'РџРѕРєСѓРїРєР° РЅР°РіСЂР°РґС‹') => set((state) => ({
+      spendTokens: (amount, title = 'Покупка награды') => set((state) => ({
         tokens: Math.max(0, state.tokens - amount),
         pointsHistory: [{
           id: Date.now().toString() + Math.random(),
@@ -125,7 +125,7 @@ export const useStore = create(
         tokens: 0,
         pointsHistory: [{
           id: Date.now().toString() + Math.random(),
-          title: 'РЎР±СЂРѕСЃ Р±Р°Р»Р°РЅСЃР°',
+          title: 'Сброс баланса',
           amount: state.tokens,
           type: 'reset',
           date: new Date().toISOString()
@@ -165,7 +165,7 @@ export const useStore = create(
         const task = state.tasks.find(t => t.id === taskId);
         if (!task) return state;
 
-        const systemMsg = `[РЎРРЎРўР•РњРќРћР• РЎРћРћР‘Р©Р•РќРР•] РџРѕР»СЊР·РѕРІР°С‚РµР»СЊ СѓРґР°Р»РёР» РЅРµРІС‹РїРѕР»РЅРµРЅРЅСѓСЋ Р·Р°РґР°С‡Сѓ "${task.title}". РџСЂРёС‡РёРЅР°: ${reason}`;
+        const systemMsg = `[СИСТЕМНОЕ СООБЩЕНИЕ] Пользователь удалил невыполненную задачу "${task.title}". Причина: ${reason}`;
 
         return {
           tasks: state.tasks.filter(t => t.id !== taskId),
@@ -187,7 +187,7 @@ export const useStore = create(
       rejectProposal: (id) => set((state) => {
         const proposal = state.taskProposals.find(p => p.id === id);
         if (!proposal) return state;
-        const systemMsg = `[РЎРРЎРўР•РњРќРћР• РЎРћРћР‘Р©Р•РќРР•] РџРѕР»СЊР·РѕРІР°С‚РµР»СЊ РѕС‚РєР°Р·Р°Р»СЃСЏ Р±СЂР°С‚СЊ РЅР° СЃРµР±СЏ РїСЂРµРґР»РѕР¶РµРЅРЅСѓСЋ С†РµР»СЊ "${proposal.title}". РЈР·РЅР°Р№ РїРѕС‡РµРјСѓ, РІРѕР·РјРѕР¶РЅРѕ РѕРЅР° СЃР»РёС€РєРѕРј СЃР»РѕР¶РЅР°СЏ Рё РµС‘ РЅР°РґРѕ СЂР°Р·Р±РёС‚СЊ.`;
+        const systemMsg = `[СИСТЕМНОЕ СООБЩЕНИЕ] Пользователь отказался брать на себя предложенную цель "${proposal.title}". Узнай почему, возможно она слишком сложная и её надо разбить.`;
         return {
           taskProposals: state.taskProposals.filter(p => p.id !== id),
           chatMessages: [...state.chatMessages, { role: 'system', content: systemMsg }]
@@ -215,7 +215,7 @@ export const useStore = create(
       rejectCalendarProposal: (id) => set((state) => {
         const proposal = state.calendarProposals.find(p => p.id === id);
         if (!proposal) return state;
-        const systemMsg = `[РЎРРЎРўР•РњРќРћР• РЎРћРћР‘Р©Р•РќРР•] РџРѕР»СЊР·РѕРІР°С‚РµР»СЊ РѕС‚РєР°Р·Р°Р»СЃСЏ РїР»Р°РЅРёСЂРѕРІР°С‚СЊ Р·Р°РґР°С‡Сѓ "${proposal.title}" РЅР° ${proposal.date}. Р’С‹СЏСЃРЅРё РїРѕС‡РµРјСѓ.`;
+        const systemMsg = `[СИСТЕМНОЕ СООБЩЕНИЕ] Пользователь отказался планировать задачу "${proposal.title}" на ${proposal.date}. Выясни почему.`;
         return {
           calendarProposals: state.calendarProposals.filter(p => p.id !== id),
           chatMessages: [...state.chatMessages, { role: 'system', content: systemMsg }]
@@ -236,7 +236,7 @@ export const useStore = create(
       rejectRewardProposal: (id) => set((state) => {
         const proposal = state.rewardProposals.find(p => p.id === id);
         if (!proposal) return state;
-        const systemMsg = `[РЎРРЎРўР•РњРќРћР• РЎРћРћР‘Р©Р•РќРР•] РџРѕР»СЊР·РѕРІР°С‚РµР»СЊ РѕС‚РєР°Р·Р°Р»СЃСЏ РґРѕР±Р°РІР»СЏС‚СЊ РїСЂРµРґР»РѕР¶РµРЅРЅСѓСЋ РЅР°РіСЂР°РґСѓ "${proposal.title}".`;
+        const systemMsg = `[СИСТЕМНОЕ СООБЩЕНИЕ] Пользователь отказался добавлять предложенную награду "${proposal.title}".`;
         return {
           rewardProposals: state.rewardProposals.filter(p => p.id !== id),
           chatMessages: [...state.chatMessages, { role: 'system', content: systemMsg }]
@@ -249,8 +249,8 @@ export const useStore = create(
       deleteRewardWithReason: (rewardId, reason) => set((state) => {
         const reward = state.rewards.find(r => r.id === rewardId);
         const systemMsg = reward
-          ? `РќР°РіСЂР°РґР° "${reward.title}" СѓРґР°Р»РµРЅР°. РџСЂРёС‡РёРЅР°: "${reason}"`
-          : `РќР°РіСЂР°РґР° СѓРґР°Р»РµРЅР°. РџСЂРёС‡РёРЅР°: "${reason}"`;
+          ? `Награда "${reward.title}" удалена. Причина: "${reason}"`
+          : `Награда удалена. Причина: "${reason}"`;
         return {
           rewards: state.rewards.filter(r => r.id !== rewardId),
           chatMessages: [...state.chatMessages, { role: 'system', content: systemMsg }]
@@ -272,7 +272,7 @@ export const useStore = create(
           tokens: state.tokens + purchase.cost,
           pointsHistory: [{
             id: Date.now().toString() + Math.random(),
-            title: `Р’РѕР·РІСЂР°С‚: ${purchase.title}`,
+            title: `Возврат: ${purchase.title}`,
             amount: purchase.cost,
             type: 'earn',
             date: new Date().toISOString()
@@ -299,7 +299,7 @@ export const useStore = create(
           tokens: state.tokens - reward.cost,
           pointsHistory: [{
             id: Date.now().toString() + Math.random(),
-            title: `РџРѕРєСѓРїРєР°: ${reward.title}`,
+            title: `Покупка: ${reward.title}`,
             amount: reward.cost,
             type: 'spend',
             date: new Date().toISOString()
@@ -312,7 +312,7 @@ export const useStore = create(
           }, ...state.purchaseHistory],
           chatMessages: [...state.chatMessages, {
             role: 'system',
-            content: `Р’С‹ РїРѕС‚СЂР°С‚РёР»Рё ${reward.cost} РѕС‡РєРѕРІ РЅР° "${reward.title}" С‡РµСЂРµР· Nova. РќР°СЃР»Р°Р¶РґР°Р№С‚РµСЃСЊ!`
+            content: `Вы потратили ${reward.cost} очков на "${reward.title}" через Nova. Наслаждайтесь!`
           }]
         };
       }),
@@ -360,18 +360,18 @@ export const useStore = create(
         const daysStr = String(period || 'everyday').toLowerCase();
 
         let targetDays = [];
-        if (daysStr.includes('everyday') || daysStr.includes('every_day') || daysStr.includes('РєР°Р¶Рґ')) {
+        if (daysStr.includes('everyday') || daysStr.includes('every_day') || daysStr.includes('кажд')) {
           targetDays = [1, 2, 3, 4, 5, 6, 7];
-        } else if (daysStr.includes('work_days') || daysStr.includes('workdays') || daysStr.includes('Р±СѓРґРЅ')) {
+        } else if (daysStr.includes('work_days') || daysStr.includes('workdays') || daysStr.includes('будн')) {
           targetDays = [1, 2, 3, 4, 5];
-        } else if (daysStr.includes('weekends') || daysStr.includes('РІС‹С…РѕРґРЅ')) {
+        } else if (daysStr.includes('weekends') || daysStr.includes('выходн')) {
           targetDays = [6, 7];
         } else {
           targetDays = daysStr.split(',').map(d => parseInt(d.trim(), 10)).filter(n => !isNaN(n) && n >= 1 && n <= 7);
           if (targetDays.length === 0) targetDays = [1, 2, 3, 4, 5, 6, 7];
         }
 
-        const taskTitle = title.endsWith('рџ”„') ? title : `${title} рџ”„`;
+        const taskTitle = title.endsWith('🔄') ? title : `${title} 🔄`;
 
         for (let i = 0; i < 30; i++) {
           const trackDate = new Date();
@@ -402,7 +402,7 @@ export const useStore = create(
           calendarTasks: newCalendarTasks,
           chatMessages: [...state.chatMessages, {
             role: 'system',
-            content: `Р”РѕР±Р°РІР»РµРЅР° СЂРµРіСѓР»СЏСЂРЅР°СЏ Р·Р°РґР°С‡Р° "${title}" (${period}) РЅР° Р±Р»РёР¶Р°Р№С€РёРµ 30 РґРЅРµР№.`
+            content: `Добавлена регулярная задача "${title}" (${period}) на ближайшие 30 дней.`
           }]
         };
       }),
@@ -412,7 +412,7 @@ export const useStore = create(
       })),
       clearChatMessages: () => set({
         chatMessages: [
-          { role: 'assistant', content: 'РџСЂРёРІРµС‚! РЇ Nova, С‚РІРѕР№ Р»РёС‡РЅС‹Р№ РР-Р°СЃСЃРёСЃС‚РµРЅС‚. РЇ Р·РґРµСЃСЊ, С‡С‚РѕР±С‹ РїРѕРјРѕС‡СЊ С‚РµР±Рµ РЅРµ СЃР±РёС‚СЊСЃСЏ СЃ РїСѓС‚Рё Рё Р·Р°СЂР°Р±РѕС‚Р°С‚СЊ РЅР° СЃРІРѕРё Р»СЋР±РёРјС‹Рµ РЅР°РіСЂР°РґС‹. Р”Р°РІР°Р№ СЃРґРµР»Р°РµРј СЃРµРіРѕРґРЅСЏ РѕС‚Р»РёС‡РЅС‹Р№ РґРµРЅСЊ!', timestamp: new Date().toISOString() }
+          { role: 'assistant', content: 'Привет! Я Nova, твой личный ИИ-ассистент. Я здесь, чтобы помочь тебе не сбиться с пути и заработать на свои любимые награды. Давай сделаем сегодня отличный день!', timestamp: new Date().toISOString() }
         ]
       }),
       addAnalysisMessage: (msg) => set((state) => ({
@@ -452,16 +452,16 @@ export const useStore = create(
         const todayStr = new Date().toISOString().split('T')[0];
 
         state.draftPlan.regular.forEach(r => {
-          const title = r.title + " рџ”„";
+          const title = r.title + " 🔄";
           const value = r.points || 5;
           const daysStr = String(r.schedule || r.days || 'everyday').toLowerCase();
 
           let targetDays = [];
-          if (daysStr.includes('everyday') || daysStr.includes('every_day') || daysStr.includes('РєР°Р¶Рґ')) {
+          if (daysStr.includes('everyday') || daysStr.includes('every_day') || daysStr.includes('кажд')) {
             targetDays = [1, 2, 3, 4, 5, 6, 7];
-          } else if (daysStr.includes('work_days') || daysStr.includes('workdays') || daysStr.includes('Р±СѓРґРЅ')) {
+          } else if (daysStr.includes('work_days') || daysStr.includes('workdays') || daysStr.includes('будн')) {
             targetDays = [1, 2, 3, 4, 5];
-          } else if (daysStr.includes('weekends') || daysStr.includes('РІС‹С…РѕРґРЅ')) {
+          } else if (daysStr.includes('weekends') || daysStr.includes('выходн')) {
             targetDays = [6, 7];
           } else {
             targetDays = daysStr.split(',').map(d => parseInt(d.trim(), 10)).filter(n => !isNaN(n) && n >= 1 && n <= 7);
@@ -510,7 +510,6 @@ export const useStore = create(
       // Apply data loaded from Supabase
       applyRemoteData: (remoteData) => set((state) => {
         if (!remoteData) return state;
-        // Merge remote data with current state, preferring remote data
         const merged = { ...state };
         for (const key of Object.keys(remoteData)) {
           if (remoteData[key] !== undefined) {
@@ -543,7 +542,7 @@ export const useStore = create(
             tasks: [...plannedToday],
             chatMessages: [
               ...state.chatMessages,
-              { role: 'assistant', content: `Р”РѕР±СЂРѕРµ СѓС‚СЂРѕ! РќР°СЃС‚СѓРїРёР» РЅРѕРІС‹Р№ РґРµРЅСЊ, СЃРїРёСЃРѕРє Р·Р°РґР°С‡ СЃР±СЂРѕС€РµРЅ. ${plannedToday.length > 0 ? `Р’ РєР°Р»РµРЅРґР°СЂРµ Сѓ РЅР°СЃ Р±С‹Р»Рѕ Р·Р°РїР»Р°РЅРёСЂРѕРІР°РЅРѕ ${plannedToday.length} Р·Р°РґР°С‡ РЅР° СЃРµРіРѕРґРЅСЏ - РѕРЅРё РїРµСЂРµРЅРµСЃРµРЅС‹ РІ Р°РєС‚РёРІРЅС‹Р№ СЃРїРёСЃРѕРє.` : 'РќР° СЃРµРіРѕРґРЅСЏ РЅРёС‡РµРіРѕ РЅРµ Р±С‹Р»Рѕ Р·Р°РїР»Р°РЅРёСЂРѕРІР°РЅРѕ.'} РљР°РєРёРµ РµС‰Рµ Сѓ РЅР°СЃ С†РµР»Рё РЅР° СЃРµРіРѕРґРЅСЏ? Р Р°СЃСЃРєР°Р¶Рё, Рё СЏ РїРѕРјРѕРіСѓ С‚РµР±Рµ РёС… СЃС„РѕСЂРјРёСЂРѕРІР°С‚СЊ.` }
+              { role: 'assistant', content: `Доброе утро! Наступил новый день, список задач сброшен. ${plannedToday.length > 0 ? `В календаре у нас было запланировано ${plannedToday.length} задач на сегодня - они перенесены в активный список.` : 'На сегодня ничего не было запланировано.'} Какие ещё у нас цели на сегодня? Расскажи, и я помогу тебе их сформировать.` }
             ]
           };
         }
@@ -554,7 +553,6 @@ export const useStore = create(
       name: currentStorageKey,
       storage: createJSONStorage(() => ({
         getItem: (name) => {
-          // Use current key dynamically
           const val = localStorage.getItem(currentStorageKey);
           return val;
         },
