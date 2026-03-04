@@ -93,12 +93,12 @@ const steps = [
         targetId: 'tour-analysis-btn',
         title: 'Стратегический Анализ',
         content: 'Застрял или не знаешь с чего начать? Кликни сюда, и я проведу глубокий стратегический разбор твоего плана.',
-        position: 'center',
+        position: 'bottom',
         action: (store) => {
             store.setIsRewardStoreOpen(false);
             store.setShowPointsHistory(false);
             store.setShowAISettings(false);
-            store.setShowAnalysisModal(true);
+            store.setShowAnalysisModal(false);
         }
     },
     {
@@ -140,24 +140,24 @@ const steps = [
         targetId: 'tour-points',
         title: 'Твой Баланс',
         content: 'Здесь отображается твое текущее топливо. Кликай, чтобы посмотреть подробную историю начислений и списаний.',
-        position: 'center',
+        position: 'bottom',
         action: (store) => {
             store.setTourDemoAIText('');
             store.setShowAnalysisModal(false);
             store.setShowAISettings(false);
-            store.setShowPointsHistory(true);
+            store.setShowPointsHistory(false);
         }
     },
     {
         targetId: 'tour-settings',
         title: 'Настройки ИИ',
         content: 'Настройте мой характер, выберите модель и управляйте профилем.',
-        position: 'center',
+        position: 'bottom',
         action: (store) => {
             store.setTourDemoAIText('');
             store.setShowAnalysisModal(false);
             store.setShowPointsHistory(false);
-            store.setShowAISettings(true);
+            store.setShowAISettings(false);
         }
     }
 ];
@@ -233,15 +233,6 @@ export default function DashboardTour() {
 
         const timer = setTimeout(() => {
             let finalTargetId = step.targetId;
-            const state = useStore.getState();
-
-            if (step.targetId === 'tour-analysis-btn' && state.showAnalysisModal) {
-                finalTargetId = 'tour-analysis-btn-modal-override';
-            } else if (step.targetId === 'tour-points' && state.showPointsHistory) {
-                finalTargetId = 'tour-points-modal-override';
-            } else if (step.targetId === 'tour-settings' && state.showAISettings) {
-                finalTargetId = 'tour-settings-modal-override';
-            }
 
             updateSpotlight(finalTargetId);
         }, 500);

@@ -50,23 +50,23 @@ export default function OnboardingView({ onComplete }) {
         const sequence = async () => {
             // Phase 0: "Привет. Я Nova."
             setFadeState('in');
-            await new Promise(r => setTimeout(r, 2000));
+            await new Promise(r => setTimeout(r, 1200));
             setFadeState('out');
-            await new Promise(r => setTimeout(r, 1000));
+            await new Promise(r => setTimeout(r, 600));
 
             // Phase 1: "Твой персональный ассистент..."
             setPhase(1);
             setFadeState('in');
-            await new Promise(r => setTimeout(r, 2500));
+            await new Promise(r => setTimeout(r, 1500));
             setFadeState('out');
-            await new Promise(r => setTimeout(r, 1000));
+            await new Promise(r => setTimeout(r, 600));
 
             // Phase 2: "Давай настроим..."
             setPhase(2);
             setFadeState('in');
-            await new Promise(r => setTimeout(r, 2000));
+            await new Promise(r => setTimeout(r, 1200));
             setFadeState('out');
-            await new Promise(r => setTimeout(r, 1000));
+            await new Promise(r => setTimeout(r, 600));
 
             // Go to interactive phase
             setPhase(3);
