@@ -1,5 +1,5 @@
-import { useEffect, useState } from 'react';
-import { useStore } from './store/useStore';
+import { useEffect, useState, useRef } from 'react';
+import { useStore, setStorageKey } from './store/useStore';
 import { Trophy, CheckCircle, MessageSquare, Plus, Activity, Calendar as CalendarIcon, ListTodo, ChevronUp, ChevronDown, HelpCircle, Settings, FileText, LogOut } from 'lucide-react';
 import TaskManager from './components/TaskManager';
 import RewardStore from './components/RewardStore';
@@ -17,6 +17,7 @@ import OnboardingView from './components/OnboardingView';
 import DashboardTour from './components/DashboardTour';
 import Tooltip from './components/Tooltip';
 import { supabase, isSupabaseConfigured } from './lib/supabase';
+import { loadUserData, debouncedSave, flushSave, clearLocalData } from './lib/supabaseSync';
 import ToastContainer from './components/ToastContainer';
 
 function App() {
@@ -40,11 +41,62 @@ function App() {
   // Auth state
   const [user, setUser] = useState(null);
   const [authLoading, setAuthLoading] = useState(true);
+  const [dataLoading, setDataLoading] = useState(false);
   const hasCompletedOnboarding = useStore(state => state.hasCompletedOnboarding);
+  const syncUnsubRef = useRef(null);
 
   useEffect(() => {
     updateActivity();
   }, [updateActivity]);
+
+  // Initialize user data from Supabase
+  const initUserData = async (userId) => {
+    if (!userId) return;
+
+    setDataLoading(true);
+    try {
+      // Set dynamic storage key for this user
+      setStorageKey(userId);
+
+      // Try to load from localStorage first (fast)
+      const localKey = `nova-storage-${userId}`;
+      const localData = localStorage.getItem(localKey);
+
+      if (localData) {
+        try {
+          const parsed = JSON.parse(localData);
+          if (parsed?.state) {
+            useStore.setState(parsed.state);
+          }
+        } catch (e) {
+          console.warn('[App] Failed to parse local data:', e);
+        }
+      }
+
+      // Then load from Supabase (authoritative)
+      const remoteData = await loadUserData(userId);
+      if (remoteData) {
+        useStore.getState().applyRemoteData(remoteData);
+        console.log('[App] Applied remote data from Supabase');
+      } else if (!localData) {
+        // New user — reset to clean state
+        useStore.getState().resetStoreForNewUser();
+        console.log('[App] New user — clean state');
+      }
+    } catch (err) {
+      console.error('[App] Error initializing user data:', err);
+    } finally {
+      setDataLoading(false);
+    }
+
+    // Subscribe to store changes for auto-save
+    if (syncUnsubRef.current) {
+      syncUnsubRef.current();
+    }
+    syncUnsubRef.current = useStore.subscribe(() => {
+      debouncedSave(userId, useStore.getState);
+    });
+  };
 
   // Supabase auth listener
   useEffect(() => {
@@ -53,20 +105,51 @@ function App() {
       return;
     }
 
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      setUser(session?.user ?? null);
+    supabase.auth.getSession().then(async ({ data: { session } }) => {
+      const currentUser = session?.user ?? null;
+      setUser(currentUser);
+      if (currentUser) {
+        await initUserData(currentUser.id);
+      }
       setAuthLoading(false);
     });
 
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
-      setUser(session?.user ?? null);
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (_event, session) => {
+      const newUser = session?.user ?? null;
+
+      if (_event === 'SIGNED_OUT') {
+        // User signed out — flush and clear
+        if (syncUnsubRef.current) {
+          syncUnsubRef.current();
+          syncUnsubRef.current = null;
+        }
+        useStore.getState().resetStoreForNewUser();
+        setStorageKey(null);
+        setUser(null);
+        return;
+      }
+
+      if (newUser && newUser.id !== user?.id) {
+        setUser(newUser);
+        await initUserData(newUser.id);
+      }
     });
 
-    return () => subscription.unsubscribe();
+    return () => {
+      subscription.unsubscribe();
+      if (syncUnsubRef.current) {
+        syncUnsubRef.current();
+      }
+    };
   }, []);
 
   const handleLogout = async () => {
     if (supabase) {
+      // Save current state before signing out
+      const currentUser = user;
+      if (currentUser) {
+        await flushSave(currentUser.id, useStore.getState());
+      }
       await supabase.auth.signOut();
       setUser(null);
     }
@@ -78,15 +161,16 @@ function App() {
   }
 
   // Show onboarding if logged in but hasn't completed it
-  if (isSupabaseConfigured() && user && !hasCompletedOnboarding) {
+  if (isSupabaseConfigured() && user && !hasCompletedOnboarding && !dataLoading) {
     return <OnboardingView />;
   }
 
   // Loading
-  if (authLoading && isSupabaseConfigured()) {
+  if ((authLoading || dataLoading) && isSupabaseConfigured()) {
     return (
-      <div className="min-h-screen flex items-center justify-center">
+      <div className="min-h-screen flex items-center justify-center flex-col gap-4">
         <span className="w-8 h-8 border-3 border-accent/30 border-t-accent rounded-full animate-spin" />
+        <span className="text-text-secondary text-sm">{dataLoading ? 'Загрузка данных...' : 'Авторизация...'}</span>
       </div>
     );
   }

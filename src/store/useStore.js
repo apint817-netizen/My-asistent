@@ -1,58 +1,72 @@
-import { create } from 'zustand';
-import { persist } from 'zustand/middleware';
+﻿import { create } from 'zustand';
+import { persist, createJSONStorage } from 'zustand/middleware';
+
+// Dynamic storage key based on user ID
+let currentStorageKey = 'nova-storage-v2.1';
+
+export const setStorageKey = (userId) => {
+  currentStorageKey = userId ? `nova-storage-${userId}` : 'nova-storage-v2.1';
+};
+
+export const getStorageKey = () => currentStorageKey;
+
+// Initial state factory вЂ” used for resetting store on new user
+const getInitialState = () => ({
+  tokens: 0,
+  aiTokensUsed: 0,
+  streak: 0,
+  lastActiveDate: null,
+  tasks: [],
+  rewards: [],
+  pointsHistory: [],
+  purchaseHistory: [],
+  chatMessages: [],
+  analysisMessages: [],
+  chatDraft: '',
+  analysisDraft: '',
+  draftPlan: {
+    today: [],
+    future: [],
+    regular: [],
+    rewards: []
+  },
+  apiKey: '',
+  googleModel: 'gemini-2.0-flash',
+  aiProvider: 'google',
+  proxyParams: {
+    url: 'http://127.0.0.1:8045/v1',
+    model: 'gemini-2.0-flash',
+    key: 'sk-9c00aee346154596bda23aa319d6cbf1'
+  },
+  userProfile: {
+    bio: '',
+    goals: '',
+    interests: ''
+  },
+  calendarTasks: {},
+  version: 2,
+  showMobileMenu: false,
+  user: null,
+  session: null,
+  hasCompletedOnboarding: false,
+  hasSeenTour: false,
+  toasts: [],
+  activeTab: 'dashboard',
+  isRewardStoreOpen: true,
+  showAISettings: false,
+  showAnalysisModal: false,
+  showPointsHistory: false,
+  tourDemoTaskText: '',
+  tourDemoAIText: '',
+  taskProposals: [],
+  calendarProposals: [],
+  rewardProposals: [],
+});
 
 export const useStore = create(
   persist(
     (set) => ({
-      tokens: 0,
-      aiTokensUsed: 0,
-      streak: 0,
-      lastActiveDate: null,
-      tasks: [],
-      rewards: [],
-      pointsHistory: [],
-      purchaseHistory: [],
-      chatMessages: [],
-      analysisMessages: [],
-      chatDraft: '',
-      analysisDraft: '',
-      draftPlan: {
-        today: [],
-        future: [],
-        regular: [],
-        rewards: []
-      },
-      apiKey: '',
-      googleModel: 'gemini-2.0-flash',
-      aiProvider: 'google', // 'google' or 'proxy'
-      proxyParams: {
-        url: 'http://127.0.0.1:8045/v1',
-        model: 'gemini-2.0-flash',
-        key: 'sk-9c00aee346154596bda23aa319d6cbf1'
-      },
-      userProfile: {
-        bio: '',
-        goals: '',
-        interests: ''
-      },
-      calendarTasks: {},
-      version: 2,
-      showMobileMenu: false,
-      // Auth State
-      user: null,
-      session: null,
-      hasCompletedOnboarding: false,
-      hasSeenTour: false,
-      // Тосты
-      toasts: [],
-      // UI State for Tour Control
-      activeTab: 'dashboard',
-      isRewardStoreOpen: true,
-      showAISettings: false,
-      showAnalysisModal: false,
-      showPointsHistory: false,
-      tourDemoTaskText: '',
-      tourDemoAIText: '',
+      ...getInitialState(),
 
       // Actions
       setUserSession: (session) => set({
@@ -87,7 +101,7 @@ export const useStore = create(
       setTourDemoAIText: (text) => set({ tourDemoAIText: text }),
 
       addAiTokensUsed: (amount) => set((state) => ({ aiTokensUsed: (state.aiTokensUsed || 0) + amount })),
-      addTokens: (amount, title = 'Выполнение задачи') => set((state) => ({
+      addTokens: (amount, title = 'Р’С‹РїРѕР»РЅРµРЅРёРµ Р·Р°РґР°С‡Рё') => set((state) => ({
         tokens: state.tokens + amount,
         pointsHistory: [{
           id: Date.now().toString() + Math.random(),
@@ -97,7 +111,7 @@ export const useStore = create(
           date: new Date().toISOString()
         }, ...state.pointsHistory]
       })),
-      spendTokens: (amount, title = 'Покупка награды') => set((state) => ({
+      spendTokens: (amount, title = 'РџРѕРєСѓРїРєР° РЅР°РіСЂР°РґС‹') => set((state) => ({
         tokens: Math.max(0, state.tokens - amount),
         pointsHistory: [{
           id: Date.now().toString() + Math.random(),
@@ -111,7 +125,7 @@ export const useStore = create(
         tokens: 0,
         pointsHistory: [{
           id: Date.now().toString() + Math.random(),
-          title: 'Сброс баланса',
+          title: 'РЎР±СЂРѕСЃ Р±Р°Р»Р°РЅСЃР°',
           amount: state.tokens,
           type: 'reset',
           date: new Date().toISOString()
@@ -151,7 +165,7 @@ export const useStore = create(
         const task = state.tasks.find(t => t.id === taskId);
         if (!task) return state;
 
-        const systemMsg = `[СИСТЕМНОЕ СООБЩЕНИЕ] Пользователь удалил невыполненную задачу "${task.title}". Причина: ${reason}`;
+        const systemMsg = `[РЎРРЎРўР•РњРќРћР• РЎРћРћР‘Р©Р•РќРР•] РџРѕР»СЊР·РѕРІР°С‚РµР»СЊ СѓРґР°Р»РёР» РЅРµРІС‹РїРѕР»РЅРµРЅРЅСѓСЋ Р·Р°РґР°С‡Сѓ "${task.title}". РџСЂРёС‡РёРЅР°: ${reason}`;
 
         return {
           tasks: state.tasks.filter(t => t.id !== taskId),
@@ -159,7 +173,6 @@ export const useStore = create(
         };
       }),
 
-      taskProposals: [],
       addProposal: (title, points) => set((state) => ({
         taskProposals: [...state.taskProposals, { id: Date.now().toString() + Math.random(), title, points }]
       })),
@@ -174,14 +187,13 @@ export const useStore = create(
       rejectProposal: (id) => set((state) => {
         const proposal = state.taskProposals.find(p => p.id === id);
         if (!proposal) return state;
-        const systemMsg = `[СИСТЕМНОЕ СООБЩЕНИЕ] Пользователь отказался брать на себя предложенную цель "${proposal.title}". Узнай почему, возможно она слишком сложная и её надо разбить.`;
+        const systemMsg = `[РЎРРЎРўР•РњРќРћР• РЎРћРћР‘Р©Р•РќРР•] РџРѕР»СЊР·РѕРІР°С‚РµР»СЊ РѕС‚РєР°Р·Р°Р»СЃСЏ Р±СЂР°С‚СЊ РЅР° СЃРµР±СЏ РїСЂРµРґР»РѕР¶РµРЅРЅСѓСЋ С†РµР»СЊ "${proposal.title}". РЈР·РЅР°Р№ РїРѕС‡РµРјСѓ, РІРѕР·РјРѕР¶РЅРѕ РѕРЅР° СЃР»РёС€РєРѕРј СЃР»РѕР¶РЅР°СЏ Рё РµС‘ РЅР°РґРѕ СЂР°Р·Р±РёС‚СЊ.`;
         return {
           taskProposals: state.taskProposals.filter(p => p.id !== id),
           chatMessages: [...state.chatMessages, { role: 'system', content: systemMsg }]
         };
       }),
 
-      calendarProposals: [],
       addCalendarProposal: (title, points, date) => set((state) => ({
         calendarProposals: [...state.calendarProposals, { id: Date.now().toString() + Math.random(), title, points, date }]
       })),
@@ -203,14 +215,13 @@ export const useStore = create(
       rejectCalendarProposal: (id) => set((state) => {
         const proposal = state.calendarProposals.find(p => p.id === id);
         if (!proposal) return state;
-        const systemMsg = `[СИСТЕМНОЕ СООБЩЕНИЕ] Пользователь отказался планировать задачу "${proposal.title}" на ${proposal.date}. Выясни почему.`;
+        const systemMsg = `[РЎРРЎРўР•РњРќРћР• РЎРћРћР‘Р©Р•РќРР•] РџРѕР»СЊР·РѕРІР°С‚РµР»СЊ РѕС‚РєР°Р·Р°Р»СЃСЏ РїР»Р°РЅРёСЂРѕРІР°С‚СЊ Р·Р°РґР°С‡Сѓ "${proposal.title}" РЅР° ${proposal.date}. Р’С‹СЏСЃРЅРё РїРѕС‡РµРјСѓ.`;
         return {
           calendarProposals: state.calendarProposals.filter(p => p.id !== id),
           chatMessages: [...state.chatMessages, { role: 'system', content: systemMsg }]
         };
       }),
 
-      rewardProposals: [],
       addRewardProposal: (title, cost) => set((state) => ({
         rewardProposals: [...state.rewardProposals, { id: Date.now().toString() + Math.random(), title, cost }]
       })),
@@ -225,7 +236,7 @@ export const useStore = create(
       rejectRewardProposal: (id) => set((state) => {
         const proposal = state.rewardProposals.find(p => p.id === id);
         if (!proposal) return state;
-        const systemMsg = `[СИСТЕМНОЕ СООБЩЕНИЕ] Пользователь отказался добавлять предложенную награду "${proposal.title}".`;
+        const systemMsg = `[РЎРРЎРўР•РњРќРћР• РЎРћРћР‘Р©Р•РќРР•] РџРѕР»СЊР·РѕРІР°С‚РµР»СЊ РѕС‚РєР°Р·Р°Р»СЃСЏ РґРѕР±Р°РІР»СЏС‚СЊ РїСЂРµРґР»РѕР¶РµРЅРЅСѓСЋ РЅР°РіСЂР°РґСѓ "${proposal.title}".`;
         return {
           rewardProposals: state.rewardProposals.filter(p => p.id !== id),
           chatMessages: [...state.chatMessages, { role: 'system', content: systemMsg }]
@@ -238,8 +249,8 @@ export const useStore = create(
       deleteRewardWithReason: (rewardId, reason) => set((state) => {
         const reward = state.rewards.find(r => r.id === rewardId);
         const systemMsg = reward
-          ? `Награда "${reward.title}" удалена. Причина: "${reason}"`
-          : `Награда удалена. Причина: "${reason}"`;
+          ? `РќР°РіСЂР°РґР° "${reward.title}" СѓРґР°Р»РµРЅР°. РџСЂРёС‡РёРЅР°: "${reason}"`
+          : `РќР°РіСЂР°РґР° СѓРґР°Р»РµРЅР°. РџСЂРёС‡РёРЅР°: "${reason}"`;
         return {
           rewards: state.rewards.filter(r => r.id !== rewardId),
           chatMessages: [...state.chatMessages, { role: 'system', content: systemMsg }]
@@ -250,7 +261,7 @@ export const useStore = create(
           ...reward,
           purchaseId: Date.now().toString(),
           date: new Date().toISOString(),
-          status: 'active' // active, refunded, used
+          status: 'active'
         }, ...state.purchaseHistory]
       })),
       refundPurchase: (purchaseId, reason) => set((state) => {
@@ -261,7 +272,7 @@ export const useStore = create(
           tokens: state.tokens + purchase.cost,
           pointsHistory: [{
             id: Date.now().toString() + Math.random(),
-            title: `Возврат: ${purchase.title}`,
+            title: `Р’РѕР·РІСЂР°С‚: ${purchase.title}`,
             amount: purchase.cost,
             type: 'earn',
             date: new Date().toISOString()
@@ -288,7 +299,7 @@ export const useStore = create(
           tokens: state.tokens - reward.cost,
           pointsHistory: [{
             id: Date.now().toString() + Math.random(),
-            title: `Покупка: ${reward.title}`,
+            title: `РџРѕРєСѓРїРєР°: ${reward.title}`,
             amount: reward.cost,
             type: 'spend',
             date: new Date().toISOString()
@@ -301,7 +312,7 @@ export const useStore = create(
           }, ...state.purchaseHistory],
           chatMessages: [...state.chatMessages, {
             role: 'system',
-            content: `Вы потратили ${reward.cost} очков на "${reward.title}" через Nova. Наслаждайтесь!`
+            content: `Р’С‹ РїРѕС‚СЂР°С‚РёР»Рё ${reward.cost} РѕС‡РєРѕРІ РЅР° "${reward.title}" С‡РµСЂРµР· Nova. РќР°СЃР»Р°Р¶РґР°Р№С‚РµСЃСЊ!`
           }]
         };
       }),
@@ -317,12 +328,9 @@ export const useStore = create(
       }),
       deleteCalendarTask: (dateStr, taskId) => set((state) => {
         const tasksForDate = state.calendarTasks[dateStr] || [];
-        // Находим задачу, чтобы извлечь оригинальный Title или ID (если это связано с глобальными тасками)
         const taskToDelete = tasksForDate.find(t => t.id === taskId);
 
         let newTasks = state.tasks;
-        // Если у нас в tasks есть задача с таким же названием, удаляем её тоже (связность)
-        // Либо, если taskId совпадает (хотя для календаря генерятся свои ID, но мы попытаемся по названию)
         if (taskToDelete) {
           newTasks = state.tasks.filter(t => t.id !== taskId && t.title !== taskToDelete.title);
         }
@@ -352,18 +360,18 @@ export const useStore = create(
         const daysStr = String(period || 'everyday').toLowerCase();
 
         let targetDays = [];
-        if (daysStr.includes('everyday') || daysStr.includes('every_day') || daysStr.includes('кажд')) {
+        if (daysStr.includes('everyday') || daysStr.includes('every_day') || daysStr.includes('РєР°Р¶Рґ')) {
           targetDays = [1, 2, 3, 4, 5, 6, 7];
-        } else if (daysStr.includes('work_days') || daysStr.includes('workdays') || daysStr.includes('будн')) {
+        } else if (daysStr.includes('work_days') || daysStr.includes('workdays') || daysStr.includes('Р±СѓРґРЅ')) {
           targetDays = [1, 2, 3, 4, 5];
-        } else if (daysStr.includes('weekends') || daysStr.includes('выходн')) {
+        } else if (daysStr.includes('weekends') || daysStr.includes('РІС‹С…РѕРґРЅ')) {
           targetDays = [6, 7];
         } else {
           targetDays = daysStr.split(',').map(d => parseInt(d.trim(), 10)).filter(n => !isNaN(n) && n >= 1 && n <= 7);
           if (targetDays.length === 0) targetDays = [1, 2, 3, 4, 5, 6, 7];
         }
 
-        const taskTitle = title.endsWith('🔄') ? title : `${title} 🔄`;
+        const taskTitle = title.endsWith('рџ”„') ? title : `${title} рџ”„`;
 
         for (let i = 0; i < 30; i++) {
           const trackDate = new Date();
@@ -394,7 +402,7 @@ export const useStore = create(
           calendarTasks: newCalendarTasks,
           chatMessages: [...state.chatMessages, {
             role: 'system',
-            content: `Добавлена регулярная задача "${title}" (${period}) на ближайшие 30 дней.`
+            content: `Р”РѕР±Р°РІР»РµРЅР° СЂРµРіСѓР»СЏСЂРЅР°СЏ Р·Р°РґР°С‡Р° "${title}" (${period}) РЅР° Р±Р»РёР¶Р°Р№С€РёРµ 30 РґРЅРµР№.`
           }]
         };
       }),
@@ -404,7 +412,7 @@ export const useStore = create(
       })),
       clearChatMessages: () => set({
         chatMessages: [
-          { role: 'assistant', content: 'Привет! Я Nova, твой личный ИИ-ассистент. Я здесь, чтобы помочь тебе не сбиться с пути и заработать на свои любимые награды. Давай сделаем сегодня отличный день!', timestamp: new Date().toISOString() }
+          { role: 'assistant', content: 'РџСЂРёРІРµС‚! РЇ Nova, С‚РІРѕР№ Р»РёС‡РЅС‹Р№ РР-Р°СЃСЃРёСЃС‚РµРЅС‚. РЇ Р·РґРµСЃСЊ, С‡С‚РѕР±С‹ РїРѕРјРѕС‡СЊ С‚РµР±Рµ РЅРµ СЃР±РёС‚СЊСЃСЏ СЃ РїСѓС‚Рё Рё Р·Р°СЂР°Р±РѕС‚Р°С‚СЊ РЅР° СЃРІРѕРё Р»СЋР±РёРјС‹Рµ РЅР°РіСЂР°РґС‹. Р”Р°РІР°Р№ СЃРґРµР»Р°РµРј СЃРµРіРѕРґРЅСЏ РѕС‚Р»РёС‡РЅС‹Р№ РґРµРЅСЊ!', timestamp: new Date().toISOString() }
         ]
       }),
       addAnalysisMessage: (msg) => set((state) => ({
@@ -412,10 +420,7 @@ export const useStore = create(
       })),
       clearAnalysisMessages: () => set({ analysisMessages: [] }),
 
-      chatDraft: '',
       setChatDraft: (text) => set({ chatDraft: text }),
-
-      analysisDraft: '',
       setAnalysisDraft: (text) => set({ analysisDraft: text }),
 
       updateDraftPlan: (planUpdate) => set((state) => ({
@@ -425,8 +430,6 @@ export const useStore = create(
         draftPlan: { today: [], future: [], regular: [], rewards: [] }
       }),
       commitDraftPlan: () => set((state) => {
-        // Here we handle transferring items from draftPlan into active tasks/calendar.
-        // For 'today' tasks -> state.tasks
         const newTasks = state.draftPlan.today.map(t => ({
           id: Date.now().toString() + Math.random(),
           title: t.title,
@@ -434,7 +437,6 @@ export const useStore = create(
           value: t.points || 10
         }));
 
-        // For 'future' tasks -> state.calendarTasks
         const newCalendarTasks = { ...state.calendarTasks };
         state.draftPlan.future.forEach(ft => {
           if (!newCalendarTasks[ft.date]) newCalendarTasks[ft.date] = [];
@@ -446,32 +448,30 @@ export const useStore = create(
           });
         });
 
-        // For regular habits -> distribute to calendar based on days
         const newHabitsForToday = [];
         const todayStr = new Date().toISOString().split('T')[0];
 
         state.draftPlan.regular.forEach(r => {
-          const title = r.title + " 🔄";
+          const title = r.title + " рџ”„";
           const value = r.points || 5;
           const daysStr = String(r.schedule || r.days || 'everyday').toLowerCase();
 
           let targetDays = [];
-          if (daysStr.includes('everyday') || daysStr.includes('every_day') || daysStr.includes('кажд')) {
+          if (daysStr.includes('everyday') || daysStr.includes('every_day') || daysStr.includes('РєР°Р¶Рґ')) {
             targetDays = [1, 2, 3, 4, 5, 6, 7];
-          } else if (daysStr.includes('work_days') || daysStr.includes('workdays') || daysStr.includes('будн')) {
+          } else if (daysStr.includes('work_days') || daysStr.includes('workdays') || daysStr.includes('Р±СѓРґРЅ')) {
             targetDays = [1, 2, 3, 4, 5];
-          } else if (daysStr.includes('weekends') || daysStr.includes('выходн')) {
+          } else if (daysStr.includes('weekends') || daysStr.includes('РІС‹С…РѕРґРЅ')) {
             targetDays = [6, 7];
           } else {
             targetDays = daysStr.split(',').map(d => parseInt(d.trim(), 10)).filter(n => !isNaN(n) && n >= 1 && n <= 7);
             if (targetDays.length === 0) targetDays = [1, 2, 3, 4, 5, 6, 7];
           }
 
-          // Add to next 30 days
           for (let i = 0; i < 30; i++) {
             const trackDate = new Date();
             trackDate.setDate(trackDate.getDate() + i);
-            const isoDay = trackDate.getDay() === 0 ? 7 : trackDate.getDay(); // 1=Mon, 7=Sun
+            const isoDay = trackDate.getDay() === 0 ? 7 : trackDate.getDay();
 
             if (targetDays.includes(isoDay)) {
               const dateStr = trackDate.toISOString().split('T')[0];
@@ -493,7 +493,6 @@ export const useStore = create(
           }
         });
 
-        // For rewards -> state.rewards
         const newRewards = (state.draftPlan.rewards || []).map(r => ({
           id: Date.now().toString() + Math.random(),
           title: r.title,
@@ -508,10 +507,31 @@ export const useStore = create(
         };
       }),
 
+      // Apply data loaded from Supabase
+      applyRemoteData: (remoteData) => set((state) => {
+        if (!remoteData) return state;
+        // Merge remote data with current state, preferring remote data
+        const merged = { ...state };
+        for (const key of Object.keys(remoteData)) {
+          if (remoteData[key] !== undefined) {
+            merged[key] = remoteData[key];
+          }
+        }
+        return merged;
+      }),
+
+      // Reset store for a new/different user
+      resetStoreForNewUser: () => set({
+        ...getInitialState(),
+      }),
+
+      clearSystemAnalysisLogs: () => set(state => ({
+        analysisMessages: state.analysisMessages.filter(m => m.role !== 'system')
+      })),
+
       updateActivity: () => set((state) => {
         const today = new Date().toISOString().split('T')[0];
         if (state.lastActiveDate !== today) {
-          // New day => reset tasks, transfer from calendar (but keep them in calendar too)
           const plannedToday = (state.calendarTasks[today] || []).map(t => ({
             ...t,
             fromCalendar: true
@@ -523,7 +543,7 @@ export const useStore = create(
             tasks: [...plannedToday],
             chatMessages: [
               ...state.chatMessages,
-              { role: 'assistant', content: `Доброе утро! Наступил новый день, список задач сброшен. ${plannedToday.length > 0 ? `В календаре у нас было запланировано ${plannedToday.length} задач на сегодня - они перенесены в активный список.` : 'На сегодня ничего не было запланировано.'} Какие еще у нас цели на сегодня? Расскажи, и я помогу тебе их сформировать.` }
+              { role: 'assistant', content: `Р”РѕР±СЂРѕРµ СѓС‚СЂРѕ! РќР°СЃС‚СѓРїРёР» РЅРѕРІС‹Р№ РґРµРЅСЊ, СЃРїРёСЃРѕРє Р·Р°РґР°С‡ СЃР±СЂРѕС€РµРЅ. ${plannedToday.length > 0 ? `Р’ РєР°Р»РµРЅРґР°СЂРµ Сѓ РЅР°СЃ Р±С‹Р»Рѕ Р·Р°РїР»Р°РЅРёСЂРѕРІР°РЅРѕ ${plannedToday.length} Р·Р°РґР°С‡ РЅР° СЃРµРіРѕРґРЅСЏ - РѕРЅРё РїРµСЂРµРЅРµСЃРµРЅС‹ РІ Р°РєС‚РёРІРЅС‹Р№ СЃРїРёСЃРѕРє.` : 'РќР° СЃРµРіРѕРґРЅСЏ РЅРёС‡РµРіРѕ РЅРµ Р±С‹Р»Рѕ Р·Р°РїР»Р°РЅРёСЂРѕРІР°РЅРѕ.'} РљР°РєРёРµ РµС‰Рµ Сѓ РЅР°СЃ С†РµР»Рё РЅР° СЃРµРіРѕРґРЅСЏ? Р Р°СЃСЃРєР°Р¶Рё, Рё СЏ РїРѕРјРѕРіСѓ С‚РµР±Рµ РёС… СЃС„РѕСЂРјРёСЂРѕРІР°С‚СЊ.` }
             ]
           };
         }
@@ -531,10 +551,22 @@ export const useStore = create(
       })
     }),
     {
-      name: 'nova-storage-v2.1',
+      name: currentStorageKey,
+      storage: createJSONStorage(() => ({
+        getItem: (name) => {
+          // Use current key dynamically
+          const val = localStorage.getItem(currentStorageKey);
+          return val;
+        },
+        setItem: (name, value) => {
+          localStorage.setItem(currentStorageKey, value);
+        },
+        removeItem: (name) => {
+          localStorage.removeItem(currentStorageKey);
+        }
+      })),
       version: 2,
       migrate: (persistedState, version) => {
-        // Миграция: сбрасываем несуществующие/старые модели на gemini-2.5-flash
         const oldModels = ['gemini-1.5-flash', 'gemini-3-flash', 'gemini-2.0-flash-exp'];
         if (persistedState && oldModels.includes(persistedState.googleModel)) {
           persistedState.googleModel = 'gemini-2.5-flash';
