@@ -1,14 +1,22 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { supabase } from '../lib/supabase';
 import { ArrowLeft, Send, User } from 'lucide-react';
-import { useStore } from '../store/useStore';
 
 export default function ChatView({ friend, onBack }) {
-    const user = useStore(state => state.user);
+    const [user, setUser] = useState(null);
     const [messages, setMessages] = useState([]);
     const [newMessage, setNewMessage] = useState('');
     const [loading, setLoading] = useState(true);
     const messagesEndRef = useRef(null);
+
+    // Получаем пользователя из Supabase Auth
+    useEffect(() => {
+        supabase.auth.getSession().then(({ data: { session } }) => {
+            if (session?.user) {
+                setUser(session.user);
+            }
+        });
+    }, []);
 
     useEffect(() => {
         if (!user || !friend) return;
