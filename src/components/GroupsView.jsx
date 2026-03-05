@@ -79,7 +79,7 @@ export default function GroupsView() {
             loadGroups(user.id);
         } catch (error) {
             console.error('Error creating group:', error);
-            alert('Ошибка при создании команды');
+            alert(`Ошибка при создании команды: ${error.message || 'Неизвестная ошибка'}`);
         }
     };
 
@@ -101,8 +101,8 @@ export default function GroupsView() {
                 <button
                     onClick={() => setIsCreating(!isCreating)}
                     className={`px-4 py-2.5 rounded-xl text-sm font-semibold transition-all flex items-center gap-2 ${isCreating
-                            ? 'bg-white/10 text-white hover:bg-white/20'
-                            : 'bg-accent text-white hover:bg-accent/80 shadow-lg shadow-accent/20'
+                        ? 'bg-white/10 text-white hover:bg-white/20'
+                        : 'bg-accent text-white hover:bg-accent/80 shadow-lg shadow-accent/20'
                         }`}
                 >
                     {isCreating ? 'Отмена' : <><Plus size={16} /> Создать команду</>}
@@ -185,8 +185,8 @@ export default function GroupsView() {
                                         <span>{membersCount} {membersCount === 1 ? 'участник' : membersCount >= 2 && membersCount <= 4 ? 'участника' : 'участников'}</span>
                                     </div>
                                     <div className={`text-[10px] font-bold px-2 py-1 rounded-full uppercase tracking-wider ${myRole === 'owner' ? 'bg-warning/20 text-warning' :
-                                            myRole === 'admin' ? 'bg-success/20 text-success' :
-                                                'bg-white/10 text-text-secondary'
+                                        myRole === 'admin' ? 'bg-success/20 text-success' :
+                                            'bg-white/10 text-text-secondary'
                                         }`}>
                                         {myRole === 'owner' ? 'Создатель' : myRole === 'admin' ? 'Админ' : 'Участник'}
                                     </div>
