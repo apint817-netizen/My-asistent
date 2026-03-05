@@ -10,7 +10,16 @@ export const setStorageKey = (userId) => {
 
 export const getStorageKey = () => currentStorageKey;
 
-// Initial state factory — used for resetting store on new user
+export const TASK_CATEGORIES = [
+  { id: 'urgent', name: 'Срочные', icon: 'Flame', color: 'text-red-500', bg: 'bg-red-500/10' },
+  { id: 'important', name: 'Важные', icon: 'Star', color: 'text-amber-500', bg: 'bg-amber-500/10' },
+  { id: 'work', name: 'Рабочие', icon: 'Briefcase', color: 'text-blue-500', bg: 'bg-blue-500/10' },
+  { id: 'personal', name: 'Личные', icon: 'Home', color: 'text-green-500', bg: 'bg-green-500/10' },
+  { id: 'health', name: 'Здоровье', icon: 'Heart', color: 'text-pink-500', bg: 'bg-pink-500/10' },
+  { id: 'learning', name: 'Обучение', icon: 'BookOpen', color: 'text-purple-500', bg: 'bg-purple-500/10' },
+  { id: 'habit', name: 'Привычки', icon: 'Target', color: 'text-accent', bg: 'bg-accent/10' },
+];
+
 const getInitialState = () => ({
   tokens: 0,
   aiTokensUsed: 0,
@@ -65,7 +74,7 @@ const getInitialState = () => ({
 
 export const useStore = create(
   persist(
-    (set) => ({
+    (set, get) => ({
       ...getInitialState(),
 
       // Actions
@@ -133,19 +142,37 @@ export const useStore = create(
       })),
       clearSystemLogs: () => set(state => ({ chatMessages: state.chatMessages.filter(m => m.role !== 'system') })),
 
-      toggleTask: (taskId) => set((state) => {
-        const tasks = state.tasks.map(t => {
-          if (t.id === taskId) {
-            const completed = !t.completed;
-            return { ...t, completed };
-          }
-          return t;
-        });
-        return { tasks };
-      }),
+      toggleTask: (taskId) => {
+        const state = get();
+        const task = state.tasks.find(t => t.id === taskId);
+        if (!task) return;
 
-      addTask: (title, value) => set((state) => ({
-        tasks: [...state.tasks, { id: Date.now().toString(), title, completed: false, value }]
+        const willComplete = !task.completed;
+        const newTasks = state.tasks.map(t => t.id === taskId ? { ...t, completed: willComplete } : t);
+
+        if (willComplete) {
+          // Задача выполнена -> начисляем очки
+          state.addTokens(task.value, `Выполнение задачи: ${task.title}`);
+        } else {
+          // Отмена выполнения -> списываем очки
+          // Создаем кастомную запись в истории, чтобы было понятно, что это отмена
+          set((s) => ({
+            tokens: Math.max(0, s.tokens - task.value),
+            pointsHistory: [{
+              id: Date.now().toString() + Math.random(),
+              title: `Отмена: ${task.title}`,
+              amount: task.value,
+              type: 'spend',
+              date: new Date().toISOString()
+            }, ...s.pointsHistory]
+          }));
+        }
+
+        set({ tasks: newTasks });
+      },
+
+      addTask: (title, value, category = null) => set((state) => ({
+        tasks: [...state.tasks, { id: Date.now().toString(), title, completed: false, value, category }]
       })),
 
       reorderTasks: (oldIndex, newIndex) => set((state) => {
@@ -161,6 +188,12 @@ export const useStore = create(
         )
       })),
 
+      editTaskCategory: (taskId, category) => set((state) => ({
+        tasks: state.tasks.map(t =>
+          t.id === taskId ? { ...t, category } : t
+        )
+      })),
+
       deleteTaskWithReason: (taskId, reason) => set((state) => {
         const task = state.tasks.find(t => t.id === taskId);
         if (!task) return state;
@@ -173,15 +206,15 @@ export const useStore = create(
         };
       }),
 
-      addProposal: (title, points) => set((state) => ({
-        taskProposals: [...state.taskProposals, { id: Date.now().toString() + Math.random(), title, points }]
+      addProposal: (title, points, category = null) => set((state) => ({
+        taskProposals: [...state.taskProposals, { id: Date.now().toString() + Math.random(), title, points, category }]
       })),
       approveProposal: (id) => set((state) => {
         const proposal = state.taskProposals.find(p => p.id === id);
         if (!proposal) return state;
         return {
           taskProposals: state.taskProposals.filter(p => p.id !== id),
-          tasks: [...state.tasks, { id: Date.now().toString(), title: proposal.title, completed: false, value: proposal.points }]
+          tasks: [...state.tasks, { id: Date.now().toString(), title: proposal.title, completed: false, value: proposal.points, category: proposal.category || null }]
         };
       }),
       rejectProposal: (id) => set((state) => {
@@ -194,8 +227,8 @@ export const useStore = create(
         };
       }),
 
-      addCalendarProposal: (title, points, date) => set((state) => ({
-        calendarProposals: [...state.calendarProposals, { id: Date.now().toString() + Math.random(), title, points, date }]
+      addCalendarProposal: (title, points, date, category = null) => set((state) => ({
+        calendarProposals: [...state.calendarProposals, { id: Date.now().toString() + Math.random(), title, points, date, category }]
       })),
       approveCalendarProposal: (id) => set((state) => {
         const proposal = state.calendarProposals.find(p => p.id === id);
@@ -208,7 +241,7 @@ export const useStore = create(
           calendarProposals: state.calendarProposals.filter(p => p.id !== id),
           calendarTasks: {
             ...state.calendarTasks,
-            [dateStr]: [...tasksForDate, { id: Date.now().toString(), title: proposal.title, completed: false, value: proposal.points }]
+            [dateStr]: [...tasksForDate, { id: Date.now().toString(), title: proposal.title, completed: false, value: proposal.points, category: proposal.category || null }]
           }
         };
       }),
@@ -317,12 +350,12 @@ export const useStore = create(
         };
       }),
 
-      addCalendarTask: (dateStr, title, value) => set((state) => {
+      addCalendarTask: (dateStr, title, value, category = null) => set((state) => {
         const tasksForDate = state.calendarTasks[dateStr] || [];
         return {
           calendarTasks: {
             ...state.calendarTasks,
-            [dateStr]: [...tasksForDate, { id: Date.now().toString() + Math.random(), title, completed: false, value }]
+            [dateStr]: [...tasksForDate, { id: Date.now().toString() + Math.random(), title, completed: false, value, category }]
           }
         };
       }),
@@ -353,7 +386,7 @@ export const useStore = create(
         };
       }),
 
-      addRegularTask: (title, value, period) => set((state) => {
+      addRegularTask: (title, value, period, category = null) => set((state) => {
         const newCalendarTasks = { ...state.calendarTasks };
         const newTasks = [...state.tasks];
         const todayStr = new Date().toISOString().split('T')[0];
@@ -385,7 +418,8 @@ export const useStore = create(
               title: taskTitle,
               completed: false,
               value,
-              isHabit: true
+              isHabit: true,
+              category: category || 'habit' // Defaults to habit if not set
             };
 
             if (dateStr === todayStr) {
@@ -434,7 +468,8 @@ export const useStore = create(
           id: Date.now().toString() + Math.random(),
           title: t.title,
           completed: false,
-          value: t.points || 10
+          value: t.points || 10,
+          category: t.category || null
         }));
 
         const newCalendarTasks = { ...state.calendarTasks };
@@ -444,7 +479,8 @@ export const useStore = create(
             id: Date.now().toString() + Math.random(),
             title: ft.title,
             completed: false,
-            value: ft.points || 10
+            value: ft.points || 10,
+            category: ft.category || null
           });
         });
 
@@ -480,7 +516,8 @@ export const useStore = create(
                 title,
                 completed: false,
                 value,
-                isHabit: true
+                isHabit: true,
+                category: r.category || 'habit'
               };
 
               if (dateStr === todayStr) {

@@ -1,12 +1,13 @@
 import React, { useState, useMemo } from 'react';
 import { ChevronLeft, ChevronRight, Calendar as CalendarIcon, Plus, Trash2, CheckCircle } from 'lucide-react';
-import { useStore } from '../store/useStore';
+import { useStore, TASK_CATEGORIES } from '../store/useStore';
 
 const CalendarView = () => {
     const [currentDate, setCurrentDate] = useState(new Date());
     const [selectedDate, setSelectedDate] = useState(null);
     const [newTaskTitle, setNewTaskTitle] = useState('');
     const [newTaskValue, setNewTaskValue] = useState(10);
+    const [selectedCategory, setSelectedCategory] = useState('');
     const [showMonthPicker, setShowMonthPicker] = useState(false);
 
     const { calendarTasks, addCalendarTask, deleteCalendarTask, toggleCalendarTask } = useStore();
@@ -75,9 +76,10 @@ const CalendarView = () => {
         e.preventDefault();
         if (!newTaskTitle.trim() || !selectedDate) return;
 
-        addCalendarTask(selectedDate, newTaskTitle.trim(), Number(newTaskValue));
+        addCalendarTask(selectedDate, newTaskTitle.trim(), Number(newTaskValue), selectedCategory || null);
         setNewTaskTitle('');
         setNewTaskValue(10);
+        setSelectedCategory('');
     };
 
     // Объединяем задачи: calendarTasks + mainTasks для сегодня
@@ -263,6 +265,17 @@ const CalendarView = () => {
                                                 {task.source === 'main' && <span className="text-blue-400 mr-2 drop-shadow-md">📋</span>}
                                                 {task.title}
                                             </span>
+                                            {task.category && (() => {
+                                                const catObj = TASK_CATEGORIES.find(c => c.id === task.category);
+                                                if (!catObj) return null;
+                                                return (
+                                                    <div className="mt-1">
+                                                        <span className={`text-[10px] px-1.5 py-0.5 rounded-full font-medium ${catObj.bg} ${catObj.color} border border-current/20`}>
+                                                            {catObj.name}
+                                                        </span>
+                                                    </div>
+                                                );
+                                            })()}
                                             <div className="flex items-center gap-3 mt-1.5">
                                                 <span className="text-[10px] md:text-xs text-accent font-black tracking-widest bg-accent/10 px-2 py-0.5 rounded text-glow">+{task.value} ОЧКОВ</span>
                                                 {task.source === 'main' && (
@@ -309,26 +322,38 @@ const CalendarView = () => {
                             onChange={(e) => setNewTaskTitle(e.target.value)}
                             className="bg-black/40 border border-border rounded-xl px-4 py-2 text-sm outline-none focus:border-accent focus:ring-1 focus:ring-accent transition-all"
                         />
-                        <div className="flex gap-2">
+                        <div className="flex flex-col sm:flex-row gap-2">
                             <select
-                                value={newTaskValue}
-                                onChange={(e) => setNewTaskValue(Number(e.target.value))}
-                                className="bg-black/40 border border-border rounded-xl px-3 py-2 text-sm outline-none focus:border-accent focus:ring-1 focus:ring-accent transition-all cursor-pointer"
+                                value={selectedCategory}
+                                onChange={(e) => setSelectedCategory(e.target.value)}
+                                className="bg-black/40 border border-border rounded-xl px-3 py-2 text-sm outline-none focus:border-accent focus:ring-1 focus:ring-accent transition-all cursor-pointer flex-1"
                             >
-                                <option value={5}>5 очков</option>
-                                <option value={10}>10 очков</option>
-                                <option value={15}>15 очков</option>
-                                <option value={30}>30 очков</option>
-                                <option value={50}>50 очков</option>
-                                <option value={100}>100 очков</option>
+                                <option value="">Без категории</option>
+                                {TASK_CATEGORIES.map(cat => (
+                                    <option key={cat.id} value={cat.id}>{cat.name}</option>
+                                ))}
                             </select>
-                            <button
-                                type="submit"
-                                disabled={!newTaskTitle.trim()}
-                                className="flex-1 bg-accent/20 hover:bg-accent/30 text-accent font-bold py-2 rounded-xl transition-colors disabled:opacity-50 flex items-center justify-center"
-                            >
-                                <Plus size={18} />
-                            </button>
+                            <div className="flex gap-2 flex-1">
+                                <select
+                                    value={newTaskValue}
+                                    onChange={(e) => setNewTaskValue(Number(e.target.value))}
+                                    className="bg-black/40 border border-border rounded-xl px-3 py-2 text-sm outline-none focus:border-accent focus:ring-1 focus:ring-accent transition-all cursor-pointer w-full"
+                                >
+                                    <option value={5}>5 очков</option>
+                                    <option value={10}>10 очков</option>
+                                    <option value={15}>15 очков</option>
+                                    <option value={30}>30 очков</option>
+                                    <option value={50}>50 очков</option>
+                                    <option value={100}>100 очков</option>
+                                </select>
+                                <button
+                                    type="submit"
+                                    disabled={!newTaskTitle.trim()}
+                                    className="bg-accent/20 hover:bg-accent/30 text-accent font-bold py-2 px-4 rounded-xl transition-colors disabled:opacity-50 flex items-center justify-center shrink-0"
+                                >
+                                    <Plus size={18} />
+                                </button>
+                            </div>
                         </div>
                     </form>
                 </div>

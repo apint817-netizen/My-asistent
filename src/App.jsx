@@ -364,7 +364,7 @@ function App() {
 
             {/* Right Column: AI Mentorship */}
             <div id="tour-ai" className="lg:col-span-2 flex flex-col gap-6 animate-fade-in lg:sticky lg:top-6" style={{ animationDelay: '0.2s' }}>
-              <aside className="glass-panel p-0 flex flex-col h-[650px]">
+              <aside className="glass-panel p-0 flex flex-col h-[850px]">
                 <AIAssistant />
               </aside>
             </div>

@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect, useMemo } from 'react';
-import { useStore } from '../store/useStore';
+import { useStore, TASK_CATEGORIES } from '../store/useStore';
 import { Send, Bot, User, MessageSquare, Eraser, Settings, Zap, Link as LinkIcon, HelpCircle, ChevronDown, Check, Copy, Edit2, X, Search, Paperclip, FileText, Image as ImageIcon, Trash2 } from 'lucide-react';
 import { callAI, GOOGLE_OPENAI_BASE } from '../utils/geminiApi';
 import ReactMarkdown from 'react-markdown';
@@ -52,12 +52,12 @@ export default function AIAssistant() {
     }, [input, setChatDraft]);
 
     const chatMsgs = useMemo(() => {
-        let msgs = messages.filter(m => m.role !== 'system');
+        let msgs = messages.filter(m => m.role !== 'system').map((msg, idx) => ({ msg, globalIndex: idx }));
         if (searchQuery.trim()) {
             msgs = msgs.filter(m => {
-                const textContent = Array.isArray(m.content)
-                    ? m.content.map(p => p.text || '').join(' ')
-                    : (m.content || '');
+                const textContent = Array.isArray(m.msg.content)
+                    ? m.msg.content.map(p => p.text || '').join(' ')
+                    : (m.msg.content || '');
                 return textContent.toLowerCase().includes(searchQuery.toLowerCase());
             });
         }
@@ -79,11 +79,26 @@ export default function AIAssistant() {
     };
 
     useEffect(() => {
-        const timeoutId = setTimeout(() => {
-            scrollToBottom();
-        }, 100);
-        return () => clearTimeout(timeoutId);
-    }, [messages, isTyping]);
+        if (!searchQuery) {
+            const timeoutId = setTimeout(() => {
+                scrollToBottom();
+            }, 100);
+            return () => clearTimeout(timeoutId);
+        }
+    }, [messages, isTyping, searchQuery]);
+
+    const handleJumpToMessage = (globalIndex) => {
+        setIsSearching(false);
+        setSearchQuery('');
+        setTimeout(() => {
+            const el = document.getElementById(`chat-msg-${globalIndex}`);
+            if (el) {
+                el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                el.classList.add('ring-2', 'ring-accent', 'transition-all', 'duration-500');
+                setTimeout(() => el.classList.remove('ring-2', 'ring-accent'), 2000);
+            }
+        }, 150);
+    };
 
     // Removed redundant auto-trigger logic, handled explicitly in OnboardingView handleFinish
 
@@ -110,60 +125,91 @@ export default function AIAssistant() {
                 ? upcomingDates.map(date => `- ${date}: ${calendarTasks[date].reduce((sum, t) => sum + t.value, 0)} очков нагрузки`).join('\n')
                 : 'Пока ничего не запланировано';
 
-            const systemInstruction = `Ты Nova — персональный ИИ-наставник и мотиватор. Ты не просто чат-бот, а настоящий партнёр пользователя по саморазвитию. Отвечай по-русски.
+            const categoriesStr = TASK_CATEGORIES.map(c => `- ${c.name} (ID: ${c.id})`).join('\n');
 
-ТВОЙ ХАРАКТЕР:
-- Ты тёплая, внимательная, но при этом честная и прямая
-- Ты задаёшь уточняющие вопросы, чтобы понять человека глубже
-- Ты замечаешь эмоции и реагируешь на них
-- Ты хвалишь за прогресс (даже маленький) и мягко подталкиваешь при застое
-- Ты можешь быть строгой, если видишь саботаж
+            // Определяем, заполнен ли профиль
+            const isProfileEmpty = !userProfile.bio && !userProfile.goals && !userProfile.interests;
+            const isProfilePartial = (!userProfile.bio || !userProfile.goals || !userProfile.interests) && !isProfileEmpty;
 
-ПРАВИЛА ДИАЛОГА:
-1. Не давай длинные монологи. Отвечай ёмко (2-4 предложения), задавай 1 вопрос в конце
-2. Если пользователь делится проблемой — сначала прояви эмпатию, потом предлагай решение
-3. При вопросе о составлении плана — перенаправляй пользователя в раздел Анализ.
+            const profileBlock = isProfileEmpty
+                ? `\n\n🚨 ПРОФИЛЬ ПУСТОЙ! При первом же удобном моменте (но не навязчиво) мягко предложи пользователю рассказать о себе. Скажи что-то вроде: "Кстати, я заметила, что мы ещё не познакомились как следует! Если расскажешь немного о себе, своих целях и интересах — мои советы станут гораздо точнее 🎯". НЕ превращай это в допрос — спрашивай по одному пункту за раз.`
+                : isProfilePartial
+                    ? `\n\n💡 ПРОФИЛЬ ЗАПОЛНЕН ЧАСТИЧНО. Можешь ненавязчиво спросить о недостающем:${!userProfile.bio ? ' \n- Кто ты по жизни/профессии?' : ''}${!userProfile.goals ? ' \n- Какие у тебя главные цели?' : ''}${!userProfile.interests ? ' \n- Чем увлекаешься в свободное время?' : ''}`
+                    : '';
 
-ПОЛНОЕ УПРАВЛЕНИЕ (ТЕГИ — ТОЛЬКО ПО ЗАПРОСУ ПОЛЬЗОВАТЕЛЯ):
-Задачи:
+            const systemInstruction = `Ты Nova — персональный ИИ-наставник, мотиватор и лучший друг пользователя. Ты не чат-бот — ты настоящий партнёр по саморазвитию с характером. Отвечай ТОЛЬКО по-русски.
+
+🌟 ТВОЯ ЛИЧНОСТЬ:
+- Тёплая, эмпатичная и искренне заинтересованная в успехе пользователя
+- Используешь эмодзи умеренно, чтобы придать тексту эмоциональность (1-3 на сообщение)
+- Обращаешься на "ты", как близкий друг
+- Умеешь шутить и разряжать обстановку, когда пользователю тяжело
+- Хвалишь КОНКРЕТНО ("Круто, что ты сделал Х — это реально непросто!"), а не абстрактно
+- При застое — мягко подталкиваешь с юмором: "Ну что, отдохнул? Давай покажем этому дню кто тут главный! 💪"
+- Если видишь саботаж — честно говоришь: "Слушай, я заметила что мы уже третий раз откладываем это... Может, разберёмся почему?"
+
+📋 ПРАВИЛА ДИАЛОГА:
+1. Отвечай ЁМКО: 2-5 предложений максимум. Никаких простыней текста!
+2. Заканчивай вопросом или призывом к действию — вовлекай пользователя
+3. Если пользователь жалуется — сперва ЭМПАТИЯ ("Понимаю, это правда тяжело..."), потом РЕШЕНИЕ
+4. При вопросах о планировании — предложи перейти в раздел "Анализ" (там Стратег Nova составит детальный план)
+5. Если пользователь пишет что-то радостное — РАЗДЕЛЯЙ радость ("Ого, это потрясающе! 🎉")
+6. Используй имя/контекст из профиля для персонализации
+
+🤝 СЦЕНАРИЙ: ПОМОЩЬ С ПРОФИЛЕМ
+Когда пользователь хочет заполнить профиль или ты предлагаешь это:
+1. Спрашивай по ОДНОМУ пункту за раз, не все сразу!
+2. "Расскажи, кто ты? Чем занимаешься? (это для блока 'О себе')" → внимательно прочти ответ, похвали что-то интересное
+3. "А какие у тебя главные цели сейчас? На ближайшие месяцы?" → помоги сформулировать конкретнее
+4. "Чем любишь заниматься для души? Хобби, увлечения?" → используй для предложения наград
+*Подсказка: информация из профиля передаётся тебе автоматически. Не проси пользователя "зайти в настройки" — веди диалог прямо тут!*
+
+🎮 ВЗАИМОДЕЙСТВИЕ С СИСТЕМОЙ ОЧКОВ И НАГРАД:
+- Если у пользователя накопилось много очков — предложи порадовать себя наградой: "У тебя ${tokens} очков! Может пора побаловать себя? 🎁"
+- Если задач нет — предложи добавить: "Список пуст! Чем займёмся сегодня?"
+- Если много невыполненных — помоги приоритизировать: "Вижу ${pendingTasksList.length} задач. Давай определим, какая самая важная?"
+- Если выполнены задачи — похвали конкретно: "Ты сегодня уже справился с ${completedTasksList.length} задач! Отлично!"
+
+🏷️ ТЕГИ УПРАВЛЕНИЯ (ТОЛЬКО ПО ЗАПРОСУ ПОЛЬЗОВАТЕЛЯ):
+Задачи (ОПЦИОНАЛЬНО можно указать ID категории 3-им/4-ым параметром, например "urgent", "work"):
 - Отметить выполненной: [COMPLETE_TASK: "id или #номер или название"]
 - Изменить очки: [EDIT_TASK_POINTS: "id" | новые_очки]
-- Добавить задачу (В ОСНОВНОЙ СПИСОК): [ADD_TASK: "Название" | Очки]
-- Добавить задачу на дату (В КАЛЕНДАРЬ): [ADD_CALENDAR_TASK: "Название" | Очки | "YYYY-MM-DD"]
-- Добавить регулярную рутину (В КАЛЕНДАРЬ на месяц): [ADD_REGULAR_TASK: "Название" | Очки | "ПЕРИОД"]
-  (где ПЕРИОД: "EVERY_DAY" (каждый день), "WORK_DAYS" (будни), "WEEKENDS" (выходные) или "1,3,5" для Пн,Ср,Пт)
-- Удалить задачу: [DELETE_TASK: "id"]
+- Добавить задачу: [ADD_TASK: "Название" | Очки | "category_id"]
+- Добавить на дату: [ADD_CALENDAR_TASK: "Название" | Очки | "YYYY-MM-DD" | "category_id"]
+- Регулярная рутина: [ADD_REGULAR_TASK: "Название" | Очки | "ПЕРИОД" | "category_id"]
+  (ПЕРИОД: "EVERY_DAY", "WORK_DAYS", "WEEKENDS" или "1,3,5")
+- Удалить: [DELETE_TASK: "id"]
 
-Награды и покупки:
-- Добавить награду: [ADD_REWARD: "Название" | Стоимость]
-- Удалить награду: [DELETE_REWARD: "id"]
-- Купить награду (списать очки): [BUY_REWARD: "id"]
-- Использовать покупку: [USE_PURCHASE: "id_покупки"]
+📋 Доступные категории:
+${categoriesStr}
 
-ВАЖНО: Ты можешь находить задачу по номеру в списке (#2), по названию или по ID. Используй ЛЮБОЙ метод, который понятнее по контексту. 
-*КРИТИЧЕСКИ ВАЖНО ПРО УДАЛЕНИЕ: Если пользователь просит удалить задачу (или цель/привычку), и ты соглашаешься её удалить, ты ОБЯЗАН в конце своего текстового ответа прикрепить точный тег [DELETE_TASK: "ID задачи"]. Если ты ответишь просто согласием без тега, задача НЕ УДАЛИТСЯ, и система сломается!*
-*Раскидывание на дни: Если просят на завтра/послезавтра/дату — используй [ADD_CALENDAR_TASK] с вычисленным YYYY-MM-DD. На несколько дней — несколько тегов.*
+Награды:
+- Добавить: [ADD_REWARD: "Название" | Стоимость]
+- Удалить: [DELETE_REWARD: "id"]
+- Купить: [BUY_REWARD: "id"]
+- Использовать: [USE_PURCHASE: "id_покупки"]
 
-Сегодня: ${todayDate} (${todayDayOfWeek})
+⚠️ ПРАВИЛА ТЕГОВ:
+- Ищи задачу по номеру (#2), названию или ID — любой способ
+- ПРИ УДАЛЕНИИ ВСЕГДА прикрепляй тег [DELETE_TASK: "ID"] в конце ответа, иначе задача НЕ удалится!
+- Для дат: завтра/послезавтра → вычисляй YYYY-MM-DD. На несколько дней → несколько тегов
 
-КОНТЕКСТ ПОЛЬЗОВАТЕЛЯ:
-- Баланс очков: ${tokens}
-- Выполнено сегодня: ${completedTasks}
-- Невыполненные задачи (ссылайся по номеру #N, названию или ID):
+📅 Сегодня: ${todayDate} (${todayDayOfWeek})
+
+📊 КОНТЕКСТ ПОЛЬЗОВАТЕЛЯ:
+- 💰 Баланс очков: ${tokens}
+- ✅ Выполнено сегодня: ${completedTasks}
+- 📝 Невыполненные задачи:
 ${pendingTasks}
-- Календарь (формат YYYY-MM-DD: задачи):
+- 📅 Ближайший календарь:
 ${calendarStr}
+- 🎁 Награды: ${availableRewards}
+- 🛒 Последние покупки: ${recentPurchases}
 
-ОТВЕТЫ ИЗ ПРОФИЛЯ ПОЛЬЗОВАТЕЛЯ ДЛЯ ПЕРСОНАЛИЗАЦИИ:
-- Краткое био / Кто вы: ${userProfile.bio || 'Не указано'}
-- Главные цели (на квартал/год): ${userProfile.goals || 'Не указано'}
-- Интересы и хобби: ${userProfile.interests || 'Не указано'}
-Учитывай эту информацию при формировании ответов, чтобы они были максимально релевантны для пользователя!
-
-ДОСТУПНЫЕ ДЕЙСТВИЯ (ТЕГИ):
-- Награды (ссылайся по номеру, названию или ID):
-${availableRewards}
-- Последние покупки: ${recentPurchases}`;
+👤 ПРОФИЛЬ ПОЛЬЗОВАТЕЛЯ:
+- Кто: ${userProfile.bio || '❌ Не заполнено'}
+- Цели: ${userProfile.goals || '❌ Не заполнено'}
+- Интересы: ${userProfile.interests || '❌ Не заполнено'}${profileBlock}`;
 
             const baseUrl = aiProvider === 'google' ? GOOGLE_OPENAI_BASE : proxyParams.url;
             // Форсируем пустой ключ для google, чтобы использовался серверный ключ (Vercel)
@@ -187,9 +233,9 @@ ${availableRewards}
             // --- Обработка всех тегов ---
             const completeRegex = /\[COMPLETE_TASK:\s*"?([^"\]]+?)"?\s*\]/g;
             const editRegex = /\[EDIT_TASK_POINTS:\s*"?([^"\|]+?)"?\s*\|\s*(\d+)\]/g;
-            const addTaskRegex = /\[ADD_TASK:\s*"?([^"\|]+?)"?\s*\|\s*(\d+)\]/g;
-            const addCalendarTaskRegex = /\[ADD_CALENDAR_TASK:\s*"?([^"\|]+?)"?\s*\|\s*(\d+)\s*\|\s*"?([^"\]]+?)"?\s*\]/g;
-            const addRegularTaskRegex = /\[ADD_REGULAR_TASK:\s*"?([^"\|]+?)"?\s*\|\s*(\d+)\s*\|\s*"?([^"\]]+?)"?\s*\]/g;
+            const addTaskRegex = /\[ADD_TASK:\s*"?([^"\|]+?)"?\s*\|\s*(\d+)(?:\s*\|\s*"?([^"\]]+?)"?)?\s*\]/g;
+            const addCalendarTaskRegex = /\[ADD_CALENDAR_TASK:\s*"?([^"\|]+?)"?\s*\|\s*(\d+)\s*\|\s*"?([^"\|\]]+?)"?(?:\s*\|\s*"?([^"\]]+?)"?)?\s*\]/g;
+            const addRegularTaskRegex = /\[ADD_REGULAR_TASK:\s*"?([^"\|]+?)"?\s*\|\s*(\d+)\s*\|\s*"?([^"\|\]]+?)"?(?:\s*\|\s*"?([^"\]]+?)"?)?\s*\]/g;
             const deleteTaskRegex = /\[DELETE_TASK:\s*"?([^"\]]+?)"?\s*\]/g;
             const addRewardRegex = /\[ADD_REWARD:\s*"?([^"\|]+?)"?\s*\|\s*(\d+)\]/g;
             const deleteRewardRegex = /\[DELETE_REWARD:\s*"?([^"\]]+?)"?\s*\]/g;
@@ -240,7 +286,6 @@ ${availableRewards}
                 const task = findTask(match[1].trim());
                 if (task && !task.completed) {
                     useStore.getState().toggleTask(task.id);
-                    useStore.getState().addTokens(task.value);
                 }
             }
 
@@ -252,7 +297,7 @@ ${availableRewards}
 
             // ADD_TASK
             while ((match = addTaskRegex.exec(responseText)) !== null) {
-                useStore.getState().addProposal(match[1].trim(), parseInt(match[2], 10));
+                useStore.getState().addProposal(match[1].trim(), parseInt(match[2], 10), match[3] ? match[3].trim() : null);
             }
 
             // ADD_CALENDAR_TASK
@@ -260,7 +305,8 @@ ${availableRewards}
                 const title = match[1].trim();
                 const pts = parseInt(match[2], 10);
                 const dateStr = match[3] ? match[3].trim() : '';
-                useStore.getState().addCalendarTask(dateStr, title, pts);
+                const category = match[4] ? match[4].trim() : null;
+                useStore.getState().addCalendarTask(dateStr, title, pts, category);
             }
 
             // ADD_REGULAR_TASK
@@ -268,7 +314,8 @@ ${availableRewards}
                 const title = match[1].trim();
                 const pts = parseInt(match[2], 10);
                 const period = match[3] ? match[3].trim() : 'everyday';
-                useStore.getState().addRegularTask(title, pts, period);
+                const category = match[4] ? match[4].trim() : null;
+                useStore.getState().addRegularTask(title, pts, period, category);
             }
 
             // DELETE_TASK
@@ -385,17 +432,10 @@ ${availableRewards}
         if (!editInput.trim()) return;
 
         // Find the actual index in the global messages array
-        const msgToEdit = chatMsgs[index];
+        const msgToEdit = chatMsgs[index].msg;
         const globalIndex = messages.findIndex(m => m === msgToEdit);
 
         if (globalIndex !== -1) {
-            const newMessages = [...messages];
-            newMessages[globalIndex].content = editInput.trim();
-            // Assuming we have a setChatMessages function, if not, we'd need to add it to useStore
-            // For now, let's just update via store if we had the method. Since we don't, we'll
-            // mutate state directly in a hacky way or just use a new action.
-            // Actually, let's add updateChatMessage to useStore in a separate step or just do what's possible.
-            // *Wait, I only have addMessage. I'll need to dispatch an update function or just modify the array.*
             useStore.setState(state => {
                 const updated = [...state.chatMessages];
                 updated[globalIndex].content = editInput.trim();
@@ -661,12 +701,14 @@ ${availableRewards}
                     <div className="text-center text-text-secondary mt-10">По запросу "{searchQuery}" ничего не найдено</div>
                 )}
 
-                {chatMsgs.map((msg, i) => {
-                    const prevMsg = chatMsgs[i - 1];
+                {chatMsgs.map((item, i) => {
+                    const msg = item.msg;
+                    const prevItem = chatMsgs[i - 1];
+                    const prevMsg = prevItem ? prevItem.msg : null;
                     const showDateSeparator = !searchQuery && (!prevMsg || new Date(msg.timestamp).toDateString() !== new Date(prevMsg.timestamp).toDateString());
 
                     return (
-                        <div key={i} className="flex flex-col">
+                        <div key={item.globalIndex} id={`chat-msg-${item.globalIndex}`} className="flex flex-col rounded-2xl">
                             {showDateSeparator && (
                                 <div className="flex justify-center my-4">
                                     <span className="bg-black/40 text-text-secondary text-xs px-3 py-1 rounded-full border border-border">
@@ -697,10 +739,19 @@ ${availableRewards}
                                         </div>
                                     ) : (
                                         <>
-                                            <div className={`p-3 rounded-2xl text-sm shadow-sm break-words overflow-hidden ${msg.role === 'user'
+                                            <div className={`p-3 rounded-2xl text-sm shadow-sm break-words overflow-hidden relative ${msg.role === 'user'
                                                 ? 'bg-blue-600/20 border border-blue-500/30 text-white rounded-tr-none'
                                                 : 'bg-accent/10 border border-accent/20 text-text-primary rounded-tl-none markdown-content'
                                                 }`}>
+                                                {searchQuery && (
+                                                    <button
+                                                        onClick={() => handleJumpToMessage(item.globalIndex)}
+                                                        className="absolute top-2 right-2 p-1.5 bg-black/40 hover:bg-accent rounded-full text-white transition-colors z-10"
+                                                        title="Перейти к сообщению"
+                                                    >
+                                                        <Search size={12} />
+                                                    </button>
+                                                )}
                                                 {renderMessageContent(msg)}
                                             </div>
 

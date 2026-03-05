@@ -1,35 +1,32 @@
 # Настройка авторизации через социальные сети в Supabase
 
-Чтобы кнопки логина (Яндекс, ВКонтакте, Telegram) заработали, вам необходимо включить их в панели управления Supabase. 
+Чтобы кнопка входа через Google заработала, вам необходимо включить провайдер в панели управления Supabase и настроить Google Cloud Platform.
 
-## Шаг 1: ВКонтакте (VK)
-1. Перейдите на сайт для разработчиков VK: [VK Developers](https://vk.com/apps?act=manage)
-2. Создайте новое приложение (Тип: "Сайт").
-3. В настройках приложения скопируйте **ID приложения (App ID)** и **Защищенный ключ (Secure Key)**.
-4. В поле "Базовый домен" укажите ваш домен (или `localhost`, если тестируете локально).
-5. В поле "Доверенный redirect URI" вставьте ссылку от Supabase (см. пункт 6).
-6. Откройте панель **Supabase -> Authentication -> Providers**.
-7. Найдите **VK**, включите ползунок. 
-8. Скопируйте `Callback URL (for OAuth)` из этого окна Supabase и вставьте его в настройки VK (Доверенный redirect URI).
-9. Вставьте App ID (Client ID) и Secure Key (Client Secret) со страницы VK в настройки Supabase. Нажмите **Save**.
+## Шаг 1: Настройка в Google Cloud
+1. Перейдите в [Google Cloud Console](https://console.cloud.google.com/).
+2. Создайте новый проект или выберите существующий.
+3. В меню слева перейдите в **APIs & Services** -> **OAuth consent screen** (Окно доступа OAuth).
+   - Выберите тип пользователя **External** (Внешний) и нажмите Create.
+   - Заполните обязательные поля: App name (например, "Ассистент Nova"), User support email и Developer contact information. Нажмите **Save and Continue**.
+4. Перейдите в **APIs & Services** -> **Credentials** (Учетные данные).
+5. Нажмите **Create Credentials** -> **OAuth client ID**.
+6. Выберите Application type: **Web application**.
+7. В поле **Name** введите название.
+8. В секции **Authorized JavaScript origins** добавьте ваш домен (или `http://localhost:5173` для локальной разработки).
+9. Откройте новую вкладку с панелью **Supabase -> Authentication -> Providers -> Google**. Скопируйте оттуда `Callback URL (for OAuth)`.
+10. Вернитесь в Google Cloud. В секции **Authorized redirect URIs** вставьте скопированный Callback URL.
+11. Нажмите **Create**. Выведется окно с вашими `Client ID` и `Client Secret`. Скопируйте их.
 
-## Шаг 2: Яндекс
-1. Перейдите на [Яндекс OAuth API](https://oauth.yandex.ru/) и нажмите "Создать приложение".
-2. Платформы: выберите "Веб-сервисы".
-3. Доступы: Добавьте доступ к "Яндекс ID" -> "Доступ к адресу электронной почты", "Доступ к портрету", "Доступ к логину, имени и фамилии".
-4. Откройте **Supabase -> Authentication -> Providers -> Yandex**.
-5. Скопируйте `Callback URL` из Supabase и вставьте его в поле "Redirect URI" в настройках Яндекса.
-6. В Яндексе скопируйте "ClientID" и "Client secret" и вставьте их в окно настроек Yandex в Supabase. Нажмите **Save**.
+## Шаг 2: Связь Google и Supabase
+1. Вернитесь в панель **Supabase -> Authentication -> Providers -> Google**.
+2. Включите ползунок **Enable Google provider**.
+3. Вставьте скопированный из Google Cloud `Client ID` в поле **Client ID**.
+4. Вставьте `Client Secret` в поле **Client Secret**.
+5. Нажмите **Save**.
 
-## Шаг 3: Telegram (через Web Apps/Widget)
-*Примечание:* Telegram не использует стандартный OAuth 2.0. Авторизация через Telegram в браузере осуществляется через виджет или Web App. Тем не менее, базовая настройка через Supabase:
-1. Зайдите в Telegram, найдите бота **@BotFather**, создайте нового бота или выберите существующего.
-2. Отправьте команду `/setdomain`. Выберите своего бота и укажите домен вашего проекта на Supabase (например, `bsmlnpdplnbwtoxvbgdu.supabase.co`).
-3. Скопируйте токен бота, который выдал BotFather.
-4. Откройте **Supabase -> Authentication -> Providers -> Telegram**.
-5. Вставьте имя бота и токен бота. Нажмите **Save**.
+Готово! Авторизация через Google настроена.
 
-## Шаг 4: Настройка Email Шаблона
+## Шаг 3: Настройка Email Шаблона (для входа по паролю и Magic Link)
 1. В панели **Supabase -> Authentication -> Email Templates**.
 2. Раскройте секцию **Confirm signup**.
 3. Замените весь HTML код в редакторе на код из файла `supabase_email_template.html`, который я для вас сгенерировал.
