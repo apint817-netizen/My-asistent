@@ -1,6 +1,6 @@
 import { useEffect, useState, useRef } from 'react';
 import { useStore, setStorageKey } from './store/useStore';
-import { Trophy, CheckCircle, MessageSquare, Plus, Activity, Calendar as CalendarIcon, ListTodo, ChevronUp, ChevronDown, HelpCircle, Settings, FileText, LogOut, Users } from 'lucide-react';
+import { Trophy, CheckCircle, MessageSquare, Plus, Activity, Calendar as CalendarIcon, ListTodo, ChevronUp, ChevronDown, HelpCircle, Settings, FileText, LogOut, Users, Shield } from 'lucide-react';
 import TaskManager from './components/TaskManager';
 import RewardStore from './components/RewardStore';
 import AIAssistant from './components/AIAssistant';
@@ -17,6 +17,7 @@ import OnboardingView from './components/OnboardingView';
 import DashboardTour from './components/DashboardTour';
 import Tooltip from './components/Tooltip';
 import FriendsView from './components/FriendsView';
+import GroupsView from './components/GroupsView';
 import { supabase, isSupabaseConfigured } from './lib/supabase';
 import { loadUserData, debouncedSave, flushSave, clearLocalData } from './lib/supabaseSync';
 import ToastContainer from './components/ToastContainer';
@@ -310,6 +311,16 @@ function App() {
             Друзья
           </button>
         </Tooltip>
+        <Tooltip text="Организуйте команды и распределяйте задачи" position="bottom">
+          <button
+            id="tour-teams-tab"
+            onClick={() => setActiveTab('teams')}
+            className={`px-5 py-2.5 rounded-xl flex items-center gap-2 text-sm font-semibold transition-all ${activeTab === 'teams' ? 'bg-accent/20 text-accent shadow-[0_0_15px_rgba(var(--color-accent),0.2)]' : 'text-text-secondary hover:text-white hover:bg-white/5'}`}
+          >
+            <Shield size={18} />
+            Команды
+          </button>
+        </Tooltip>
       </div>
 
       {
@@ -317,6 +328,8 @@ function App() {
           <ResumeView />
         ) : activeTab === 'friends' ? (
           <FriendsView />
+        ) : activeTab === 'teams' ? (
+          <GroupsView />
         ) : (
           <main className="grid grid-cols-1 lg:grid-cols-5 gap-6 flex-1 items-start">
             {/* Left Column: Content Area */}
