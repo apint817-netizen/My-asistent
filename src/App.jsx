@@ -1,6 +1,6 @@
 import { useEffect, useState, useRef } from 'react';
 import { useStore, setStorageKey } from './store/useStore';
-import { Trophy, CheckCircle, MessageSquare, Plus, Activity, Calendar as CalendarIcon, ListTodo, ChevronUp, ChevronDown, HelpCircle, Settings, FileText, LogOut } from 'lucide-react';
+import { Trophy, CheckCircle, MessageSquare, Plus, Activity, Calendar as CalendarIcon, ListTodo, ChevronUp, ChevronDown, HelpCircle, Settings, FileText, LogOut, Users } from 'lucide-react';
 import TaskManager from './components/TaskManager';
 import RewardStore from './components/RewardStore';
 import AIAssistant from './components/AIAssistant';
@@ -16,6 +16,7 @@ import AuthView from './components/AuthView';
 import OnboardingView from './components/OnboardingView';
 import DashboardTour from './components/DashboardTour';
 import Tooltip from './components/Tooltip';
+import FriendsView from './components/FriendsView';
 import { supabase, isSupabaseConfigured } from './lib/supabase';
 import { loadUserData, debouncedSave, flushSave, clearLocalData } from './lib/supabaseSync';
 import ToastContainer from './components/ToastContainer';
@@ -299,11 +300,23 @@ function App() {
             Резюме
           </button>
         </Tooltip>
+        <Tooltip text="Общайтесь с друзьями и следите за их успехами" position="bottom">
+          <button
+            id="tour-friends-tab"
+            onClick={() => setActiveTab('friends')}
+            className={`px-5 py-2.5 rounded-xl flex items-center gap-2 text-sm font-semibold transition-all ${activeTab === 'friends' ? 'bg-accent/20 text-accent shadow-[0_0_15px_rgba(var(--color-accent),0.2)]' : 'text-text-secondary hover:text-white hover:bg-white/5'}`}
+          >
+            <Users size={18} />
+            Друзья
+          </button>
+        </Tooltip>
       </div>
 
       {
         activeTab === 'resume' ? (
           <ResumeView />
+        ) : activeTab === 'friends' ? (
+          <FriendsView />
         ) : (
           <main className="grid grid-cols-1 lg:grid-cols-5 gap-6 flex-1 items-start">
             {/* Left Column: Content Area */}
