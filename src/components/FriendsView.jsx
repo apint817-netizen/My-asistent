@@ -11,7 +11,9 @@ export default function FriendsView() {
     const [requests, setRequests] = useState([]);
     const [searchResults, setSearchResults] = useState([]);
     const [searchQuery, setSearchQuery] = useState('');
-    const [loading, setLoading] = useState(false);
+    const [loadingFriends, setLoadingFriends] = useState(true);
+    const [loadingRequests, setLoadingRequests] = useState(true);
+    const [loadingSearch, setLoadingSearch] = useState(false);
 
     const [selectedFriend, setSelectedFriend] = useState(null);
     const [myProfile, setMyProfile] = useState(null);
@@ -120,6 +122,7 @@ export default function FriendsView() {
 
     const loadFriends = async () => {
         if (!user) return;
+        setLoadingFriends(true);
         try {
             // STEP 1: Get just the raw friendships (Blazing fast, no joins)
             const { data: rels, error: relsError } = await supabase
@@ -164,11 +167,14 @@ export default function FriendsView() {
             setFriends(formattedFriends);
         } catch (error) {
             console.error('Error loading friends:', error);
+        } finally {
+            setLoadingFriends(false);
         }
     };
 
     const loadRequests = async () => {
         if (!user) return;
+        setLoadingRequests(true);
         try {
             // STEP 1: Incoming requests where user_id is the sender and friend_id is ME
             const { data: rels, error: relsError } = await supabase
@@ -211,6 +217,8 @@ export default function FriendsView() {
             setRequests(formattedRequests);
         } catch (error) {
             console.error('Error loading requests:', error);
+        } finally {
+            setLoadingRequests(false);
         }
     };
 
@@ -219,7 +227,7 @@ export default function FriendsView() {
         const query = searchQuery.trim();
         if (!query || !user) return;
 
-        setLoading(true);
+        setLoadingSearch(true);
         try {
             let queryBuilder = supabase
                 .from('profiles')
@@ -274,7 +282,7 @@ export default function FriendsView() {
         } catch (error) {
             console.error('Search error:', error);
         } finally {
-            setLoading(false);
+            setLoadingSearch(false);
         }
     };
 
@@ -433,8 +441,10 @@ export default function FriendsView() {
                         </form>
 
                         <div className="space-y-3">
-                            {loading ? (
-                                <div className="text-center py-8 text-text-secondary">Поиск...</div>
+                            {loadingSearch ? (
+                                <div className="text-center py-12 flex justify-center">
+                                    <div className="w-8 h-8 border-2 border-accent border-t-transparent rounded-full animate-spin"></div>
+                                </div>
                             ) : searchResults.length > 0 ? (
                                 searchResults.map(profile => (
                                     <div key={profile.id} className="flex items-center justify-between p-4 bg-white/5 rounded-2xl border border-white/5 hover:bg-white/10 transition-colors">
@@ -472,7 +482,7 @@ export default function FriendsView() {
                                         </div>
                                     </div>
                                 ))
-                            ) : searchQuery && !loading ? (
+                            ) : searchQuery && !loadingSearch ? (
                                 <div className="text-center py-8 text-text-secondary">Никого не найдено</div>
                             ) : (
                                 <div className="text-center py-8 text-text-secondary/50">Здесь появятся результаты поиска</div>
@@ -484,7 +494,11 @@ export default function FriendsView() {
                 {/* Requests Tab */}
                 {activeTab === 'requests' && (
                     <div className="space-y-3">
-                        {requests.length > 0 ? (
+                        {loadingRequests ? (
+                            <div className="text-center py-12 flex justify-center">
+                                <div className="w-8 h-8 border-2 border-accent border-t-transparent rounded-full animate-spin"></div>
+                            </div>
+                        ) : requests.length > 0 ? (
                             requests.map(req => (
                                 <div key={req.id} className="flex items-center justify-between p-4 bg-white/5 rounded-2xl border border-white/5 hover:bg-white/10 transition-colors">
                                     <div className="flex items-center gap-4">
@@ -531,7 +545,11 @@ export default function FriendsView() {
                 {/* Friends Tab */}
                 {activeTab === 'friends' && (
                     <div className="space-y-3">
-                        {friends.length > 0 ? (
+                        {loadingFriends ? (
+                            <div className="text-center py-12 flex justify-center">
+                                <div className="w-8 h-8 border-2 border-accent border-t-transparent rounded-full animate-spin"></div>
+                            </div>
+                        ) : friends.length > 0 ? (
                             friends.map(friend => (
                                 <div key={friend.id} className="flex items-center justify-between p-4 bg-white/5 rounded-2xl border border-white/5 hover:bg-white/10 transition-colors group cursor-pointer" onClick={() => setSelectedFriend(friend)}>
                                     <div className="flex items-center gap-4">
