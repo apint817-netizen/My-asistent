@@ -1,6 +1,6 @@
 import React, { useState, useRef, useEffect, useMemo } from 'react';
 import { useStore, TASK_CATEGORIES } from '../store/useStore';
-import { Send, Bot, User, Trash2, Settings, X } from 'lucide-react';
+import { Send, Bot, User, Trash2, Settings, X, ChevronDown } from 'lucide-react';
 import { callAI, GOOGLE_OPENAI_BASE } from '../utils/geminiApi';
 import { supabase } from '../lib/supabase';
 import ReactMarkdown from 'react-markdown';
