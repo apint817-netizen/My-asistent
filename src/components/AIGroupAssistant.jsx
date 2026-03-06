@@ -1,6 +1,6 @@
 import React, { useState, useRef, useEffect, useMemo } from 'react';
 import { useStore, TASK_CATEGORIES } from '../store/useStore';
-import { Send, Bot, User, Trash2, Paperclip } from 'lucide-react';
+import { Send, Bot, User, Trash2, Settings, X } from 'lucide-react';
 import { callAI, GOOGLE_OPENAI_BASE } from '../utils/geminiApi';
 import { supabase } from '../lib/supabase';
 import ReactMarkdown from 'react-markdown';
@@ -9,6 +9,30 @@ export default function AIGroupAssistant({ group, user, members, profiles, tasks
     const [messages, setMessages] = useState([]);
     const [input, setInput] = useState('');
     const [isThinking, setIsThinking] = useState(false);
+
+    // AI Task settings
+    const [showParams, setShowParams] = useState(false);
+    const [aiTaskAssignee, setAiTaskAssignee] = useState('');
+    const [aiTaskRewardType, setAiTaskRewardType] = useState('points');
+    const [aiTaskRewardAmount, setAiTaskRewardAmount] = useState(10);
+    const [aiTaskCategory, setAiTaskCategory] = useState('normal');
+
+    const storageKey = `ai_group_chat_${group.id}`;
+
+    // Load history
+    useEffect(() => {
+        const saved = localStorage.getItem(storageKey);
+        if (saved) {
+            try { setMessages(JSON.parse(saved)); } catch (e) { }
+        }
+    }, [storageKey]);
+
+    // Save history
+    useEffect(() => {
+        if (messages.length > 0) {
+            localStorage.setItem(storageKey, JSON.stringify(messages));
+        }
+    }, [messages, storageKey]);
 
     const apiKey = useStore(state => state.apiKey);
     const googleModel = useStore(state => state.googleModel);
@@ -51,11 +75,11 @@ export default function AIGroupAssistant({ group, user, members, profiles, tasks
 - Насколько задача срочная или важная?
 
 Шаг 2. ТОЛЬКО когда руководитель даст все нужные подробности (или если он сразу написал всё в первом сообщении), в конце своего ответа добавь специальную команду (в квадратных скобках):
-[ADD_GROUP_TASK: Название задачи | Подробное описание | points/money/duty | 100 | normal/important/urgent/urgent_important]
+[ADD_GROUP_TASK: Название задачи | Подробное описание | points/money/duty | 100 | normal/important/urgent/urgent_important | ALL_или_ID_пользователя]
 
 Например:
 Конечно, я добавила эту задачу для команды!
-[ADD_GROUP_TASK: Обзвон холодной базы | Нужно обзвонить 50 клиентов из нового списка | points | 150 | urgent_important]
+[ADD_GROUP_TASK: Обзвон холодной базы | Нужно обзвонить 50 клиентов из нового списка | points | 150 | urgent_important | ALL]
 
 Логика наград:
 - "money" и сумма (если поощрение деньгами)
@@ -64,6 +88,11 @@ export default function AIGroupAssistant({ group, user, members, profiles, tasks
 
 Текущий контекст группы:
 ${groupContext}
+
+ВНИМАНИЕ: Пользователь (командир) уже выбрал следующие ПАРАМЕТРЫ ПО УМОЛЧАНИЮ для быстрого создания задач. ИСПОЛЬЗУЙ ИХ, не задавай лишних уточняющих вопросов, если они тут указаны (просто сразу создай задачу нужной командой):
+- Награда по умолчанию: ${aiTaskRewardAmount} ${aiTaskRewardType}
+- Исполнитель (ID): ${aiTaskAssignee ? aiTaskAssignee : 'ALL (кто угодно)'} ${aiTaskAssignee ? `(Имя: ${profiles[aiTaskAssignee]?.display_name})` : ''}
+- Важность: ${aiTaskCategory}
 `;
 
             const baseUrl = aiProvider === 'google' ? GOOGLE_OPENAI_BASE : proxyParams?.url;
@@ -89,7 +118,7 @@ ${groupContext}
             let cleanResponse = responseText;
 
             // Обработка команд создания задач
-            const addGroupTaskRegex = /\[ADD_GROUP_TASK:\s*(.*?)\s*\|\s*(.*?)\s*\|\s*(points|money|duty)\s*\|\s*(\d+)\s*\|\s*(normal|important|urgent|urgent_important)\]/g;
+            const addGroupTaskRegex = /\[ADD_GROUP_TASK:\s*(.*?)\s*\|\s*(.*?)\s*\|\s*(points|money|duty)\s*\|\s*(\d+)\s*\|\s*(normal|important|urgent|urgent_important)\s*\|\s*(.*?)\]/g;
             let match;
             let tasksAdded = 0;
 
@@ -99,6 +128,8 @@ ${groupContext}
                 const rewardType = match[3];
                 const amount = parseInt(match[4], 10);
                 const category = match[5];
+                const assigneeRaw = match[6].trim();
+                const assignedTo = (assigneeRaw === 'ALL' || assigneeRaw === '') ? null : assigneeRaw;
 
                 try {
                     const { error } = await supabase.from('group_tasks').insert({
@@ -109,6 +140,7 @@ ${groupContext}
                         reward_amount: amount,
                         value: amount, // Для обратной совместимости
                         category,
+                        assigned_to: assignedTo,
                         created_by: user.id
                     });
                     if (error) throw error;
@@ -149,6 +181,7 @@ ${groupContext}
     const clearChat = () => {
         if (window.confirm('Очистить историю диалога с ИИ?')) {
             setMessages([]);
+            localStorage.removeItem(storageKey);
         }
     };
 
@@ -216,16 +249,55 @@ ${groupContext}
 
             {/* Input Area */}
             <div className="p-4 sm:p-6 pb-6 bg-gradient-to-t from-bg-primary via-bg-primary to-transparent z-10 w-full relative shrink-0 border-t border-white/5">
-                <div className="flex justify-between items-center mb-2 px-1">
-                    <span className="text-[10px] text-purple-400/70 font-bold uppercase tracking-wider flex items-center gap-1">
-                        <Bot size={10} /> Умное создание задач
-                    </span>
+                <div className="flex justify-between items-center mb-2 px-1 relative">
+                    <div className="flex items-center gap-2">
+                        <span className="text-[10px] text-purple-400/70 font-bold uppercase tracking-wider flex items-center gap-1">
+                            <Bot size={10} /> Умное создание
+                        </span>
+                        <button type="button" onClick={() => setShowParams(!showParams)} className={`px-2 py-0.5 rounded flex items-center gap-1 text-[10px] font-bold transition-colors ${showParams ? 'bg-purple-500/20 text-purple-400' : 'bg-white/5 text-text-secondary hover:text-white'}`}>
+                            <Settings size={10} /> Умолч. настройки <ChevronDown size={10} className={`transition-transform ${showParams ? 'rotate-180' : ''}`} />
+                        </button>
+                    </div>
                     {messages.length > 0 && (
-                        <button onClick={clearChat} className="text-[10px] text-text-secondary hover:text-danger flex items-center gap-1 transition-colors">
-                            <Trash2 size={10} /> Очистить чат
+                        <button type="button" onClick={clearChat} className="text-[10px] text-text-secondary hover:text-danger flex items-center gap-1 transition-colors">
+                            <Trash2 size={10} /> Очистить
                         </button>
                     )}
                 </div>
+
+                {showParams && (
+                    <div className="mb-3 p-3 bg-black/40 border border-purple-500/20 rounded-xl space-y-3 animate-fade-in shadow-lg">
+                        <div className="flex items-center justify-between gap-2">
+                            <label className="text-xs text-text-secondary w-[30%]">Исполнитель:</label>
+                            <select value={aiTaskAssignee} onChange={e => setAiTaskAssignee(e.target.value)} className="w-[70%] bg-black/60 border border-white/10 text-white text-xs rounded-lg px-2 py-1.5 outline-none focus:border-purple-500/50">
+                                <option value="">Кто угодно (Авто)</option>
+                                {members.map(m => (
+                                    <option key={m.user_id} value={m.user_id}>{profiles[m.user_id]?.display_name || m.user_id}</option>
+                                ))}
+                            </select>
+                        </div>
+                        <div className="flex items-center justify-between gap-2">
+                            <label className="text-xs text-text-secondary w-[30%]">Награда:</label>
+                            <div className="w-[70%] flex gap-1">
+                                <select value={aiTaskRewardType} onChange={e => setAiTaskRewardType(e.target.value)} className="w-1/2 bg-black/60 border border-white/10 text-white text-xs rounded-lg px-2 py-1.5 outline-none focus:border-purple-500/50">
+                                    <option value="points">Очки ✨</option>
+                                    <option value="money">К ЗП 💵</option>
+                                    <option value="duty">Обязанность 👔</option>
+                                </select>
+                                <input type="number" min="0" disabled={aiTaskRewardType === 'duty'} value={aiTaskRewardAmount} onChange={e => setAiTaskRewardAmount(e.target.value ? parseInt(e.target.value) : 0)} className="w-1/2 bg-black/60 border border-white/10 text-white text-xs text-center rounded-lg px-2 py-1.5 outline-none disabled:opacity-50 focus:border-purple-500/50" />
+                            </div>
+                        </div>
+                        <div className="flex items-center justify-between gap-2">
+                            <label className="text-xs text-text-secondary w-[30%]">Важность:</label>
+                            <select value={aiTaskCategory} onChange={e => setAiTaskCategory(e.target.value)} className="w-[70%] bg-black/60 border border-white/10 text-white text-xs rounded-lg px-2 py-1.5 outline-none focus:border-purple-500/50">
+                                <option value="normal">Обычная</option>
+                                <option value="important">Важно (План)</option>
+                                <option value="urgent">Срочно (Делегировать)</option>
+                                <option value="urgent_important">Срочно и Важно</option>
+                            </select>
+                        </div>
+                    </div>
+                )}
                 <form onSubmit={handleSend} className="relative group">
                     <textarea
                         value={input}
