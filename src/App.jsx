@@ -297,8 +297,8 @@ function App() {
             onClick={() => setActiveTab('resume')}
             className={`px-5 py-2.5 rounded-xl flex items-center gap-2 text-sm font-semibold transition-all ${activeTab === 'resume' ? 'bg-accent/20 text-accent shadow-[0_0_15px_rgba(var(--color-accent),0.2)]' : 'text-text-secondary hover:text-white hover:bg-white/5'}`}
           >
-            <UserCircle size={18} />
-            Профиль / ИИ
+            <FileText size={18} />
+            Резюме
           </button>
         </Tooltip>
         <Tooltip text="Общайтесь с друзьями и следите за их успехами" position="bottom">

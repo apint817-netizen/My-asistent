@@ -1,6 +1,6 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useStore } from '../store/useStore';
-import { Settings, Bot, X, Link as LinkIcon, Zap, HelpCircle, ChevronDown, Sparkles, Heart, Code, Trash2, User, LogOut } from 'lucide-react';
+import { Settings, Bot, X, Link as LinkIcon, Zap, HelpCircle, ChevronDown, Sparkles, Heart, Code, Trash2, User, LogOut, Upload, Loader, Save, Edit2 } from 'lucide-react';
 import { PROXY_MODELS } from '../utils/geminiApi';
 import { isSupabaseConfigured, supabase } from '../lib/supabase';
 
@@ -22,21 +22,100 @@ export default function AISettingsModal({ isOpen, onClose }) {
     const [customProxyModel, setCustomProxyModel] = useState(false);
     const [activeSection, setActiveSection] = useState('ai'); // 'ai' | 'profile' | 'about' | 'guide'
 
+    const [displayName, setDisplayName] = useState('');
+    const [avatarUrl, setAvatarUrl] = useState('');
+    const [userTag, setUserTag] = useState('');
+    const [isSavingProfile, setIsSavingProfile] = useState(false);
+    const [profileError, setProfileError] = useState('');
+    const [profileSuccess, setProfileSuccess] = useState('');
+    const avatarInputRef = useRef(null);
+
     useEffect(() => {
         if (isOpen) {
             setTempKey(apiKey || '');
             setTempProxy(proxyParams);
             setTempProfile(userProfile || { bio: '', goals: '', interests: '' });
+            loadProfile();
         }
     }, [isOpen, apiKey, proxyParams, userProfile]);
 
+    const loadProfile = async () => {
+        try {
+            const { data: { user } } = await supabase.auth.getUser();
+            if (!user) return;
+
+            const { data, error } = await supabase
+                .from('user_profiles')
+                .select('*')
+                .eq('id', user.id)
+                .single();
+
+            if (error && error.code !== 'PGRST116') throw error;
+
+            if (data) {
+                setDisplayName(data.display_name || '');
+                setAvatarUrl(data.avatar_url || '');
+                setUserTag(data.user_tag || '');
+            }
+        } catch (err) {
+            console.error('Error loading profile:', err);
+        }
+    };
+
     if (!isOpen) return null;
 
-    const saveSettings = (e) => {
+    const handleAvatarUpload = async (e) => {
+        const file = e.target.files?.[0];
+        if (!file) return;
+
+        try {
+            setProfileError('');
+            setIsSavingProfile(true);
+
+            if (file.size > 2 * 1024 * 1024) throw new Error('Файл слишком большой (макс. 2МБ)');
+
+            const reader = new FileReader();
+            reader.onloadend = async () => {
+                const base64String = reader.result;
+                setAvatarUrl(base64String);
+                setIsSavingProfile(false);
+            };
+            reader.readAsDataURL(file);
+        } catch (err) {
+            setProfileError(err.message);
+            setIsSavingProfile(false);
+        }
+    };
+
+    const saveSettings = async (e) => {
         e.preventDefault();
         setApiKey(tempKey.trim());
         setProxyParams(tempProxy);
         updateUserProfile(tempProfile);
+
+        if (displayName.trim()) {
+            setIsSavingProfile(true);
+            setProfileError('');
+            try {
+                const { data: { user } } = await supabase.auth.getUser();
+                if (user) {
+                    const { error } = await supabase
+                        .from('user_profiles')
+                        .update({
+                            display_name: displayName.trim(),
+                            avatar_url: avatarUrl.trim()
+                        })
+                        .eq('id', user.id);
+                    if (error) throw error;
+                }
+            } catch (err) {
+                console.error('Error saving profile:', err);
+                setProfileError('Ошибка при сохранении профиля');
+            } finally {
+                setIsSavingProfile(false);
+            }
+        }
+
         onClose();
     };
 
@@ -236,6 +315,41 @@ export default function AISettingsModal({ isOpen, onClose }) {
                     {/* ===== Profile Section ===== */}
                     {activeSection === 'profile' && (
                         <div className="space-y-5 animate-fade-in">
+
+                            <div className="flex gap-4 items-start pb-5 border-b border-white/10">
+                                <div className="relative group cursor-pointer" onClick={() => avatarInputRef.current?.click()}>
+                                    <div className="w-16 h-16 rounded-full bg-black/50 flex items-center justify-center text-white text-xl font-bold overflow-hidden border-2 border-dashed border-white/20 group-hover:border-accent transition-colors">
+                                        {avatarUrl ? (
+                                            <img src={avatarUrl} alt="Avatar" className="w-full h-full object-cover opacity-50 group-hover:opacity-30 transition-opacity" />
+                                        ) : (
+                                            displayName?.charAt(0)?.toUpperCase() || 'U'
+                                        )}
+                                        <div className="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
+                                            <Upload size={20} className="text-white" />
+                                        </div>
+                                    </div>
+                                    <input
+                                        type="file"
+                                        ref={avatarInputRef}
+                                        onChange={handleAvatarUpload}
+                                        accept="image/*"
+                                        className="hidden"
+                                    />
+                                </div>
+                                <div className="flex-1">
+                                    <label className="text-xs text-text-secondary uppercase tracking-wider font-bold mb-1 block">Отображаемое имя (Никнейм)</label>
+                                    <input
+                                        type="text"
+                                        value={displayName}
+                                        onChange={e => setDisplayName(e.target.value)}
+                                        className="w-full bg-black/40 border border-border px-3 py-2 rounded-xl text-white text-sm focus:border-accent outline-none"
+                                        placeholder="Как вас будут видеть друзья"
+                                    />
+                                    {userTag && <div className="text-[10px] text-text-secondary font-mono mt-1">Тег: #{userTag}</div>}
+                                    {profileError && <div className="text-[10px] text-danger mt-1">{profileError}</div>}
+                                </div>
+                            </div>
+
                             <div className="bg-blue-500/10 border border-blue-500/20 rounded-xl p-4 text-sm text-text-secondary flex items-start gap-3">
                                 <User size={16} className="text-blue-400 mt-0.5 shrink-0" />
                                 <div>
@@ -272,7 +386,8 @@ export default function AISettingsModal({ isOpen, onClose }) {
                                         onChange={(e) => setTempProfile({ ...tempProfile, interests: e.target.value })}
                                     />
                                 </div>
-                                <button type="submit" className="w-full bg-accent text-white px-4 py-3 mt-4 rounded-xl text-sm hover:bg-accent-hover transition-colors font-semibold shadow-lg shadow-accent/20">
+                                <button type="submit" disabled={isSavingProfile} className="w-full bg-accent text-white px-4 py-3 mt-4 rounded-xl text-sm hover:bg-accent-hover transition-colors font-semibold shadow-lg shadow-accent/20 flex items-center justify-center gap-2 disabled:opacity-50">
+                                    {isSavingProfile ? <Loader size={16} className="animate-spin" /> : null}
                                     Сохранить профиль
                                 </button>
                             </form>
