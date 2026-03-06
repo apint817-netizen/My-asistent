@@ -278,7 +278,7 @@ export default function RewardStore() {
 
             {/* Refund Modal */}
             {refundModal.isOpen && (
-                <div className="absolute inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm rounded-xl">
+                <div className="absolute inset-0 z-[60] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm rounded-xl">
                     <div className="bg-bg-secondary border border-border p-5 rounded-2xl w-full shadow-2xl animate-fade-in text-center">
                         <h3 className="font-bold text-lg mb-2">Отмена покупки</h3>
                         <p className="text-sm text-text-secondary mb-4">
@@ -314,7 +314,7 @@ export default function RewardStore() {
 
             {/* Delete Reward Modal */}
             {deleteRewardModal.isOpen && (
-                <div className="absolute inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm rounded-lg animate-fade-in">
+                <div className="absolute inset-0 z-[60] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm rounded-lg animate-fade-in">
                     <div className="bg-bg-secondary border border-border p-6 rounded-xl w-full max-w-sm shadow-xl">
                         <h3 className="font-bold text-lg text-white mb-2">Удаление награды</h3>
                         <p className="text-sm text-text-secondary mb-4">

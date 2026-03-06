@@ -4,7 +4,7 @@ import { useStore } from '../store/useStore';
 import { ArrowLeft, Send, Users, Shield, UserPlus, Settings, LogOut, CheckCheck, Check, Search, Trash2, X, ListTodo, Plus, Circle, CheckCircle, Sparkles, Bot, Edit2, MessageSquare, Calendar, ChevronLeft, ChevronRight } from 'lucide-react';
 import AIGroupAssistant from './AIGroupAssistant';
 
-export default function GroupChatView({ group, user, onBack, onGroupUpdate }) {
+export default function GroupChatView({ group, user, onBack, onGroupUpdate, initialOpenSettings }) {
     const [messages, setMessages] = useState([]);
     const [newMessage, setNewMessage] = useState('');
     const [loading, setLoading] = useState(true);

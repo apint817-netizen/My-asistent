@@ -148,7 +148,7 @@ export default function OnboardingView({ onComplete }) {
     // Render Text Phases (0, 1, 2)
     if (phase < 3) {
         return (
-            <div className="fixed inset-0 z-50 bg-black flex items-center justify-center">
+            <div className="fixed inset-0 z-[60] bg-black flex items-center justify-center">
                 <h1 className={`text-4xl sm:text-5xl md:text-6xl font-black text-white px-6 text-center transition-opacity duration-1000 ${fadeState === 'in' ? 'opacity-100' : 'opacity-0'}`}>
                     {phase === 0 && "Привет. Я Nova."}
                     {phase === 1 && "Твой персональный ассистент продуктивности."}
@@ -159,7 +159,7 @@ export default function OnboardingView({ onComplete }) {
     }
 
     return (
-        <div className="fixed inset-0 z-50 bg-bg-primary overflow-y-auto flex flex-col transition-colors duration-1000">
+        <div className="fixed inset-0 z-[60] bg-bg-primary overflow-y-auto flex flex-col transition-colors duration-1000">
             {/* Background elements to simulate app */}
             <div className="absolute inset-0 opacity-20 pointer-events-none">
                 <div className="w-full h-full flex flex-col p-4 sm:p-8 gap-4 sm:gap-8">

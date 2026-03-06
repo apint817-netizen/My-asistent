@@ -344,7 +344,7 @@ export default function GroupsView() {
 
             {/* Модальное окно удаления */}
             {groupToDelete && (
-                <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-fade-in">
+                <div className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-fade-in">
                     <div className="bg-bg-secondary border border-border rounded-2xl p-6 w-full max-w-md shadow-2xl" onClick={e => e.stopPropagation()}>
                         <h3 className="text-xl font-bold text-white mb-2">Удалить команду?</h3>
                         <p className="text-text-secondary mb-6">

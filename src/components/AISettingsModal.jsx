@@ -202,11 +202,11 @@ export default function AISettingsModal({ isOpen, onClose }) {
     };
 
     return (
-        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4 animate-fade-in" onClick={onClose}>
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[60] flex items-center justify-center p-4 animate-fade-in" onClick={onClose}>
             {/* Cropper Modal Overlay */}
             {showCropper && imageSrc && (
                 <div
-                    className="fixed inset-0 bg-black/90 z-[60] flex flex-col items-center justify-center p-4"
+                    className="fixed inset-0 bg-black/90 z-[70] flex flex-col items-center justify-center p-4"
                     onClick={e => e.stopPropagation()}
                 >
                     <div className="bg-bg-secondary w-full max-w-md rounded-2xl overflow-hidden shadow-2xl border border-white/10 flex flex-col">

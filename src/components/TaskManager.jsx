@@ -416,7 +416,7 @@ export default function TaskManager() {
 
             {/* Delete Task Modal */}
             {deletingTask && (
-                <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm rounded-lg animate-fade-in">
+                <div className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm rounded-lg animate-fade-in">
                     <div className="bg-bg-secondary border border-border p-6 rounded-xl w-full max-w-sm shadow-xl">
                         <h3 className="font-bold text-lg text-white mb-2">Удаление задачи</h3>
                         <p className="text-sm text-text-secondary mb-4">

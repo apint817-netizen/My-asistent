@@ -44,7 +44,7 @@ export default function HelpView({ isOpen, onClose }) {
     if (!isOpen) return null;
 
     return (
-        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4 animate-fade-in" onClick={onClose}>
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[60] flex items-center justify-center p-4 animate-fade-in" onClick={onClose}>
             <div
                 className="glass-panel w-full max-w-2xl max-h-[85vh] overflow-y-auto p-8 relative animate-fade-in custom-scrollbar"
                 onClick={e => e.stopPropagation()}
