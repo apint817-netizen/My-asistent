@@ -121,30 +121,45 @@ export default function FriendsView() {
     const loadFriends = async () => {
         if (!user) return;
         try {
-            // Get accepted friendships where user is either user_id or friend_id
-            const { data, error } = await supabase
+            // STEP 1: Get just the raw friendships (Blazing fast, no joins)
+            const { data: rels, error: relsError } = await supabase
                 .from('friendships')
-                .select(`
-                    id,
-                    status,
-                    user_id,
-                    friend_id,
-                    profile_user:profiles!friendships_user_id_fkey(id, display_name, avatar_url, level, is_online),
-                    profile_friend:profiles!friendships_friend_id_fkey(id, display_name, avatar_url, level, is_online)
-                `)
+                .select('id, status, user_id, friend_id')
                 .eq('status', 'accepted')
                 .or(`user_id.eq.${user.id},friend_id.eq.${user.id}`);
 
-            if (error) throw error;
+            if (relsError) throw relsError;
 
-            // Format to a clean list of friend profiles
-            const formattedFriends = data.map(rel => {
+            if (!rels || rels.length === 0) {
+                setFriends([]);
+                return;
+            }
+
+            // Extract all unique friend IDs (excluding the current user)
+            const friendIds = rels.map(rel => rel.user_id === user.id ? rel.friend_id : rel.user_id);
+            const uniqueFriendIds = [...new Set(friendIds)];
+
+            // STEP 2: Fetch the profiles for those IDs (Blazing fast, simple IN query)
+            const { data: profiles, error: profError } = await supabase
+                .from('profiles')
+                .select('id, display_name, avatar_url, level, is_online')
+                .in('id', uniqueFriendIds);
+
+            if (profError) throw profError;
+
+            // Combine the data manually to match the expected format
+            const formattedFriends = rels.map(rel => {
                 const isInitiator = rel.user_id === user.id;
+                const targetId = isInitiator ? rel.friend_id : rel.user_id;
+                const friendProfile = profiles.find(p => p.id === targetId);
+
+                if (!friendProfile) return null;
+
                 return {
                     relationship_id: rel.id,
-                    ...(isInitiator ? rel.profile_friend : rel.profile_user)
+                    ...friendProfile
                 };
-            }).filter(f => f && f.id);
+            }).filter(f => f !== null);
 
             setFriends(formattedFriends);
         } catch (error) {
@@ -155,21 +170,45 @@ export default function FriendsView() {
     const loadRequests = async () => {
         if (!user) return;
         try {
-            // Incoming requests where user_id is the sender and friend_id is ME
-            const { data, error } = await supabase
+            // STEP 1: Incoming requests where user_id is the sender and friend_id is ME
+            const { data: rels, error: relsError } = await supabase
                 .from('friendships')
-                .select(`
-                    id,
-                    status,
-                    user_id,
-                    friend_id,
-                    profile_user:profiles!friendships_user_id_fkey(id, display_name, avatar_url, level)
-                `)
+                .select('id, status, user_id, friend_id')
                 .eq('status', 'pending')
                 .eq('friend_id', user.id);
 
-            if (error) throw error;
-            setRequests(data);
+            if (relsError) throw relsError;
+
+            if (!rels || rels.length === 0) {
+                setRequests([]);
+                return;
+            }
+
+            // Extract sender IDs
+            const senderIds = rels.map(rel => rel.user_id);
+            const uniqueSenderIds = [...new Set(senderIds)];
+
+            // STEP 2: Fetch the profiles for those senders
+            const { data: profiles, error: profError } = await supabase
+                .from('profiles')
+                .select('id, display_name, avatar_url, level')
+                .in('id', uniqueSenderIds);
+
+            if (profError) throw profError;
+
+            // Combine the data
+            const formattedRequests = rels.map(rel => {
+                const profile = profiles.find(p => p.id === rel.user_id);
+                return {
+                    id: rel.id,
+                    status: rel.status,
+                    user_id: rel.user_id,
+                    friend_id: rel.friend_id,
+                    profile_user: profile
+                };
+            });
+
+            setRequests(formattedRequests);
         } catch (error) {
             console.error('Error loading requests:', error);
         }
