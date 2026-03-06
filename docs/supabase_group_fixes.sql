@@ -29,3 +29,6 @@ FOR DELETE USING (
 -- Кто может удалить? Только создатель группы. (group_members удалятся сами благодаря ON DELETE CASCADE)
 CREATE POLICY "Delete group" ON public.groups
 FOR DELETE USING (auth.uid() = creator_id);
+
+-- 4. Добавление колонки due_date в group_tasks для Календаря Команд
+ALTER TABLE public.group_tasks ADD COLUMN IF NOT EXISTS due_date DATE;

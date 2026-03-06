@@ -96,9 +96,9 @@ ${groupContext}
 `;
 
             const baseUrl = aiProvider === 'google' ? GOOGLE_OPENAI_BASE : proxyParams?.url;
-            const modelToUse = aiProvider === 'google' ? googleModel : proxyParams?.model;
-            let finalKey = apiKey;
-            if (aiProvider === 'custom') finalKey = proxyParams?.key || apiKey;
+            // Форсируем пустой ключ для google, чтобы использовался серверный ключ (Vercel)
+            const modelToUse = aiProvider === 'google' ? (googleModel || 'gemini-2.5-flash') : (proxyParams?.model || 'gemini-2.5-flash');
+            const key = aiProvider === 'google' ? '' : proxyParams?.key;
 
             // Формируем историю для API
             const history = messages
@@ -107,7 +107,7 @@ ${groupContext}
 
             const responseText = await callAI({
                 baseUrl,
-                apiKey: finalKey,
+                apiKey: key,
                 model: modelToUse,
                 systemPrompt: systemInstruction,
                 history,
@@ -152,15 +152,26 @@ ${groupContext}
 
             cleanResponse = cleanResponse.replace(addGroupTaskRegex, '').trim();
 
-            if (tasksAdded > 0) {
-                cleanResponse += `\n\n*(✅ Добавлено ${tasksAdded} задач(и) в список команды)*`;
+            if (!cleanResponse) {
+                cleanResponse = `Готово! Я создала задач: ${tasksAdded}. Посмотрите в вкладке "Задачи".`;
             }
 
             setMessages(prev => [...prev, { role: 'assistant', content: cleanResponse }]);
-
         } catch (error) {
-            console.error("AI Error:", error);
-            setMessages(prev => [...prev, { role: 'assistant', content: `Ошибка при обращении к ИИ: ${error.message}` }]);
+            console.error('AI Error:', error);
+
+            // Обработка ошибок в стиле базового ассистента
+            if (error.message.includes('429') || error.message.includes('Quota exceeded')) {
+                setMessages(prev => [...prev, {
+                    role: 'assistant',
+                    content: `Упс! ⏳ Кажется, мы исчерпали лимит запросов нейросети на эту минуту.\n\nДавайте сделаем крошечную паузу, и через минуту я снова буду с вами! (Также вы можете сменить ключ или модель в настройках)`
+                }]);
+            } else {
+                setMessages(prev => [...prev, {
+                    role: 'assistant',
+                    content: `Ошибка при обращении к ИИ: ${error.message}. Проверьте правильность настроек API.`
+                }]);
+            }
         } finally {
             setIsThinking(false);
         }

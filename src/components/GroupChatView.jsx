@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { supabase } from '../lib/supabase';
 import { useStore } from '../store/useStore';
-import { ArrowLeft, Send, Users, Shield, UserPlus, Settings, LogOut, CheckCheck, Check, Search, Trash2, X, ListTodo, Plus, Circle, CheckCircle, Sparkles, Bot, Edit2, MessageSquare } from 'lucide-react';
+import { ArrowLeft, Send, Users, Shield, UserPlus, Settings, LogOut, CheckCheck, Check, Search, Trash2, X, ListTodo, Plus, Circle, CheckCircle, Sparkles, Bot, Edit2, MessageSquare, Calendar, ChevronLeft, ChevronRight } from 'lucide-react';
 import AIGroupAssistant from './AIGroupAssistant';
 
 export default function GroupChatView({ group, user, onBack, onGroupUpdate }) {
@@ -11,9 +11,13 @@ export default function GroupChatView({ group, user, onBack, onGroupUpdate }) {
     const messagesEndRef = useRef(null);
 
     // Modals & Panels state
+    const [activeGroupTab, setActiveGroupTab] = useState('tasks'); // 'tasks' | 'calendar'
     const [showChat, setShowChat] = useState(false);
     const [showMembers, setShowMembers] = useState(false);
-    const [showSettings, setShowSettings] = useState(false);
+    const [showSettings, setShowSettings] = useState(initialOpenSettings || false);
+
+    // Unread count state
+    const [unreadCount, setUnreadCount] = useState(0);
 
     // Edit group state
     const [editGroupName, setEditGroupName] = useState(group.name);
@@ -33,6 +37,22 @@ export default function GroupChatView({ group, user, onBack, onGroupUpdate }) {
     const [newTaskRewardType, setNewTaskRewardType] = useState('points');
     const [newTaskCategory, setNewTaskCategory] = useState('normal');
     const [newTaskAssignedTo, setNewTaskAssignedTo] = useState('');
+    const [newTaskDueDate, setNewTaskDueDate] = useState('');
+
+    // Calendar state
+    const [currentDate, setCurrentDate] = useState(new Date());
+    const [selectedDate, setSelectedDate] = useState(null);
+    const [showMonthPicker, setShowMonthPicker] = useState(false);
+
+    const getDaysInMonth = (year, month) => new Date(year, month + 1, 0).getDate();
+    const getFirstDayOfMonth = (year, month) => {
+        let day = new Date(year, month, 1).getDay();
+        return day === 0 ? 6 : day - 1;
+    };
+    const formatDateString = (year, month, day) => `${year}-${String(month + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+    const monthNames = ['Январь', 'Февраль', 'Март', 'Апрель', 'Май', 'Июнь', 'Июль', 'Август', 'Сентябрь', 'Октябрь', 'Ноябрь', 'Декабрь'];
+    const weekDays = ['Пн', 'Вт', 'Ср', 'Чт', 'Пт', 'Сб', 'Вс'];
+    const fullWeekDays = ['Воскресенье', 'Понедельник', 'Вторник', 'Среда', 'Четверг', 'Пятница', 'Суббота'];
 
 
 
@@ -119,6 +139,26 @@ export default function GroupChatView({ group, user, onBack, onGroupUpdate }) {
             messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
         }, 50);
     };
+
+    // Update unread count
+    useEffect(() => {
+        if (!messages.length) return;
+
+        const storageKey = `group_chat_last_read_${group.id}`;
+        if (showChat) {
+            setUnreadCount(0);
+            localStorage.setItem(storageKey, new Date().toISOString());
+        } else {
+            const lastReadStr = localStorage.getItem(storageKey);
+            if (!lastReadStr) {
+                setUnreadCount(messages.filter(m => m.sender_id !== user?.id).length);
+            } else {
+                const lastReadTime = new Date(lastReadStr).getTime();
+                const unread = messages.filter(m => m.sender_id !== user?.id && new Date(m.created_at).getTime() > lastReadTime);
+                setUnreadCount(unread.length);
+            }
+        }
+    }, [messages, showChat, group.id, user?.id]);
 
     const loadMessages = async () => {
         try {
@@ -375,48 +415,50 @@ export default function GroupChatView({ group, user, onBack, onGroupUpdate }) {
         if (!newTaskTitle.trim()) return;
 
         try {
+            let req;
             if (editingTaskId) {
-                const { error } = await supabase
-                    .from('group_tasks')
-                    .update({
-                        title: newTaskTitle.trim(),
-                        description: newTaskDesc.trim(),
-                        value: newTaskValue,
-                        reward_amount: newTaskValue,
-                        reward_type: newTaskRewardType,
-                        category: newTaskCategory,
-                        assigned_to: newTaskAssignedTo || null
-                    })
-                    .eq('id', editingTaskId);
-                if (error) throw error;
+                req = supabase.from('group_tasks').update({
+                    title: newTaskTitle.trim(),
+                    description: newTaskDesc.trim(),
+                    reward_type: newTaskRewardType,
+                    value: newTaskValue,
+                    category: newTaskCategory,
+                    assigned_to: newTaskAssignedTo || null,
+                    due_date: newTaskDueDate || null
+                }).eq('id', editingTaskId);
             } else {
-                const { error } = await supabase
-                    .from('group_tasks')
-                    .insert({
-                        group_id: group.id,
-                        title: newTaskTitle.trim(),
-                        description: newTaskDesc.trim(),
-                        value: newTaskValue,
-                        reward_amount: newTaskValue,
-                        reward_type: newTaskRewardType,
-                        category: newTaskCategory,
-                        assigned_to: newTaskAssignedTo || null,
-                        created_by: user.id
-                    });
-                if (error) throw error;
+                req = supabase.from('group_tasks').insert({
+                    group_id: group.id,
+                    title: newTaskTitle.trim(),
+                    description: newTaskDesc.trim(),
+                    reward_type: newTaskRewardType,
+                    value: newTaskValue,
+                    created_by: user.id,
+                    category: newTaskCategory,
+                    assigned_to: newTaskAssignedTo || null,
+                    due_date: newTaskDueDate || null
+                });
+            }
+            const { error } = await req;
+            if (error) throw error;
+
+            if (!editingTaskId && activeGroupTab === 'calendar' && selectedDate && !newTaskDueDate) {
+                // Если создавали из календаря и дата не была выставлена вручную, но мы в календаре - ничего не делаем доп., 
+                // но лучше чтобы дата бралась из selectedDate по умолчанию (установлено в кнопке добавления)
             }
 
             setNewTaskTitle('');
             setNewTaskDesc('');
-            setNewTaskValue(10);
             setNewTaskRewardType('points');
+            setNewTaskValue(10);
             setNewTaskCategory('normal');
             setNewTaskAssignedTo('');
-            setShowTaskForm(false);
+            setNewTaskDueDate('');
             setEditingTaskId(null);
+            setShowTaskForm(false);
             loadTasks();
-        } catch (err) {
-            console.error('Error saving task:', err);
+        } catch (error) {
+            console.error('Error saving task:', error);
             alert('Ошибка при сохранении задачи');
         }
     };
@@ -425,10 +467,11 @@ export default function GroupChatView({ group, user, onBack, onGroupUpdate }) {
         setEditingTaskId(task.id);
         setNewTaskTitle(task.title);
         setNewTaskDesc(task.description || '');
-        setNewTaskValue(task.value);
-        setNewTaskRewardType(task.reward_type || 'points');
+        setNewTaskRewardType(task.reward_type);
+        setNewTaskValue(task.value || task.reward_amount || 0);
         setNewTaskCategory(task.category || 'normal');
         setNewTaskAssignedTo(task.assigned_to || '');
+        setNewTaskDueDate(task.due_date || '');
         setShowTaskForm(true);
         window.scrollTo({ top: 0, behavior: 'smooth' });
     };
@@ -533,10 +576,30 @@ export default function GroupChatView({ group, user, onBack, onGroupUpdate }) {
 
                 <div className="flex bg-black/40 rounded-xl p-1 shrink-0 overflow-x-auto scrollbar-hide">
                     <button
+                        onClick={() => setActiveGroupTab('tasks')}
+                        className={`px-4 sm:px-6 py-2 text-sm font-semibold rounded-lg transition-all whitespace-nowrap flex items-center gap-2 ${activeGroupTab === 'tasks' ? 'bg-white/10 text-white shadow-md' : 'text-text-secondary hover:text-white'}`}
+                    >
+                        <ListTodo size={16} /> Задачи
+                    </button>
+                    <button
+                        onClick={() => setActiveGroupTab('calendar')}
+                        className={`px-4 sm:px-6 py-2 text-sm font-semibold rounded-lg transition-all whitespace-nowrap flex items-center gap-2 ${activeGroupTab === 'calendar' ? 'bg-white/10 text-white shadow-md' : 'text-text-secondary hover:text-white'}`}
+                    >
+                        <Calendar size={16} /> Календарь
+                    </button>
+
+                    <div className="w-px h-6 bg-white/10 mx-2 self-center shrink-0"></div>
+
+                    <button
                         onClick={() => setShowChat(true)}
-                        className={`px-4 sm:px-6 py-2 text-sm font-semibold rounded-lg transition-all whitespace-nowrap text-text-secondary hover:text-white flex items-center gap-2`}
+                        className={`px-4 sm:px-6 py-2 text-sm font-semibold rounded-lg transition-all whitespace-nowrap text-text-secondary hover:text-white flex items-center gap-2 relative`}
                     >
                         <MessageSquare size={16} /> Чат
+                        {unreadCount > 0 && (
+                            <span className="absolute -top-1 -right-1 w-5 h-5 bg-danger text-white text-[10px] font-bold flex items-center justify-center rounded-full animate-pulse shadow-lg shadow-danger/50">
+                                {unreadCount > 99 ? '99+' : unreadCount}
+                            </span>
+                        )}
                     </button>
                     <button
                         onClick={() => setShowMembers(true)}
@@ -557,9 +620,9 @@ export default function GroupChatView({ group, user, onBack, onGroupUpdate }) {
 
             {/* Chat Sidebar/Modal */}
             {showChat && (
-                <div className="absolute inset-0 z-[60] bg-black/40 backdrop-blur-sm flex justify-end animate-fade-in" onClick={() => setShowChat(false)}>
-                    <div className="w-full sm:w-[450px] h-full bg-[#0a0a0c] border-l border-white/10 shadow-2xl flex flex-col animate-slide-left" onClick={e => e.stopPropagation()}>
-                        <div className="p-4 border-b border-white/5 flex items-center justify-between bg-white/[0.02]">
+                <div className="absolute inset-0 z-[60] bg-black/60 backdrop-blur-md flex justify-end animate-fade-in" onClick={() => setShowChat(false)}>
+                    <div className="w-full sm:w-[450px] h-full bg-bg-primary border-l border-white/20 shadow-[-20px_0_50px_rgba(0,0,0,0.6)] flex flex-col animate-slide-left relative shadow-inner-light" onClick={e => e.stopPropagation()}>
+                        <div className="p-4 border-b border-white/10 flex items-center justify-between bg-white/[0.03]">
                             <h3 className="font-bold text-white flex items-center gap-2"><MessageSquare size={18} className="text-accent" /> Чат команды</h3>
                             <button onClick={() => setShowChat(false)} className="w-8 h-8 flex items-center justify-center rounded-xl bg-white/5 hover:bg-white/10 text-white transition-colors"><X size={18} /></button>
                         </div>
@@ -582,43 +645,67 @@ export default function GroupChatView({ group, user, onBack, onGroupUpdate }) {
                                     const isOptimistic = msg._optimistic;
                                     const senderProfile = profiles[msg.sender_id];
 
+                                    // Обработка дат
+                                    const msgDate = msg.created_at ? new Date(msg.created_at) : new Date();
+                                    const dateStr = msgDate.toLocaleDateString('ru-RU', { day: 'numeric', month: 'long', year: 'numeric' });
+                                    let showDateSeparator = false;
+                                    if (i === 0) {
+                                        showDateSeparator = true;
+                                    } else {
+                                        const prevDate = messages[i - 1].created_at ? new Date(messages[i - 1].created_at) : new Date();
+                                        if (msgDate.toDateString() !== prevDate.toDateString()) {
+                                            showDateSeparator = true;
+                                        }
+                                    }
+
                                     return (
-                                        <div key={msg.id} className={`flex max-w-[80%] md:max-w-[70%] ${isMine ? 'self-end' : 'self-start'} gap-2 ${isOptimistic ? 'opacity-70' : ''} animate-fade-in`}>
-                                            {!isMine && (
-                                                <div className="w-8 shrink-0 flex items-end">
-                                                    {showAvatar && (
-                                                        <div className="w-8 h-8 rounded-full bg-gradient-to-br from-indigo-500 to-purple-500 flex items-center justify-center text-white text-[10px] font-bold overflow-hidden shadow-md">
-                                                            {senderProfile?.avatar_url ? (
-                                                                <img src={senderProfile.avatar_url} alt="" className="w-full h-full object-cover" />
-                                                            ) : (
-                                                                senderProfile?.display_name?.charAt(0)?.toUpperCase() || 'U'
-                                                            )}
-                                                        </div>
-                                                    )}
+                                        <React.Fragment key={msg.id || i}>
+                                            {showDateSeparator && (
+                                                <div className="flex justify-center my-4 w-full">
+                                                    <span className="px-3 py-1 bg-white/5 border border-white/10 rounded-full text-[11px] font-semibold tracking-wider text-text-secondary">
+                                                        {msgDate.toDateString() === new Date().toDateString() ? 'Сегодня' :
+                                                            msgDate.toDateString() === new Date(Date.now() - 86400000).toDateString() ? 'Вчера' :
+                                                                dateStr}
+                                                    </span>
                                                 </div>
                                             )}
-                                            <div className={`flex flex-col ${isMine ? 'items-end' : 'items-start'}`}>
-                                                {!isMine && showAvatar && (
-                                                    <span className="text-xs text-text-secondary ml-2 mb-1 font-medium">{senderProfile?.display_name || '...'}</span>
-                                                )}
-                                                <div className={`px-4 py-2.5 ${isMine
-                                                    ? 'bg-accent text-white rounded-2xl rounded-br-md shadow-accent/20 shadow-lg'
-                                                    : 'bg-white/[0.08] text-white rounded-2xl rounded-bl-md shadow-md/50'
-                                                    } relative`}>
-                                                    <p className="text-sm leading-relaxed whitespace-pre-wrap break-words">{msg.content}</p>
-                                                    <div className="flex items-center justify-end gap-1 mt-1">
-                                                        <span className="text-[9px] opacity-50 font-medium">{formatTime(msg.created_at)}</span>
-                                                        {isMine && (
-                                                            isOptimistic ? (
-                                                                <div className="w-2.5 h-2.5 border border-white/40 border-t-transparent rounded-full animate-spin ml-0.5"></div>
-                                                            ) : (
-                                                                msg.id && <Check size={12} className="opacity-50 ml-0.5" />
-                                                            )
+                                            <div className={`flex max-w-[80%] md:max-w-[70%] ${isMine ? 'self-end' : 'self-start'} gap-2 ${isOptimistic ? 'opacity-70' : ''} animate-fade-in`}>
+                                                {!isMine && (
+                                                    <div className="w-8 shrink-0 flex items-end">
+                                                        {showAvatar && (
+                                                            <div className="w-8 h-8 rounded-full bg-gradient-to-br from-indigo-500 to-purple-500 flex items-center justify-center text-white text-[10px] font-bold overflow-hidden shadow-md">
+                                                                {senderProfile?.avatar_url ? (
+                                                                    <img src={senderProfile.avatar_url} alt="" className="w-full h-full object-cover" />
+                                                                ) : (
+                                                                    senderProfile?.display_name?.charAt(0)?.toUpperCase() || 'U'
+                                                                )}
+                                                            </div>
                                                         )}
+                                                    </div>
+                                                )}
+                                                <div className={`flex flex-col ${isMine ? 'items-end' : 'items-start'}`}>
+                                                    {!isMine && showAvatar && (
+                                                        <span className="text-xs text-text-secondary ml-2 mb-1 font-medium">{senderProfile?.display_name || '...'}</span>
+                                                    )}
+                                                    <div className={`px-4 py-2.5 ${isMine
+                                                        ? 'bg-accent text-white rounded-2xl rounded-br-md shadow-accent/20 shadow-lg'
+                                                        : 'bg-white/[0.08] text-white rounded-2xl rounded-bl-md shadow-md/50'
+                                                        } relative`}>
+                                                        <p className="text-sm leading-relaxed whitespace-pre-wrap break-words">{msg.content}</p>
+                                                        <div className="flex items-center justify-end gap-1 mt-1">
+                                                            <span className="text-[9px] opacity-50 font-medium">{msg.created_at ? new Date(msg.created_at).toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' }) : ''}</span>
+                                                            {isMine && (
+                                                                isOptimistic ? (
+                                                                    <div className="w-2.5 h-2.5 border border-white/40 border-t-transparent rounded-full animate-spin ml-0.5"></div>
+                                                                ) : (
+                                                                    msg.id && <Check size={12} className="opacity-50 ml-0.5" />
+                                                                )
+                                                            )}
+                                                        </div>
                                                     </div>
                                                 </div>
                                             </div>
-                                        </div>
+                                        </React.Fragment>
                                     );
                                 })
                             )}
@@ -649,13 +736,13 @@ export default function GroupChatView({ group, user, onBack, onGroupUpdate }) {
 
             {/* Members Sidebar/Modal */}
             {showMembers && (
-                <div className="absolute inset-0 z-[60] bg-black/40 backdrop-blur-sm flex justify-end animate-fade-in" onClick={() => setShowMembers(false)}>
-                    <div className="w-full sm:w-[500px] lg:w-[800px] h-full bg-[#0a0a0c] border-l border-white/10 shadow-2xl flex flex-col animate-slide-left overflow-hidden relative" onClick={e => e.stopPropagation()}>
-                        <div className="p-4 border-b border-white/5 flex items-center justify-between bg-white/[0.02] sticky top-0 z-20">
-                            <h3 className="font-bold text-white flex items-center gap-2"><Users size={18} className="text-accent" /> Команда</h3>
+                <div className="absolute inset-0 z-[60] bg-black/60 backdrop-blur-md flex justify-end animate-fade-in" onClick={() => setShowMembers(false)}>
+                    <div className="w-full sm:w-[450px] h-full bg-bg-primary border-l border-white/20 shadow-[-20px_0_50px_rgba(0,0,0,0.6)] flex flex-col animate-slide-left relative shadow-inner-light" onClick={e => e.stopPropagation()}>
+                        <div className="p-4 border-b border-white/10 flex items-center justify-between bg-white/[0.03]">
+                            <h3 className="font-bold text-white flex items-center gap-2"><Users size={18} className="text-accent" /> Участники команды</h3>
                             <button onClick={() => setShowMembers(false)} className="w-8 h-8 flex items-center justify-center rounded-xl bg-white/5 hover:bg-white/10 text-white transition-colors"><X size={18} /></button>
                         </div>
-                        <div className="flex-1 overflow-y-auto p-4 sm:p-6 flex flex-col lg:flex-row gap-6 lg:gap-8 bg-[#0a0a0c]">
+                        <div className="flex-1 overflow-y-auto p-4 sm:p-6 flex flex-col lg:flex-row gap-6 lg:gap-8 bg-bg-primary">
                             {/* Список участников */}
                             <div className="flex-1">
                                 <h4 className="text-white font-bold mb-4 flex items-center gap-2"><Users size={18} className="text-accent" /> Участники ({members.length})</h4>
@@ -821,242 +908,397 @@ export default function GroupChatView({ group, user, onBack, onGroupUpdate }) {
                 </div>
             )}
 
-            {/* Main Content: Tasks ALWAYS VISIBLE */}
+            {/* Main Content: Tasks or Calendar */}
             <div className="flex-1 overflow-hidden p-0 flex flex-col lg:flex-row w-full relative bg-transparent">
                 <div className="flex-1 overflow-y-auto p-4 sm:p-6 w-full custom-scrollbar">
-                    <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between mb-6 gap-4">
-                        <div>
-                            <h4 className="text-white font-bold text-lg flex items-center gap-2"><ListTodo size={20} className="text-accent" /> Задачи команды</h4>
-                            <p className="text-xs text-text-secondary mt-1">Работайте сообща и достигайте целей</p>
-                        </div>
-                        <button
-                            onClick={() => setShowTaskForm(!showTaskForm)}
-                            className={`px-4 py-2 rounded-xl text-sm font-semibold transition-all flex items-center gap-2 ${showTaskForm
-                                ? 'bg-white/10 text-white hover:bg-white/20'
-                                : 'bg-accent text-white hover:bg-accent/80 shadow-lg shadow-accent/20'
-                                }`}
-                        >
-                            {showTaskForm ? 'Отмена' : <><Plus size={16} /> Создать задачу</>}
-                        </button>
-                    </div>
-
-                    {showTaskForm && (
-                        <form onSubmit={handleCreateTask} className="bg-white/5 border border-white/10 rounded-2xl p-5 mb-6 animate-fade-in relative">
-                            <h5 className="text-white font-bold mb-4">Новая задача</h5>
-
-                            <div className="space-y-4">
-                                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                                    <div className="sm:col-span-2">
-                                        <label className="block text-xs font-semibold text-text-secondary uppercase tracking-wider mb-1.5">Название задачи</label>
-                                        <input
-                                            type="text"
-                                            value={newTaskTitle}
-                                            onChange={(e) => setNewTaskTitle(e.target.value)}
-                                            className="w-full bg-black/40 border border-white/10 rounded-xl px-4 py-2.5 text-sm text-white focus:border-accent outline-none transition-colors"
-                                            placeholder="Что нужно сделать?"
-                                            required
-                                        />
-                                    </div>
-                                    <div className="sm:col-span-2">
-                                        <label className="block text-xs font-semibold text-text-secondary uppercase tracking-wider mb-1.5">Описание (необязательно)</label>
-                                        <input
-                                            type="text"
-                                            value={newTaskDesc}
-                                            onChange={(e) => setNewTaskDesc(e.target.value)}
-                                            className="w-full bg-black/40 border border-white/10 rounded-xl px-4 py-2.5 text-sm text-white focus:border-accent outline-none transition-colors"
-                                            placeholder="Подробности задачи"
-                                        />
-                                    </div>
-
-                                    <div>
-                                        <label className="block text-xs font-semibold text-text-secondary uppercase tracking-wider mb-1.5">Награда</label>
-                                        <div className="flex bg-black/40 rounded-xl border border-white/10 p-1">
-                                            <select
-                                                value={newTaskRewardType}
-                                                onChange={(e) => setNewTaskRewardType(e.target.value)}
-                                                className="bg-transparent border-none text-white text-sm outline-none px-2 py-1.5 w-full cursor-pointer appearance-none"
-                                            >
-                                                <option value="points" className="bg-bg-primary text-white">Очки ✨</option>
-                                                <option value="money" className="bg-bg-primary text-white">К ЗП 💵</option>
-                                                <option value="duty" className="bg-bg-primary text-white">Обязанность 👔</option>
-                                            </select>
-                                        </div>
-                                    </div>
-                                    <div>
-                                        <label className="block text-xs font-semibold text-text-secondary uppercase tracking-wider mb-1.5">
-                                            {newTaskRewardType === 'points' ? 'Количество очков' : newTaskRewardType === 'money' ? 'Сумма ($/₽)' : 'Ценность (Скрыта)'}
-                                        </label>
-                                        <input
-                                            type="number"
-                                            min="0"
-                                            disabled={newTaskRewardType === 'duty'}
-                                            value={newTaskValue}
-                                            onChange={(e) => setNewTaskValue(e.target.value ? parseInt(e.target.value) : 0)}
-                                            className={`w-full bg-black/40 border border-white/10 rounded-xl px-4 py-2.5 text-sm text-center font-bold outline-none transition-colors ${newTaskRewardType === 'duty' ? 'opacity-50 text-text-secondary' : 'text-accent focus:border-accent'}`}
-                                        />
-                                    </div>
-
-                                    <div>
-                                        <label className="block text-xs font-semibold text-text-secondary uppercase tracking-wider mb-1.5">Исполнитель</label>
-                                        <div className="flex bg-black/40 rounded-xl border border-white/10 p-1">
-                                            <select
-                                                value={newTaskAssignedTo}
-                                                onChange={(e) => setNewTaskAssignedTo(e.target.value)}
-                                                className="bg-transparent border-none text-white text-sm outline-none px-2 py-1.5 w-full cursor-pointer appearance-none"
-                                            >
-                                                <option value="" className="bg-bg-primary text-white">Все участники</option>
-                                                {members.map(m => {
-                                                    const p = profiles[m.user_id];
-                                                    return <option key={m.user_id} value={m.user_id} className="bg-bg-primary text-white">{p?.display_name || m.user_id}</option>
-                                                })}
-                                            </select>
-                                        </div>
-                                    </div>
-                                    <div>
-                                        <label className="block text-xs font-semibold text-text-secondary uppercase tracking-wider mb-1.5">Матрица Эйзенхауэра</label>
-                                        <div className="flex bg-black/40 rounded-xl border border-white/10 p-1">
-                                            <select
-                                                value={newTaskCategory}
-                                                onChange={(e) => setNewTaskCategory(e.target.value)}
-                                                className="bg-transparent border-none text-white text-sm outline-none px-2 py-1.5 w-full cursor-pointer appearance-none"
-                                            >
-                                                <option value="normal" className="bg-bg-primary text-white">Обычная</option>
-                                                <option value="important" className="bg-bg-primary text-white">Важно, не срочно (План)</option>
-                                                <option value="urgent" className="bg-bg-primary text-white">Срочно, не важно (Делегировать)</option>
-                                                <option value="urgent_important" className="bg-bg-primary text-white text-warning">Важно и Срочно (Сделать сейчас)</option>
-                                            </select>
-                                        </div>
-                                    </div>
+                    {activeGroupTab === 'tasks' ? (
+                        <>
+                            <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between mb-6 gap-4">
+                                <div>
+                                    <h4 className="text-white font-bold text-lg flex items-center gap-2"><ListTodo size={20} className="text-accent" /> Задачи команды</h4>
+                                    <p className="text-xs text-text-secondary mt-1">Работайте сообща и достигайте целей</p>
                                 </div>
-                                <div className="flex justify-end pt-2">
-                                    <button
-                                        type="button"
-                                        onClick={() => {
-                                            setShowTaskForm(false);
-                                            setEditingTaskId(null);
-                                            setNewTaskTitle('');
-                                            setNewTaskDesc('');
-                                        }}
-                                        className="px-6 py-2 bg-white/5 border border-white/10 text-white rounded-xl text-sm hover:bg-white/10 transition-colors mr-2"
-                                    >
-                                        Отмена
-                                    </button>
-                                    <button
-                                        type="submit"
-                                        disabled={!newTaskTitle.trim()}
-                                        className="px-6 py-2 bg-accent text-white rounded-xl text-sm font-semibold hover:bg-accent/80 transition-colors disabled:opacity-50"
-                                    >
-                                        {editingTaskId ? 'Сохранить изменения' : 'Создать задачу'}
-                                    </button>
-                                </div>
+                                <button
+                                    onClick={() => setShowTaskForm(!showTaskForm)}
+                                    className={`px-4 py-2 rounded-xl text-sm font-semibold transition-all flex items-center gap-2 ${showTaskForm
+                                        ? 'bg-white/10 text-white hover:bg-white/20'
+                                        : 'bg-accent text-white hover:bg-accent/80 shadow-lg shadow-accent/20'
+                                        }`}
+                                >
+                                    {showTaskForm ? 'Отмена' : <><Plus size={16} /> Создать задачу</>}
+                                </button>
                             </div>
-                        </form>
-                    )}
 
-                    {tasks.length === 0 && !showTaskForm ? (
-                        <div className="flex flex-col items-center justify-center flex-1 py-12 opacity-60">
-                            <ListTodo size={48} className="text-white/30 mb-4" />
-                            <p className="text-white font-medium">Нет активных задач</p>
-                            <p className="text-sm text-text-secondary mt-1 text-center">Создайте первую задачу для команды</p>
-                        </div>
-                    ) : (
-                        <div className="space-y-3">
-                            {tasks.map(task => {
-                                const creator = profiles[task.created_by];
-                                const completer = task.completed_by ? profiles[task.completed_by] : null;
-                                const canDelete = task.created_by === user.id || myRole === 'owner' || myRole === 'admin';
+                            {showTaskForm && (
+                                <form onSubmit={handleCreateTask} className="bg-white/5 border border-white/10 rounded-2xl p-5 mb-6 animate-fade-in relative">
+                                    <h5 className="text-white font-bold mb-4">Новая задача</h5>
 
-                                return (
-                                    <div
-                                        key={task.id}
-                                        className={`p-4 rounded-2xl border transition-all ${task.completed
-                                            ? 'bg-white/[0.02] border-white/5 opacity-70'
-                                            : 'bg-white/5 border-white/10 hover:border-accent/40 shadow-sm'
-                                            }`}
-                                    >
-                                        <div className="flex items-start gap-4">
-                                            <button
-                                                onClick={() => handleToggleTask(task)}
-                                                className={`mt-1 shrink-0 transition-all ${task.completed ? 'text-success' : 'text-text-secondary hover:text-accent'
-                                                    }`}
-                                            >
-                                                {task.completed ? <CheckCircle size={22} className="fill-success/20" /> : <Circle size={22} />}
-                                            </button>
+                                    <div className="space-y-4">
+                                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                                            <div className="sm:col-span-2">
+                                                <label className="block text-xs font-semibold text-text-secondary uppercase tracking-wider mb-1.5">Название задачи</label>
+                                                <input
+                                                    type="text"
+                                                    value={newTaskTitle}
+                                                    onChange={(e) => setNewTaskTitle(e.target.value)}
+                                                    className="w-full bg-black/40 border border-white/10 rounded-xl px-4 py-2.5 text-sm text-white focus:border-accent outline-none transition-colors"
+                                                    placeholder="Что нужно сделать?"
+                                                    required
+                                                />
+                                            </div>
+                                            <div className="sm:col-span-2">
+                                                <label className="block text-xs font-semibold text-text-secondary uppercase tracking-wider mb-1.5">Описание (необязательно)</label>
+                                                <input
+                                                    type="text"
+                                                    value={newTaskDesc}
+                                                    onChange={(e) => setNewTaskDesc(e.target.value)}
+                                                    className="w-full bg-black/40 border border-white/10 rounded-xl px-4 py-2.5 text-sm text-white focus:border-accent outline-none transition-colors"
+                                                    placeholder="Подробности задачи"
+                                                />
+                                            </div>
 
-                                            <div className="flex-1 min-w-0">
-                                                <div className="flex items-center gap-2 flex-wrap">
-                                                    <h5 className={`font-bold text-base truncate ${task.completed ? 'text-white/50 line-through' : 'text-white'}`}>
-                                                        {task.title}
-                                                    </h5>
-                                                    <span className={`shrink-0 text-[10px] font-bold px-2 py-0.5 rounded-full ${task.reward_type === 'points' ? 'bg-accent/20 text-accent' :
-                                                        task.reward_type === 'money' ? 'bg-emerald-500/20 text-emerald-400' :
-                                                            'bg-white/10 text-white/50'
-                                                        }`}>
-                                                        {task.reward_type === 'points' ? `+${task.reward_amount || task.value} ✨` :
-                                                            task.reward_type === 'money' ? `+${task.reward_amount || task.value} 💵` :
-                                                                '👔 Обязанность'}
-                                                    </span>
-                                                    {task.category && task.category !== 'normal' && (
-                                                        <span className={`shrink-0 text-[9px] font-bold px-1.5 py-0.5 rounded-sm uppercase tracking-widest border ${task.category === 'urgent_important' ? 'border-danger text-danger bg-danger/10' :
-                                                            task.category === 'important' ? 'border-warning text-warning bg-warning/10' :
-                                                                'border-blue-400 text-blue-400 bg-blue-400/10'
-                                                            }`}>
-                                                            {task.category === 'urgent_important' ? 'Срочно & Важно' :
-                                                                task.category === 'important' ? 'Важно' : 'Срочно'}
-                                                        </span>
-                                                    )}
+                                            <div>
+                                                <label className="block text-xs font-semibold text-text-secondary uppercase tracking-wider mb-1.5">Награда</label>
+                                                <div className="flex bg-black/40 rounded-xl border border-white/10 p-1">
+                                                    <select
+                                                        value={newTaskRewardType}
+                                                        onChange={(e) => setNewTaskRewardType(e.target.value)}
+                                                        className="bg-transparent border-none text-white text-sm outline-none px-2 py-1.5 w-full cursor-pointer appearance-none"
+                                                    >
+                                                        <option value="points" className="bg-bg-primary text-white">Очки ✨</option>
+                                                        <option value="money" className="bg-bg-primary text-white">К ЗП 💵</option>
+                                                        <option value="duty" className="bg-bg-primary text-white">Обязанность 👔</option>
+                                                    </select>
                                                 </div>
+                                            </div>
+                                            <div>
+                                                <label className="block text-xs font-semibold text-text-secondary uppercase tracking-wider mb-1.5">
+                                                    {newTaskRewardType === 'points' ? 'Количество очков' : newTaskRewardType === 'money' ? 'Сумма ($/₽)' : 'Ценность (Скрыта)'}
+                                                </label>
+                                                <input
+                                                    type="number"
+                                                    min="0"
+                                                    disabled={newTaskRewardType === 'duty'}
+                                                    value={newTaskValue}
+                                                    onChange={(e) => setNewTaskValue(e.target.value ? parseInt(e.target.value) : 0)}
+                                                    className={`w-full bg-black/40 border border-white/10 rounded-xl px-4 py-2.5 text-sm text-center font-bold outline-none transition-colors ${newTaskRewardType === 'duty' ? 'opacity-50 text-text-secondary' : 'text-accent focus:border-accent'}`}
+                                                />
+                                            </div>
 
-                                                {task.description && (
-                                                    <p className={`text-sm mt-1 mb-2 ${task.completed ? 'text-white/30 truncate' : 'text-text-secondary line-clamp-2'}`}>
-                                                        {task.description}
-                                                    </p>
-                                                )}
-
-                                                <div className="mt-3 flex items-center justify-between text-xs font-medium text-text-secondary flex-wrap gap-2">
-                                                    <div className="flex items-center gap-4 flex-wrap">
-                                                        <div className="flex items-center gap-1.5" title="Кем создана">
-                                                            <div className="w-4 h-4 rounded-full bg-white/10 flex items-center justify-center overflow-hidden">
-                                                                {creator?.avatar_url ? <img src={creator.avatar_url} alt="" className="w-full h-full object-cover" /> : <span className="text-[8px] text-white/50">{creator?.display_name?.charAt(0) || '?'}</span>}
-                                                            </div>
-                                                            <span>От: {creator?.display_name?.split(' ')[0] || '...'}</span>
-                                                        </div>
-                                                        {task.assigned_to && (
-                                                            <div className="flex items-center gap-1 text-white/60">
-                                                                <span>→</span>
-                                                                <span>Кому: {profiles[task.assigned_to]?.display_name?.split(' ')[0] || '...'}</span>
-                                                            </div>
-                                                        )}
-                                                        {task.completed && completer && (
-                                                            <div className="flex items-center gap-1.5 text-success/80" title={`Выполнена: ${formatTime(task.completed_at)}`}>
-                                                                <Check size={12} />
-                                                                <span>Сделал(а): {completer?.display_name?.split(' ')[0] || '...'}</span>
-                                                            </div>
-                                                        )}
-                                                    </div>
-
-                                                    {canDelete && (
-                                                        <div className="flex items-center gap-1 ml-auto">
-                                                            <button
-                                                                onClick={() => handleEditTask(task)}
-                                                                className="text-white/20 hover:text-accent hover:bg-accent/10 p-1.5 rounded-lg transition-colors"
-                                                            >
-                                                                <Edit2 size={14} />
-                                                            </button>
-                                                            <button
-                                                                onClick={() => handleDeleteTask(task.id)}
-                                                                className="text-white/20 hover:text-danger hover:bg-danger/10 p-1.5 rounded-lg transition-colors"
-                                                            >
-                                                                <Trash2 size={14} />
-                                                            </button>
-                                                        </div>
-                                                    )}
+                                            <div>
+                                                <label className="block text-xs font-semibold text-text-secondary uppercase tracking-wider mb-1.5">Исполнитель</label>
+                                                <div className="flex bg-black/40 rounded-xl border border-white/10 p-1">
+                                                    <select
+                                                        value={newTaskAssignedTo}
+                                                        onChange={(e) => setNewTaskAssignedTo(e.target.value)}
+                                                        className="bg-transparent border-none text-white text-sm outline-none px-2 py-1.5 w-full cursor-pointer appearance-none"
+                                                    >
+                                                        <option value="" className="bg-bg-primary text-white">Все участники</option>
+                                                        {members.map(m => {
+                                                            const p = profiles[m.user_id];
+                                                            return <option key={m.user_id} value={m.user_id} className="bg-bg-primary text-white">{p?.display_name || m.user_id}</option>
+                                                        })}
+                                                    </select>
+                                                </div>
+                                            </div>
+                                            <div>
+                                                <label className="block text-xs font-semibold text-text-secondary uppercase tracking-wider mb-1.5">Крайний срок (Срок сдачи)</label>
+                                                <input
+                                                    type="date"
+                                                    value={newTaskDueDate}
+                                                    onChange={(e) => setNewTaskDueDate(e.target.value)}
+                                                    className="w-full bg-black/40 border border-white/10 rounded-xl px-4 py-2.5 text-sm text-white focus:border-accent outline-none transition-colors cursor-pointer"
+                                                />
+                                            </div>
+                                            <div className="sm:col-span-2">
+                                                <label className="block text-xs font-semibold text-text-secondary uppercase tracking-wider mb-1.5">Матрица Эйзенхауэра</label>
+                                                <div className="flex bg-black/40 rounded-xl border border-white/10 p-1">
+                                                    <select
+                                                        value={newTaskCategory}
+                                                        onChange={(e) => setNewTaskCategory(e.target.value)}
+                                                        className="bg-transparent border-none text-white text-sm outline-none px-2 py-1.5 w-full cursor-pointer appearance-none"
+                                                    >
+                                                        <option value="normal" className="bg-bg-primary text-white">Обычная</option>
+                                                        <option value="important" className="bg-bg-primary text-white">Важно, не срочно (План)</option>
+                                                        <option value="urgent" className="bg-bg-primary text-white">Срочно, не важно (Делегировать)</option>
+                                                        <option value="urgent_important" className="bg-bg-primary text-white text-warning">Важно и Срочно (Сделать сейчас)</option>
+                                                    </select>
                                                 </div>
                                             </div>
                                         </div>
+                                        <div className="flex justify-end pt-2">
+                                            <button
+                                                type="button"
+                                                onClick={() => {
+                                                    setShowTaskForm(false);
+                                                    setEditingTaskId(null);
+                                                    setNewTaskTitle('');
+                                                    setNewTaskDesc('');
+                                                }}
+                                                className="px-6 py-2 bg-white/5 border border-white/10 text-white rounded-xl text-sm hover:bg-white/10 transition-colors mr-2"
+                                            >
+                                                Отмена
+                                            </button>
+                                            <button
+                                                type="submit"
+                                                disabled={!newTaskTitle.trim()}
+                                                className="px-6 py-2 bg-accent text-white rounded-xl text-sm font-semibold hover:bg-accent/80 transition-colors disabled:opacity-50"
+                                            >
+                                                {editingTaskId ? 'Сохранить изменения' : 'Создать задачу'}
+                                            </button>
+                                        </div>
                                     </div>
-                                );
-                            })}
+                                </form>
+                            )}
+
+                            {tasks.length === 0 && !showTaskForm ? (
+                                <div className="flex flex-col items-center justify-center flex-1 py-12 opacity-60">
+                                    <ListTodo size={48} className="text-white/30 mb-4" />
+                                    <p className="text-white font-medium">Нет активных задач</p>
+                                    <p className="text-sm text-text-secondary mt-1 text-center">Создайте первую задачу для команды</p>
+                                </div>
+                            ) : (
+                                <div className="space-y-3">
+                                    {tasks.map(task => {
+                                        // Если мы в Табе Задач, скрываем календарные задачи? Нет, можно просто показывать все, либо показывать только без дат/с датой сегодня. 
+                                        // Логичнее показывать вообще все актуальные задачи в списке.
+
+                                        const creator = profiles[task.created_by];
+                                        const completer = task.completed_by ? profiles[task.completed_by] : null;
+                                        const canDelete = task.created_by === user.id || myRole === 'owner' || myRole === 'admin';
+
+                                        return (
+                                            <div
+                                                key={task.id}
+                                                className={`p-4 rounded-2xl border transition-all ${task.completed
+                                                    ? 'bg-white/[0.02] border-white/5 opacity-70'
+                                                    : 'bg-white/5 border-white/10 hover:border-accent/40 shadow-sm'
+                                                    }`}
+                                            >
+                                                <div className="flex items-start gap-4">
+                                                    <button
+                                                        onClick={() => handleToggleTask(task)}
+                                                        className={`mt-1 shrink-0 transition-all ${task.completed ? 'text-success' : 'text-text-secondary hover:text-accent'
+                                                            }`}
+                                                    >
+                                                        {task.completed ? <CheckCircle size={22} className="fill-success/20" /> : <Circle size={22} />}
+                                                    </button>
+
+                                                    <div className="flex-1 min-w-0">
+                                                        <div className="flex items-center gap-2 flex-wrap">
+                                                            <h5 className={`font-bold text-base truncate ${task.completed ? 'text-white/50 line-through' : 'text-white'}`}>
+                                                                {task.title}
+                                                            </h5>
+                                                            <span className={`shrink-0 text-[10px] font-bold px-2 py-0.5 rounded-full ${task.reward_type === 'points' ? 'bg-accent/20 text-accent' :
+                                                                task.reward_type === 'money' ? 'bg-emerald-500/20 text-emerald-400' :
+                                                                    'bg-white/10 text-white/50'
+                                                                }`}>
+                                                                {task.reward_type === 'points' ? `+${task.reward_amount || task.value} ✨` :
+                                                                    task.reward_type === 'money' ? `+${task.reward_amount || task.value} 💵` :
+                                                                        '👔 Обязанность'}
+                                                            </span>
+                                                            {task.category && task.category !== 'normal' && (
+                                                                <span className={`shrink-0 text-[9px] font-bold px-1.5 py-0.5 rounded-sm uppercase tracking-widest border ${task.category === 'urgent_important' ? 'border-danger text-danger bg-danger/10' :
+                                                                    task.category === 'important' ? 'border-warning text-warning bg-warning/10' :
+                                                                        'border-blue-400 text-blue-400 bg-blue-400/10'
+                                                                    }`}>
+                                                                    {task.category === 'urgent_important' ? 'Срочно & Важно' :
+                                                                        task.category === 'important' ? 'Важно' : 'Срочно'}
+                                                                </span>
+                                                            )}
+                                                        </div>
+
+                                                        {task.description && (
+                                                            <p className={`text-sm mt-1 mb-2 ${task.completed ? 'text-white/30 truncate' : 'text-text-secondary line-clamp-2'}`}>
+                                                                {task.description}
+                                                            </p>
+                                                        )}
+
+                                                        <div className="mt-3 flex items-center justify-between text-xs font-medium text-text-secondary flex-wrap gap-2">
+                                                            <div className="flex items-center gap-4 flex-wrap">
+                                                                <div className="flex items-center gap-1.5" title="Кем создана">
+                                                                    <div className="w-4 h-4 rounded-full bg-white/10 flex items-center justify-center overflow-hidden">
+                                                                        {creator?.avatar_url ? <img src={creator.avatar_url} alt="" className="w-full h-full object-cover" /> : <span className="text-[8px] text-white/50">{creator?.display_name?.charAt(0) || '?'}</span>}
+                                                                    </div>
+                                                                    <span>От: {creator?.display_name?.split(' ')[0] || '...'}</span>
+                                                                </div>
+                                                                {task.assigned_to && (
+                                                                    <div className="flex items-center gap-1 text-white/60">
+                                                                        <span>→</span>
+                                                                        <span>Кому: {profiles[task.assigned_to]?.display_name?.split(' ')[0] || '...'}</span>
+                                                                    </div>
+                                                                )}
+                                                                {task.due_date && (
+                                                                    <div className="flex items-center gap-1 text-accent/80">
+                                                                        <Calendar size={12} />
+                                                                        <span>Срок: {task.due_date.split('-').reverse().join('.')}</span>
+                                                                    </div>
+                                                                )}
+                                                                {task.completed && completer && (
+                                                                    <div className="flex items-center gap-1.5 text-success/80" title={`Выполнена: ${formatTime(task.completed_at)}`}>
+                                                                        <Check size={12} />
+                                                                        <span>Сделал(а): {completer?.display_name?.split(' ')[0] || '...'}</span>
+                                                                    </div>
+                                                                )}
+                                                            </div>
+
+                                                            {canDelete && (
+                                                                <div className="flex items-center gap-1 ml-auto">
+                                                                    <button
+                                                                        onClick={() => handleEditTask(task)}
+                                                                        className="text-white/20 hover:text-accent hover:bg-accent/10 p-1.5 rounded-lg transition-colors"
+                                                                    >
+                                                                        <Edit2 size={14} />
+                                                                    </button>
+                                                                    <button
+                                                                        onClick={() => handleDeleteTask(task.id)}
+                                                                        className="text-white/20 hover:text-danger hover:bg-danger/10 p-1.5 rounded-lg transition-colors"
+                                                                    >
+                                                                        <Trash2 size={14} />
+                                                                    </button>
+                                                                </div>
+                                                            )}
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        );
+                                    })}
+                                </div>
+                            )}
+                        </>
+                    ) : (
+                        <div className="flex flex-col h-full">
+                            <div className="flex justify-between items-center mb-6">
+                                <h2 className="text-xl font-bold flex items-center gap-2 text-white">
+                                    <Calendar size={20} className="text-accent" />
+                                    Календарь Команды
+                                </h2>
+                                <div className="flex items-center gap-2 sm:gap-4 bg-bg-secondary px-2 sm:px-3 py-1.5 rounded-xl border border-white/10">
+                                    <button onClick={() => { setCurrentDate(new Date(currentDate.getFullYear(), currentDate.getMonth() - 1, 1)); setSelectedDate(null); }} className="hover:text-accent font-semibold transition-colors text-white"><ChevronLeft size={20} /></button>
+                                    <div className="relative flex items-center justify-center min-w-[100px] z-10">
+                                        <button onClick={() => setShowMonthPicker(!showMonthPicker)} className="font-semibold text-center text-sm hover:text-accent transition-colors px-2 py-1 rounded-md text-white">
+                                            {monthNames[currentDate.getMonth()]} {currentDate.getFullYear()}
+                                        </button>
+                                        {showMonthPicker && (
+                                            <div className="absolute top-full mt-2 bg-bg-secondary border border-white/10 rounded-xl shadow-2xl p-3 w-64 animate-fade-in right-0 sm:right-auto z-50">
+                                                <div className="grid grid-cols-3 gap-2">
+                                                    {monthNames.map((m, index) => (
+                                                        <button
+                                                            key={m}
+                                                            onClick={() => {
+                                                                setCurrentDate(new Date(currentDate.getFullYear(), index, 1));
+                                                                setSelectedDate(null);
+                                                                setShowMonthPicker(false);
+                                                            }}
+                                                            className={`text-xs py-2 rounded-lg transition-colors font-medium text-white ${currentDate.getMonth() === index ? 'bg-accent' : 'hover:bg-white/10'}`}
+                                                        >
+                                                            {m.substring(0, 3)}
+                                                        </button>
+                                                    ))}
+                                                </div>
+                                            </div>
+                                        )}
+                                    </div>
+                                    <button onClick={() => { setCurrentDate(new Date(currentDate.getFullYear(), currentDate.getMonth() + 1, 1)); setSelectedDate(null); }} className="hover:text-accent font-semibold transition-colors text-white"><ChevronRight size={20} /></button>
+                                </div>
+                            </div>
+
+                            <div className="grid grid-cols-7 gap-1 sm:gap-2 mb-2">
+                                {weekDays.map(day => (
+                                    <div key={day} className="text-center font-bold text-text-secondary text-xs uppercase py-2 tracking-wider">{day}</div>
+                                ))}
+                            </div>
+                            <div className="grid grid-cols-7 gap-1 sm:gap-2">
+                                {Array.from({ length: getFirstDayOfMonth(currentDate.getFullYear(), currentDate.getMonth()) }).map((_, i) => (
+                                    <div key={`empty-${i}`} className="h-16 md:h-24"></div>
+                                ))}
+                                {Array.from({ length: getDaysInMonth(currentDate.getFullYear(), currentDate.getMonth()) }).map((_, i) => {
+                                    const day = i + 1;
+                                    const dayStr = formatDateString(currentDate.getFullYear(), currentDate.getMonth(), day);
+                                    const isSelected = selectedDate === dayStr;
+                                    const isToday = dayStr === new Date().toISOString().split('T')[0];
+
+                                    const tasksForDay = tasks.filter(t => t.due_date === dayStr);
+                                    const totalCount = tasksForDay.length;
+                                    const completedCount = tasksForDay.filter(t => t.completed).length;
+                                    const uncompletedCount = totalCount - completedCount;
+
+                                    return (
+                                        <button
+                                            key={day}
+                                            onClick={() => setSelectedDate(selectedDate === dayStr ? null : dayStr)}
+                                            className={`h-16 md:h-24 rounded-2xl flex flex-col items-center justify-start py-1.5 md:py-3 transition-all duration-300 border relative group overflow-hidden
+                                                ${isSelected ? 'bg-accent/20 border-accent/50 text-accent shadow-[0_0_20px_rgba(var(--color-accent),0.3)] scale-[1.02] z-10' :
+                                                    totalCount > 0 ? 'bg-bg-primary/60 border-accent/20 hover:border-accent/50 text-white hover:-translate-y-1' :
+                                                        'bg-white/5 border-white/5 hover:border-white/20 text-text-secondary hover:bg-white/10'}
+                                                ${isToday && !isSelected ? 'ring-2 ring-white/20' : ''}`}
+                                        >
+                                            <span className={`font-bold text-sm md:text-lg relative z-10 ${isToday ? 'text-white' : ''}`}>{day}</span>
+                                            {totalCount > 0 && (
+                                                <div className="mt-auto w-full flex flex-col items-center gap-1 relative z-10">
+                                                    <div className="flex gap-1 justify-center max-w-full px-1 flex-wrap h-2 overflow-hidden">
+                                                        {Array.from({ length: Math.min(completedCount, 3) }).map((_, idx) => (
+                                                            <div key={`c-${idx}`} className="w-1.5 h-1.5 md:w-2 md:h-2 rounded-full bg-success"></div>
+                                                        ))}
+                                                        {Array.from({ length: Math.min(uncompletedCount, Math.max(0, 3 - completedCount)) }).map((_, idx) => (
+                                                            <div key={`u-${idx}`} className="w-1.5 h-1.5 md:w-2 md:h-2 rounded-full bg-accent"></div>
+                                                        ))}
+                                                    </div>
+                                                    <span className="text-[8px] md:text-[9px] font-bold text-white/70 truncate w-full px-1 text-center">
+                                                        {totalCount} {totalCount === 1 ? 'зад.' : 'зад.'}
+                                                    </span>
+                                                </div>
+                                            )}
+                                        </button>
+                                    );
+                                })}
+                            </div>
+
+                            {selectedDate && (
+                                <div className="mt-6 p-5 bg-white/5 rounded-2xl border border-white/10 animate-fade-in relative z-20">
+                                    <div className="flex justify-between items-center mb-4">
+                                        <h3 className="font-bold text-lg text-white">План на {selectedDate.split('-').reverse().join('.')}</h3>
+                                        <button
+                                            onClick={() => {
+                                                setNewTaskDueDate(selectedDate);
+                                                setActiveGroupTab('tasks');
+                                                setShowTaskForm(true);
+                                                // auto scroll to form logic could be added here
+                                            }}
+                                            className="px-4 py-2 bg-accent/20 text-accent hover:bg-accent hover:text-white rounded-xl text-xs font-bold transition-all flex items-center gap-2"
+                                        >
+                                            <Plus size={14} /> Добавить
+                                        </button>
+                                    </div>
+                                    <div className="space-y-3">
+                                        {tasks.filter(t => t.due_date === selectedDate).length === 0 ? (
+                                            <p className="text-sm text-text-secondary italic">На этот день задач нет.</p>
+                                        ) : (
+                                            tasks.filter(t => t.due_date === selectedDate).map(task => {
+                                                const creator = profiles[task.created_by];
+                                                return (
+                                                    <div key={task.id} className={`p-3 rounded-xl border flex gap-3 transition-colors ${task.completed ? 'bg-white/5 border-transparent opacity-50' : 'bg-bg-primary border-white/10'}`}>
+                                                        <button onClick={() => handleToggleTask(task)} className={`mt-0.5 shrink-0 ${task.completed ? 'text-success' : 'text-text-secondary hover:text-accent'}`}>
+                                                            {task.completed ? <CheckCircle size={18} /> : <Circle size={18} />}
+                                                        </button>
+                                                        <div className="flex-1 min-w-0">
+                                                            <div className="flex items-center gap-2">
+                                                                <span className={`text-sm font-semibold truncate ${task.completed ? 'line-through' : 'text-white'}`}>{task.title}</span>
+                                                                <span className="text-[9px] font-bold px-1.5 py-0.5 rounded-md bg-accent/20 text-accent ml-auto">+{task.reward_amount || task.value}</span>
+                                                            </div>
+                                                            <div className="flex items-center gap-2 mt-1 text-[10px] text-text-secondary">
+                                                                <span>От: {creator?.display_name?.split(' ')[0] || '...'}</span>
+                                                                {task.assigned_to && <span>Кому: {profiles[task.assigned_to]?.display_name?.split(' ')[0] || '...'}</span>}
+                                                            </div>
+                                                        </div>
+                                                    </div>
+                                                );
+                                            })
+                                        )}
+                                    </div>
+                                </div>
+                            )}
                         </div>
                     )}
                 </div>
@@ -1076,56 +1318,60 @@ export default function GroupChatView({ group, user, onBack, onGroupUpdate }) {
             </div>
 
             {/* Settings Modal */}
-            {showSettings && (
-                <div className="fixed inset-0 z-[100] bg-black/60 backdrop-blur-md flex items-center justify-center p-4 animate-fade-in" onClick={() => setShowSettings(false)}>
-                    <div className="bg-[#0a0a0c] border border-white/10 rounded-2xl w-full max-w-md p-6 shadow-2xl" onClick={e => e.stopPropagation()}>
-                        <div className="flex justify-between items-center mb-6">
-                            <h3 className="text-xl font-bold text-white flex items-center gap-2"><Settings size={20} className="text-accent" /> Настройки команды</h3>
-                            <button onClick={() => setShowSettings(false)} className="text-text-secondary hover:text-white transition-colors"><X size={20} /></button>
-                        </div>
+            {
+                showSettings && (
+                    <div className="fixed inset-0 z-[100] bg-black/60 backdrop-blur-md flex items-center justify-center p-4 animate-fade-in" onClick={() => setShowSettings(false)}>
+                        <div className="bg-[#0a0a0c] border border-white/10 rounded-2xl w-full max-w-md p-6 shadow-2xl" onClick={e => e.stopPropagation()}>
+                            <div className="flex justify-between items-center mb-6">
+                                <h3 className="text-xl font-bold text-white flex items-center gap-2"><Settings size={20} className="text-accent" /> Настройки команды</h3>
+                                <button onClick={() => setShowSettings(false)} className="text-text-secondary hover:text-white transition-colors"><X size={20} /></button>
+                            </div>
 
-                        <form onSubmit={handleUpdateGroup} className="space-y-4">
-                            <div>
-                                <label className="block text-xs font-semibold text-text-secondary uppercase tracking-wider mb-1.5">Название</label>
-                                <input type="text" value={editGroupName} onChange={e => setEditGroupName(e.target.value)} className="w-full bg-black/40 border border-white/10 rounded-xl px-4 py-2.5 text-sm text-white focus:border-accent outline-none" required />
-                            </div>
-                            <div>
-                                <label className="block text-xs font-semibold text-text-secondary uppercase tracking-wider mb-1.5">Описание</label>
-                                <textarea value={editGroupDesc} onChange={e => setEditGroupDesc(e.target.value)} className="w-full bg-black/40 border border-white/10 rounded-xl px-4 py-2.5 text-sm text-white focus:border-accent outline-none min-h-[80px]" />
-                            </div>
-                            <div className="pt-2 flex flex-col gap-3">
-                                <button type="submit" className="w-full py-2.5 bg-accent text-white font-semibold rounded-xl hover:bg-accent/80 transition-all">Сохранить изменения</button>
-                                {canManage && myRole === 'owner' && (
-                                    <button type="button" onClick={handleDeleteGroup} className="w-full py-2.5 bg-danger/10 text-danger font-semibold rounded-xl hover:bg-danger hover:text-white transition-all flex items-center justify-center gap-2 mt-4"><Trash2 size={18} /> Удалить команду навсегда</button>
-                                )}
-                            </div>
-                        </form>
+                            <form onSubmit={handleUpdateGroup} className="space-y-4">
+                                <div>
+                                    <label className="block text-xs font-semibold text-text-secondary uppercase tracking-wider mb-1.5">Название</label>
+                                    <input type="text" value={editGroupName} onChange={e => setEditGroupName(e.target.value)} className="w-full bg-black/40 border border-white/10 rounded-xl px-4 py-2.5 text-sm text-white focus:border-accent outline-none" required />
+                                </div>
+                                <div>
+                                    <label className="block text-xs font-semibold text-text-secondary uppercase tracking-wider mb-1.5">Описание</label>
+                                    <textarea value={editGroupDesc} onChange={e => setEditGroupDesc(e.target.value)} className="w-full bg-black/40 border border-white/10 rounded-xl px-4 py-2.5 text-sm text-white focus:border-accent outline-none min-h-[80px]" />
+                                </div>
+                                <div className="pt-2 flex flex-col gap-3">
+                                    <button type="submit" className="w-full py-2.5 bg-accent text-white font-semibold rounded-xl hover:bg-accent/80 transition-all">Сохранить изменения</button>
+                                    {canManage && myRole === 'owner' && (
+                                        <button type="button" onClick={handleDeleteGroup} className="w-full py-2.5 bg-danger/10 text-danger font-semibold rounded-xl hover:bg-danger hover:text-white transition-all flex items-center justify-center gap-2 mt-4"><Trash2 size={18} /> Удалить команду навсегда</button>
+                                    )}
+                                </div>
+                            </form>
+                        </div>
                     </div>
-                </div>
-            )}
+                )
+            }
 
             {/* Avatar Viewer Modal */}
-            {viewingAvatar && (
-                <div
-                    className="fixed inset-0 z-[100] bg-black/80 backdrop-blur-md flex items-center justify-center p-4 sm:p-8 cursor-zoom-out animate-fade-in"
-                    onClick={() => setViewingAvatar(null)}
-                >
-                    <button
-                        className="absolute top-4 right-4 sm:top-8 sm:right-8 p-3 text-white/50 hover:text-white bg-black/20 hover:bg-black/40 border border-white/10 rounded-full transition-all"
+            {
+                viewingAvatar && (
+                    <div
+                        className="fixed inset-0 z-[100] bg-black/80 backdrop-blur-md flex items-center justify-center p-4 sm:p-8 cursor-zoom-out animate-fade-in"
                         onClick={() => setViewingAvatar(null)}
                     >
-                        <X size={24} />
-                    </button>
-                    <div className="relative max-w-full max-h-full flex items-center justify-center p-2 rounded-[2rem] bg-white/5 border border-white/10 shadow-2xl overflow-hidden pointer-events-none">
-                        <img
-                            src={viewingAvatar}
-                            alt="Profile Fullsize"
-                            className="max-w-full max-h-[85vh] rounded-[1.5rem] object-contain pointer-events-auto shadow-[0_0_100px_rgba(255,255,255,0.05)] cursor-default"
-                            onClick={(e) => e.stopPropagation()}
-                        />
+                        <button
+                            className="absolute top-4 right-4 sm:top-8 sm:right-8 p-3 text-white/50 hover:text-white bg-black/20 hover:bg-black/40 border border-white/10 rounded-full transition-all"
+                            onClick={() => setViewingAvatar(null)}
+                        >
+                            <X size={24} />
+                        </button>
+                        <div className="relative max-w-full max-h-full flex items-center justify-center p-2 rounded-[2rem] bg-white/5 border border-white/10 shadow-2xl overflow-hidden pointer-events-none">
+                            <img
+                                src={viewingAvatar}
+                                alt="Profile Fullsize"
+                                className="max-w-full max-h-[85vh] rounded-[1.5rem] object-contain pointer-events-auto shadow-[0_0_100px_rgba(255,255,255,0.05)] cursor-default"
+                                onClick={(e) => e.stopPropagation()}
+                            />
+                        </div>
                     </div>
-                </div>
-            )}
-        </div>
+                )
+            }
+        </div >
     );
 }

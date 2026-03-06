@@ -8,6 +8,11 @@ export default function GroupsView() {
     const [groups, setGroups] = useState([]);
     const [loading, setLoading] = useState(true);
     const [activeGroup, setActiveGroup] = useState(null); // Если выбрана группа, показываем чат
+    const [openGroupSettings, setOpenGroupSettings] = useState(false);
+
+    // Delete confirmation state
+    const [groupToDelete, setGroupToDelete] = useState(null);
+    const [isDeleting, setIsDeleting] = useState(false);
 
     // Create group state
     const [isCreating, setIsCreating] = useState(false);
@@ -122,10 +127,32 @@ export default function GroupsView() {
         }
     };
 
+    const handleDeleteConfirm = async () => {
+        if (!groupToDelete) return;
+        setIsDeleting(true);
+        try {
+            const { error } = await supabase.from('groups').delete().eq('id', groupToDelete.id);
+            if (error) throw error;
+            setGroupToDelete(null);
+            loadGroups(user.id);
+        } catch (error) {
+            console.error('Error deleting group:', error);
+            alert(`Ошибка при удалении: ${error.message || 'Неизвестная ошибка'}`);
+        } finally {
+            setIsDeleting(false);
+        }
+    };
+
     if (!user) return null;
 
     if (activeGroup) {
-        return <GroupChatView group={activeGroup} user={user} onBack={() => setActiveGroup(null)} onGroupUpdate={() => loadGroups(user.id)} />;
+        return <GroupChatView
+            group={activeGroup}
+            user={user}
+            onBack={() => { setActiveGroup(null); setOpenGroupSettings(false); }}
+            onGroupUpdate={() => loadGroups(user.id)}
+            initialOpenSettings={openGroupSettings}
+        />;
     }
 
     return (
@@ -253,10 +280,42 @@ export default function GroupsView() {
                         return (
                             <div
                                 key={group.id}
-                                className="bg-white/5 border border-white/10 hover:border-accent/50 rounded-2xl p-5 cursor-pointer transition-all hover:-translate-y-1 hover:shadow-lg hover:shadow-accent/10 group animate-fade-in"
-                                onClick={() => setActiveGroup(group)}
+                                className="bg-white/5 border border-white/10 hover:border-accent/50 rounded-2xl p-5 cursor-pointer transition-all hover:-translate-y-1 hover:shadow-lg hover:shadow-accent/10 group animate-fade-in relative overflow-hidden"
+                                onClick={() => {
+                                    setOpenGroupSettings(false);
+                                    setActiveGroup(group);
+                                }}
                             >
-                                <div className="flex items-start gap-4 mb-4">
+                                {/* Кнопки быстрого управления для админов/оунеров */}
+                                {(myRole === 'owner' || myRole === 'admin') && (
+                                    <div className="absolute top-4 right-4 flex items-center gap-2 opacity-0 group-hover:opacity-100 transition-opacity z-10">
+                                        <button
+                                            onClick={(e) => {
+                                                e.stopPropagation();
+                                                setOpenGroupSettings(true);
+                                                setActiveGroup(group);
+                                            }}
+                                            className="w-8 h-8 rounded-xl bg-black/40 border border-white/10 flex items-center justify-center text-text-secondary hover:text-white hover:bg-white/10 transition-colors backdrop-blur-md"
+                                            title="Настройки"
+                                        >
+                                            <Settings size={14} />
+                                        </button>
+                                        {myRole === 'owner' && (
+                                            <button
+                                                onClick={(e) => {
+                                                    e.stopPropagation();
+                                                    setGroupToDelete(group);
+                                                }}
+                                                className="w-8 h-8 rounded-xl bg-black/40 border border-white/10 flex items-center justify-center text-text-secondary hover:text-danger hover:bg-danger/20 hover:border-danger/30 transition-colors backdrop-blur-md"
+                                                title="Удалить команду"
+                                            >
+                                                <Trash2 size={14} />
+                                            </button>
+                                        )}
+                                    </div>
+                                )}
+
+                                <div className="flex items-start gap-4 mb-4 relative z-0">
                                     <div className="w-12 h-12 shrink-0 rounded-2xl bg-gradient-to-br from-indigo-500/80 to-purple-500/80 flex items-center justify-center text-white font-bold text-lg shadow-inner">
                                         {initLetters}
                                     </div>
@@ -282,6 +341,40 @@ export default function GroupsView() {
                     })
                 )}
             </div>
+
+            {/* Модальное окно удаления */}
+            {groupToDelete && (
+                <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-fade-in">
+                    <div className="bg-bg-secondary border border-border rounded-2xl p-6 w-full max-w-md shadow-2xl" onClick={e => e.stopPropagation()}>
+                        <h3 className="text-xl font-bold text-white mb-2">Удалить команду?</h3>
+                        <p className="text-text-secondary mb-6">
+                            Вы уверены, что хотите удалить команду <span className="text-white font-semibold">"{groupToDelete.name}"</span>? Это действие нельзя отменить, вся история чата и задачи Команды будут безвозвратно удалены.
+                        </p>
+
+                        <div className="flex gap-3 justify-end">
+                            <button
+                                onClick={() => setGroupToDelete(null)}
+                                disabled={isDeleting}
+                                className="px-5 py-2.5 rounded-xl text-sm font-semibold text-text-secondary hover:text-white hover:bg-white/5 transition-all"
+                            >
+                                Отмена
+                            </button>
+                            <button
+                                onClick={handleDeleteConfirm}
+                                disabled={isDeleting}
+                                className="px-5 py-2.5 rounded-xl text-sm font-semibold bg-danger text-white hover:bg-danger/80 transition-all flex items-center gap-2"
+                            >
+                                {isDeleting ? (
+                                    <span className="w-4 h-4 border-2 border-white/20 border-t-white rounded-full animate-spin" />
+                                ) : (
+                                    <Trash2 size={16} />
+                                )}
+                                Удалить безвозвратно
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
         </div>
     );
 }

@@ -271,7 +271,7 @@ function App() {
         </div>
       </header>
 
-      <div id="tour-summary" className="flex bg-black/40 p-1 rounded-2xl border border-border w-fit shadow-inner z-10 relative">
+      <div id="tour-summary" className="flex bg-black/40 p-1 rounded-2xl border border-border w-fit shadow-inner z-50 relative">
         <Tooltip text="Добавляйте задачи на сегодня и обменивайте очки на награды" position="bottom">
           <button
             onClick={() => setActiveTab('dashboard')}
