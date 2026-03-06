@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { supabase } from '../lib/supabase';
-import { ArrowLeft, Send, Users, Shield, UserPlus, Settings, LogOut, CheckCheck, Check, Search, Trash2, X } from 'lucide-react';
+import { useStore } from '../store/useStore';
+import { ArrowLeft, Send, Users, Shield, UserPlus, Settings, LogOut, CheckCheck, Check, Search, Trash2, X, ListTodo, Plus, Circle, CheckCircle } from 'lucide-react';
 
 export default function GroupChatView({ group, user, onBack, onGroupUpdate }) {
     const [messages, setMessages] = useState([]);
@@ -9,10 +10,20 @@ export default function GroupChatView({ group, user, onBack, onGroupUpdate }) {
     const messagesEndRef = useRef(null);
     const [activeTab, setActiveTab] = useState('chat'); // 'chat' or 'members'
 
+    const { addTokens } = useStore();
+
     const [members, setMembers] = useState([]);
     const [profiles, setProfiles] = useState({}); // id -> profile
+    const [tasks, setTasks] = useState([]);
 
-    // search for inviting
+    // Tasks form state
+    const [showTaskForm, setShowTaskForm] = useState(false);
+    const [newTaskTitle, setNewTaskTitle] = useState('');
+    const [newTaskDesc, setNewTaskDesc] = useState('');
+    const [newTaskValue, setNewTaskValue] = useState(10);
+
+    // search & invite
+    const [friends, setFriends] = useState([]);
     const [searchQuery, setSearchQuery] = useState('');
     const [searchResults, setSearchResults] = useState([]);
     const [isSearching, setIsSearching] = useState(false);
@@ -23,6 +34,8 @@ export default function GroupChatView({ group, user, onBack, onGroupUpdate }) {
     useEffect(() => {
         loadMessages();
         loadMembers();
+        loadFriends();
+        loadTasks();
 
         const msgsChannel = supabase.channel(`group_chat_${group.id}`)
             .on('postgres_changes', {
@@ -51,9 +64,21 @@ export default function GroupChatView({ group, user, onBack, onGroupUpdate }) {
             })
             .subscribe();
 
+        const tasksChannel = supabase.channel(`group_tasks_${group.id}`)
+            .on('postgres_changes', {
+                event: '*',
+                schema: 'public',
+                table: 'group_tasks',
+                filter: `group_id=eq.${group.id}`
+            }, () => {
+                loadTasks();
+            })
+            .subscribe();
+
         return () => {
             supabase.removeChannel(msgsChannel);
             supabase.removeChannel(membersChannel);
+            supabase.removeChannel(tasksChannel);
         };
     }, [group.id]);
 
@@ -109,6 +134,28 @@ export default function GroupChatView({ group, user, onBack, onGroupUpdate }) {
         }
     };
 
+    const loadTasks = async () => {
+        try {
+            const { data, error } = await supabase
+                .from('group_tasks')
+                .select('*')
+                .eq('group_id', group.id)
+                .order('created_at', { ascending: false });
+            if (error) throw error;
+            setTasks(data || []);
+            if (data?.length > 0) {
+                const userIds = [];
+                data.forEach(t => {
+                    if (t.created_by) userIds.push(t.created_by);
+                    if (t.completed_by) userIds.push(t.completed_by);
+                });
+                if (userIds.length > 0) loadProfiles([...new Set(userIds)]);
+            }
+        } catch (error) {
+            console.error('Error loading tasks:', error);
+        }
+    };
+
     const loadProfiles = async (userIds) => {
         const missingIds = userIds.filter(id => !profiles[id]);
         if (missingIds.length === 0) return;
@@ -127,6 +174,30 @@ export default function GroupChatView({ group, user, onBack, onGroupUpdate }) {
             });
         } catch (error) {
             console.error('Error loading profiles:', error);
+        }
+    };
+
+    const loadFriends = async () => {
+        try {
+            const { data, error } = await supabase
+                .from('friendships')
+                .select(`
+                    status, user_id, friend_id,
+                    profile_user:profiles!friendships_user_id_fkey(id, display_name, avatar_url, user_tag),
+                    profile_friend:profiles!friendships_friend_id_fkey(id, display_name, avatar_url, user_tag)
+                `)
+                .eq('status', 'accepted')
+                .or(`user_id.eq.${user.id},friend_id.eq.${user.id}`);
+
+            if (error) throw error;
+            const formattedFriends = data.map(rel => {
+                const isInitiator = rel.user_id === user.id;
+                return isInitiator ? rel.profile_friend : rel.profile_user;
+            }).filter(f => f && f.id);
+
+            setFriends(formattedFriends);
+        } catch (err) {
+            console.error('Error loading friends:', err);
         }
     };
 
@@ -172,15 +243,31 @@ export default function GroupChatView({ group, user, onBack, onGroupUpdate }) {
 
             setIsSearching(true);
             try {
-                // Поиск по display_name и email
-                // В идеале использовать RPC, но сделаем простой ilike по display_name для теста
-                const { data, error } = await supabase
+                let queryBuilder = supabase
                     .from('profiles')
                     .select('id, display_name, user_tag, avatar_url')
-                    .ilike('display_name', `%${searchQuery}%`)
                     .neq('id', user.id)
                     .limit(10);
 
+                let q = searchQuery.trim();
+                if (q.includes('@')) {
+                    queryBuilder = queryBuilder.eq('email', q);
+                } else if (q.includes('#')) {
+                    const parts = q.split('#');
+                    if (parts.length === 2 && parts[0] && parts[1]) {
+                        queryBuilder = queryBuilder.ilike('display_name', `%${parts[0]}%`).eq('user_tag', parts[1]);
+                    } else if (parts[1]) {
+                        queryBuilder = queryBuilder.eq('user_tag', parts[1]);
+                    }
+                } else {
+                    if (/^\d{4}$/.test(q)) {
+                        queryBuilder = queryBuilder.or(`display_name.ilike.%${q}%,user_tag.eq.${q}`);
+                    } else {
+                        queryBuilder = queryBuilder.ilike('display_name', `%${q}%`);
+                    }
+                }
+
+                const { data, error } = await queryBuilder;
                 if (error) throw error;
                 setSearchResults(data || []);
             } catch (error) {
@@ -256,6 +343,73 @@ export default function GroupChatView({ group, user, onBack, onGroupUpdate }) {
         try { return new Date(dateStr).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }); } catch { return ''; }
     };
 
+    const handleCreateTask = async (e) => {
+        e.preventDefault();
+        if (!newTaskTitle.trim()) return;
+
+        try {
+            const { error } = await supabase
+                .from('group_tasks')
+                .insert({
+                    group_id: group.id,
+                    title: newTaskTitle.trim(),
+                    description: newTaskDesc.trim(),
+                    value: newTaskValue,
+                    created_by: user.id
+                });
+            if (error) throw error;
+            setNewTaskTitle('');
+            setNewTaskDesc('');
+            setNewTaskValue(10);
+            setShowTaskForm(false);
+            loadTasks();
+        } catch (err) {
+            console.error('Error creating task:', err);
+            alert('Ошибка при создании задачи');
+        }
+    };
+
+    const handleToggleTask = async (task) => {
+        try {
+            const isCompleted = !task.completed;
+            const updates = {
+                completed: isCompleted,
+                completed_by: isCompleted ? user.id : null,
+                completed_at: isCompleted ? new Date().toISOString() : null
+            };
+            const { error } = await supabase
+                .from('group_tasks')
+                .update(updates)
+                .eq('id', task.id);
+            if (error) throw error;
+
+            // Optimistic update
+            setTasks(prev => prev.map(t => t.id === task.id ? { ...t, ...updates } : t));
+
+            // Начисление очков (только если мы её выполнили, а не отменили)
+            if (isCompleted && task.value) {
+                addTokens(task.value, `Командная задача: ${task.title}`);
+            }
+        } catch (err) {
+            console.error('Error toggling task:', err);
+        }
+    };
+
+    const handleDeleteTask = async (taskId) => {
+        if (!confirm('Удалить задачу?')) return;
+        try {
+            const { error } = await supabase
+                .from('group_tasks')
+                .delete()
+                .eq('id', taskId);
+            if (error) throw error;
+            setTasks(prev => prev.filter(t => t.id !== taskId));
+        } catch (err) {
+            console.error('Error deleting task:', err);
+            alert('Ошибка удаления. Возможно у вас нет прав.');
+        }
+    };
+
     return (
         <div className="flex flex-col bg-[#0a0a0c]/80 backdrop-blur-3xl border border-white/5 rounded-3xl overflow-hidden shadow-2xl animate-fade-in relative z-10 w-full max-w-5xl mx-auto" style={{ minHeight: '75vh', maxHeight: '85vh' }}>
             {/* Header */}
@@ -287,6 +441,12 @@ export default function GroupChatView({ group, user, onBack, onGroupUpdate }) {
                         className={`px-4 py-1.5 rounded-lg text-sm font-medium transition-all ${activeTab === 'members' ? 'bg-white/10 text-white shadow-sm' : 'text-text-secondary hover:text-white'}`}
                     >
                         Участники
+                    </button>
+                    <button
+                        onClick={() => setActiveTab('tasks')}
+                        className={`px-4 py-1.5 rounded-lg text-sm font-medium transition-all ${activeTab === 'tasks' ? 'bg-white/10 text-white shadow-sm' : 'text-text-secondary hover:text-white'}`}
+                    >
+                        Задачи
                     </button>
                 </div>
             </header>
@@ -403,8 +563,8 @@ export default function GroupChatView({ group, user, onBack, onGroupUpdate }) {
                                                     {isMe && <span className="text-[10px] bg-white/10 px-1.5 py-0.5 rounded text-white/50">ВЫ</span>}
                                                 </div>
                                                 <div className={`text-[11px] mt-1 font-bold px-2 py-0.5 rounded-full inline-block uppercase tracking-wider ${m.role === 'owner' ? 'bg-warning/20 text-warning' :
-                                                        m.role === 'admin' ? 'bg-success/20 text-success' :
-                                                            'bg-white/10 text-text-secondary'
+                                                    m.role === 'admin' ? 'bg-success/20 text-success' :
+                                                        'bg-white/10 text-text-secondary'
                                                     }`}>
                                                     {m.role === 'owner' ? 'Создатель' : m.role === 'admin' ? 'Администратор' : 'Участник'}
                                                 </div>
@@ -470,7 +630,7 @@ export default function GroupChatView({ group, user, onBack, onGroupUpdate }) {
                                             </div>
                                         ) : searchQuery.length > 0 && searchResults.length === 0 ? (
                                             <div className="text-center py-6 text-sm font-medium text-text-secondary bg-white/5 rounded-xl border border-white/5">Ничего не найдено</div>
-                                        ) : (
+                                        ) : searchQuery.length > 0 ? (
                                             searchResults.map(userResult => {
                                                 const isAlreadyMember = members.some(m => m.user_id === userResult.id);
                                                 return (
@@ -498,10 +658,194 @@ export default function GroupChatView({ group, user, onBack, onGroupUpdate }) {
                                                     </div>
                                                 );
                                             })
+                                        ) : friends.length > 0 ? (
+                                            <div className="space-y-2 mt-4">
+                                                <p className="text-xs font-bold text-white/40 uppercase tracking-wider mb-2 px-2">Ваши друзья</p>
+                                                {friends.map(friend => {
+                                                    const isAlreadyMember = members.some(m => m.user_id === friend.id);
+                                                    return (
+                                                        <div key={friend.id} className="flex items-center justify-between p-3 rounded-xl hover:bg-white/5 transition-all group">
+                                                            <div className="flex items-center gap-3 min-w-0">
+                                                                <div className="w-10 h-10 rounded-full bg-white/10 flex shrink-0 items-center justify-center text-white text-sm font-bold overflow-hidden">
+                                                                    {friend.avatar_url ? (
+                                                                        <img src={friend.avatar_url} alt="" className="w-full h-full object-cover" />
+                                                                    ) : (
+                                                                        friend.display_name?.charAt(0)?.toUpperCase()
+                                                                    )}
+                                                                </div>
+                                                                <div className="min-w-0 flex-1">
+                                                                    <p className="text-sm font-bold text-white truncate leading-tight group-hover:text-accent transition-colors">{friend.display_name}</p>
+                                                                    {friend.user_tag && <p className="text-[10px] text-text-secondary truncate mt-0.5">#{friend.user_tag}</p>}
+                                                                </div>
+                                                            </div>
+                                                            <button
+                                                                disabled={isAlreadyMember}
+                                                                onClick={() => handleAddMember(friend.id)}
+                                                                className="shrink-0 w-8 h-8 flex items-center justify-center rounded-lg bg-white/5 text-text-secondary hover:bg-accent hover:text-white disabled:opacity-30 transition-all active:scale-95 ml-2"
+                                                            >
+                                                                {isAlreadyMember ? <Check size={14} /> : <Plus size={14} />}
+                                                            </button>
+                                                        </div>
+                                                    );
+                                                })}
+                                            </div>
+                                        ) : (
+                                            <div className="text-center py-6 text-sm font-medium text-text-secondary bg-white/5 rounded-xl border border-white/5">Введите имя или тег для поиска</div>
                                         )}
                                     </div>
                                 </div>
                             </div>
+                        </div>
+                    )}
+                </div>
+            )}
+
+            {/* Tasks Tab */}
+            {activeTab === 'tasks' && (
+                <div className="flex-1 overflow-y-auto p-4 sm:p-6 bg-black/20 flex flex-col relative w-full">
+                    <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between mb-6 gap-4">
+                        <div>
+                            <h4 className="text-white font-bold text-lg flex items-center gap-2"><ListTodo size={20} className="text-accent" /> Задачи команды</h4>
+                            <p className="text-xs text-text-secondary mt-1">Работайте сообща и достигайте целей</p>
+                        </div>
+                        <button
+                            onClick={() => setShowTaskForm(!showTaskForm)}
+                            className={`px-4 py-2 rounded-xl text-sm font-semibold transition-all flex items-center gap-2 ${showTaskForm
+                                ? 'bg-white/10 text-white hover:bg-white/20'
+                                : 'bg-accent text-white hover:bg-accent/80 shadow-lg shadow-accent/20'
+                                }`}
+                        >
+                            {showTaskForm ? 'Отмена' : <><Plus size={16} /> Создать задачу</>}
+                        </button>
+                    </div>
+
+                    {showTaskForm && (
+                        <form onSubmit={handleCreateTask} className="bg-white/5 border border-white/10 rounded-2xl p-5 mb-6 animate-fade-in">
+                            <h5 className="text-white font-bold mb-4">Новая задача</h5>
+                            <div className="space-y-4">
+                                <div>
+                                    <label className="block text-xs font-semibold text-text-secondary uppercase tracking-wider mb-1.5">Название задачи</label>
+                                    <input
+                                        type="text"
+                                        value={newTaskTitle}
+                                        onChange={(e) => setNewTaskTitle(e.target.value)}
+                                        className="w-full bg-black/40 border border-white/10 rounded-xl px-4 py-2.5 text-sm text-white focus:border-accent outline-none transition-colors"
+                                        placeholder="Что нужно сделать?"
+                                        required
+                                    />
+                                </div>
+                                <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                                    <div className="sm:col-span-2">
+                                        <label className="block text-xs font-semibold text-text-secondary uppercase tracking-wider mb-1.5">Описание (необязательно)</label>
+                                        <input
+                                            type="text"
+                                            value={newTaskDesc}
+                                            onChange={(e) => setNewTaskDesc(e.target.value)}
+                                            className="w-full bg-black/40 border border-white/10 rounded-xl px-4 py-2.5 text-sm text-white focus:border-accent outline-none transition-colors"
+                                            placeholder="Подробности задачи"
+                                        />
+                                    </div>
+                                    <div>
+                                        <label className="block text-xs font-semibold text-text-secondary uppercase tracking-wider mb-1.5">Ценность (очки)</label>
+                                        <input
+                                            type="number"
+                                            min="1"
+                                            max="1000"
+                                            value={newTaskValue}
+                                            onChange={(e) => setNewTaskValue(e.target.value ? parseInt(e.target.value) : 0)}
+                                            className="w-full bg-black/40 border border-white/10 rounded-xl px-4 py-2.5 text-sm text-center font-bold text-accent focus:border-accent outline-none transition-colors"
+                                        />
+                                    </div>
+                                </div>
+                                <div className="flex justify-end pt-2">
+                                    <button
+                                        type="submit"
+                                        disabled={!newTaskTitle.trim()}
+                                        className="px-6 py-2 bg-accent text-white rounded-xl text-sm font-semibold hover:bg-accent/80 transition-colors disabled:opacity-50"
+                                    >
+                                        Создать задачу
+                                    </button>
+                                </div>
+                            </div>
+                        </form>
+                    )}
+
+                    {tasks.length === 0 && !showTaskForm ? (
+                        <div className="flex flex-col items-center justify-center flex-1 py-12 opacity-60">
+                            <ListTodo size={48} className="text-white/30 mb-4" />
+                            <p className="text-white font-medium">Нет активных задач</p>
+                            <p className="text-sm text-text-secondary mt-1 text-center">Создайте первую задачу для команды</p>
+                        </div>
+                    ) : (
+                        <div className="space-y-3">
+                            {tasks.map(task => {
+                                const creator = profiles[task.created_by];
+                                const completer = task.completed_by ? profiles[task.completed_by] : null;
+                                const canDelete = task.created_by === user.id || myRole === 'owner' || myRole === 'admin';
+
+                                return (
+                                    <div
+                                        key={task.id}
+                                        className={`p-4 rounded-2xl border transition-all ${task.completed
+                                            ? 'bg-white/[0.02] border-white/5 opacity-70'
+                                            : 'bg-white/5 border-white/10 hover:border-accent/40 shadow-sm'
+                                            }`}
+                                    >
+                                        <div className="flex items-start gap-4">
+                                            <button
+                                                onClick={() => handleToggleTask(task)}
+                                                className={`mt-1 shrink-0 transition-all ${task.completed ? 'text-success' : 'text-text-secondary hover:text-accent'
+                                                    }`}
+                                            >
+                                                {task.completed ? <CheckCircle size={22} className="fill-success/20" /> : <Circle size={22} />}
+                                            </button>
+
+                                            <div className="flex-1 min-w-0">
+                                                <div className="flex items-center gap-2 flex-wrap">
+                                                    <h5 className={`font-bold text-base truncate ${task.completed ? 'text-white/50 line-through' : 'text-white'}`}>
+                                                        {task.title}
+                                                    </h5>
+                                                    <span className="shrink-0 bg-accent/20 text-accent text-[10px] font-bold px-2 py-0.5 rounded-full">
+                                                        +{task.value} очков
+                                                    </span>
+                                                </div>
+
+                                                {task.description && (
+                                                    <p className={`text-sm mt-1 mb-2 ${task.completed ? 'text-white/30 truncate' : 'text-text-secondary line-clamp-2'}`}>
+                                                        {task.description}
+                                                    </p>
+                                                )}
+
+                                                <div className="mt-3 flex items-center justify-between text-xs font-medium text-text-secondary">
+                                                    <div className="flex items-center gap-4">
+                                                        <div className="flex items-center gap-1.5" title="Кем создана">
+                                                            <div className="w-4 h-4 rounded-full bg-white/10 flex items-center justify-center overflow-hidden">
+                                                                {creator?.avatar_url ? <img src={creator.avatar_url} alt="" className="w-full h-full object-cover" /> : <span className="text-[8px] text-white/50">{creator?.display_name?.charAt(0) || '?'}</span>}
+                                                            </div>
+                                                            <span>Создал(а): {creator?.display_name?.split(' ')[0] || '...'}</span>
+                                                        </div>
+                                                        {task.completed && completer && (
+                                                            <div className="flex items-center gap-1.5 text-success/80" title={`Выполнена: ${formatTime(task.completed_at)}`}>
+                                                                <Check size={12} />
+                                                                <span>Выполнил(а): {completer?.display_name?.split(' ')[0] || '...'}</span>
+                                                            </div>
+                                                        )}
+                                                    </div>
+
+                                                    {canDelete && (
+                                                        <button
+                                                            onClick={() => handleDeleteTask(task.id)}
+                                                            className="text-white/20 hover:text-danger hover:bg-danger/10 p-1.5 rounded-lg transition-colors ml-auto"
+                                                        >
+                                                            <Trash2 size={14} />
+                                                        </button>
+                                                    )}
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                );
+                            })}
                         </div>
                     )}
                 </div>

@@ -13,12 +13,15 @@ export default function GroupsView() {
     const [isCreating, setIsCreating] = useState(false);
     const [newGroupName, setNewGroupName] = useState('');
     const [newGroupDesc, setNewGroupDesc] = useState('');
+    const [selectedFriends, setSelectedFriends] = useState([]);
+    const [friends, setFriends] = useState([]);
 
     useEffect(() => {
         supabase.auth.getSession().then(({ data: { session } }) => {
             if (session?.user) {
                 setUser(session.user);
                 loadGroups(session.user.id);
+                loadFriends(session.user.id);
             }
         });
     }, []);
@@ -41,6 +44,30 @@ export default function GroupsView() {
             console.error('Error loading groups:', error);
         } finally {
             setLoading(false);
+        }
+    };
+
+    const loadFriends = async (userId) => {
+        try {
+            const { data, error } = await supabase
+                .from('friendships')
+                .select(`
+                    status, user_id, friend_id,
+                    profile_user:profiles!friendships_user_id_fkey(id, display_name, avatar_url, user_tag),
+                    profile_friend:profiles!friendships_friend_id_fkey(id, display_name, avatar_url, user_tag)
+                `)
+                .eq('status', 'accepted')
+                .or(`user_id.eq.${userId},friend_id.eq.${userId}`);
+
+            if (error) throw error;
+            const formattedFriends = data.map(rel => {
+                const isInitiator = rel.user_id === userId;
+                return isInitiator ? rel.profile_friend : rel.profile_user;
+            }).filter(f => f && f.id);
+
+            setFriends(formattedFriends);
+        } catch (err) {
+            console.error('Error loading friends:', err);
         }
     };
 
@@ -73,8 +100,20 @@ export default function GroupsView() {
 
             if (memberError) throw memberError;
 
+            // 3. Добавление выбранных друзей
+            if (selectedFriends.length > 0) {
+                const invites = selectedFriends.map(friendId => ({
+                    group_id: groupData.id,
+                    user_id: friendId,
+                    role: 'member'
+                }));
+                const { error: invitesError } = await supabase.from('group_members').insert(invites);
+                if (invitesError) console.error('Error inviting friends:', invitesError);
+            }
+
             setNewGroupName('');
             setNewGroupDesc('');
+            setSelectedFriends([]);
             setIsCreating(false);
             loadGroups(user.id);
         } catch (error) {
@@ -99,7 +138,14 @@ export default function GroupsView() {
                     <p className="text-text-secondary text-sm mt-1">Организуйте совместную работу и общайтесь с коллегами</p>
                 </div>
                 <button
-                    onClick={() => setIsCreating(!isCreating)}
+                    onClick={() => {
+                        setIsCreating(!isCreating);
+                        if (!isCreating) {
+                            setNewGroupName('');
+                            setNewGroupDesc('');
+                            setSelectedFriends([]);
+                        }
+                    }}
                     className={`px-4 py-2.5 rounded-xl text-sm font-semibold transition-all flex items-center gap-2 ${isCreating
                         ? 'bg-white/10 text-white hover:bg-white/20'
                         : 'bg-accent text-white hover:bg-accent/80 shadow-lg shadow-accent/20'
@@ -134,6 +180,46 @@ export default function GroupsView() {
                                 placeholder="Например: Обсуждение текущих проектов"
                             />
                         </div>
+
+                        {friends.length > 0 && (
+                            <div>
+                                <label className="block text-sm font-medium text-text-secondary mb-2">Пригласить друзей</label>
+                                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2">
+                                    {friends.map(friend => {
+                                        const isSelected = selectedFriends.includes(friend.id);
+                                        return (
+                                            <div
+                                                key={friend.id}
+                                                onClick={() => {
+                                                    if (isSelected) {
+                                                        setSelectedFriends(prev => prev.filter(id => id !== friend.id));
+                                                    } else {
+                                                        setSelectedFriends(prev => [...prev, friend.id]);
+                                                    }
+                                                }}
+                                                className={`flex items-center gap-3 p-3 rounded-xl border cursor-pointer transition-all ${isSelected
+                                                    ? 'bg-accent/20 border-accent/50'
+                                                    : 'bg-white/5 border-transparent hover:bg-white/10'
+                                                    }`}
+                                            >
+                                                <div className="w-8 h-8 rounded-full bg-indigo-500/50 flex shrink-0 items-center justify-center text-white text-xs font-bold overflow-hidden shadow-inner">
+                                                    {friend.avatar_url ? (
+                                                        <img src={friend.avatar_url} alt="" className="w-full h-full object-cover" />
+                                                    ) : (
+                                                        friend.display_name?.charAt(0)?.toUpperCase()
+                                                    )}
+                                                </div>
+                                                <div className="min-w-0 flex-1">
+                                                    <p className="text-sm font-bold text-white truncate leading-tight">{friend.display_name}</p>
+                                                    {friend.user_tag && <p className="text-[10px] text-text-secondary truncate mt-0.5">#{friend.user_tag}</p>}
+                                                </div>
+                                            </div>
+                                        );
+                                    })}
+                                </div>
+                            </div>
+                        )}
+
                         <div className="flex justify-end pt-2">
                             <button
                                 type="submit"
