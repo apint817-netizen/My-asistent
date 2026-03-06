@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { supabase } from '../lib/supabase';
 import { useStore } from '../store/useStore';
-import { ArrowLeft, Send, Users, Shield, UserPlus, Settings, LogOut, CheckCheck, Check, Search, Trash2, X, ListTodo, Plus, Circle, CheckCircle, Sparkles } from 'lucide-react';
+import { ArrowLeft, Send, Users, Shield, UserPlus, Settings, LogOut, CheckCheck, Check, Search, Trash2, X, ListTodo, Plus, Circle, CheckCircle, Sparkles, Bot, Edit2 } from 'lucide-react';
 
 export default function GroupChatView({ group, user, onBack, onGroupUpdate }) {
     const [messages, setMessages] = useState([]);
@@ -24,6 +24,20 @@ export default function GroupChatView({ group, user, onBack, onGroupUpdate }) {
     const [newTaskRewardType, setNewTaskRewardType] = useState('points');
     const [newTaskCategory, setNewTaskCategory] = useState('normal');
     const [newTaskAssignedTo, setNewTaskAssignedTo] = useState('');
+
+    // AI Helper state
+    const [showAiHelper, setShowAiHelper] = useState(false);
+    const [aiQuery, setAiQuery] = useState('');
+    const [isGeneratingTask, setIsGeneratingTask] = useState(false);
+
+    // Edit task state
+    const [editingTaskId, setEditingTaskId] = useState(null);
+
+    // Global settings for AI
+    const googleModel = useStore(state => state.googleModel);
+    const aiProvider = useStore(state => state.aiProvider);
+    const proxyParams = useStore(state => state.proxyParams);
+    const apiKey = useStore(state => state.apiKey);
 
     // search & invite
     const [friends, setFriends] = useState([]);
@@ -352,20 +366,37 @@ export default function GroupChatView({ group, user, onBack, onGroupUpdate }) {
         if (!newTaskTitle.trim()) return;
 
         try {
-            const { error } = await supabase
-                .from('group_tasks')
-                .insert({
-                    group_id: group.id,
-                    title: newTaskTitle.trim(),
-                    description: newTaskDesc.trim(),
-                    value: newTaskValue,
-                    reward_amount: newTaskValue,
-                    reward_type: newTaskRewardType,
-                    category: newTaskCategory,
-                    assigned_to: newTaskAssignedTo || null,
-                    created_by: user.id
-                });
-            if (error) throw error;
+            if (editingTaskId) {
+                const { error } = await supabase
+                    .from('group_tasks')
+                    .update({
+                        title: newTaskTitle.trim(),
+                        description: newTaskDesc.trim(),
+                        value: newTaskValue,
+                        reward_amount: newTaskValue,
+                        reward_type: newTaskRewardType,
+                        category: newTaskCategory,
+                        assigned_to: newTaskAssignedTo || null
+                    })
+                    .eq('id', editingTaskId);
+                if (error) throw error;
+            } else {
+                const { error } = await supabase
+                    .from('group_tasks')
+                    .insert({
+                        group_id: group.id,
+                        title: newTaskTitle.trim(),
+                        description: newTaskDesc.trim(),
+                        value: newTaskValue,
+                        reward_amount: newTaskValue,
+                        reward_type: newTaskRewardType,
+                        category: newTaskCategory,
+                        assigned_to: newTaskAssignedTo || null,
+                        created_by: user.id
+                    });
+                if (error) throw error;
+            }
+
             setNewTaskTitle('');
             setNewTaskDesc('');
             setNewTaskValue(10);
@@ -373,10 +404,88 @@ export default function GroupChatView({ group, user, onBack, onGroupUpdate }) {
             setNewTaskCategory('normal');
             setNewTaskAssignedTo('');
             setShowTaskForm(false);
+            setEditingTaskId(null);
             loadTasks();
         } catch (err) {
-            console.error('Error creating task:', err);
-            alert('Ошибка при создании задачи');
+            console.error('Error saving task:', err);
+            alert('Ошибка при сохранении задачи');
+        }
+    };
+
+    const handleEditTask = (task) => {
+        setEditingTaskId(task.id);
+        setNewTaskTitle(task.title);
+        setNewTaskDesc(task.description || '');
+        setNewTaskValue(task.value);
+        setNewTaskRewardType(task.reward_type || 'points');
+        setNewTaskCategory(task.category || 'normal');
+        setNewTaskAssignedTo(task.assigned_to || '');
+        setShowTaskForm(true);
+        window.scrollTo({ top: 0, behavior: 'smooth' });
+    };
+
+    const handleGenerateTask = async () => {
+        if (!aiQuery.trim()) return;
+        setIsGeneratingTask(true);
+        try {
+            const { callAI, GOOGLE_OPENAI_BASE } = await import('../utils/geminiApi');
+            const systemPrompt = `Ты помощник командира/руководителя. Пользователь пишет тебе, что нужно сделать. Твоя задача - превратить это в структурированную задачу.
+Верни ТОЛЬКО JSON строго в таком формате:
+{
+  "title": "Краткое и четкое название задачи",
+  "description": "Подробное, пошаговое описание задачи на основе запроса",
+  "rewardType": "points" | "money" | "duty",
+  "rewardValue": 100,
+  "category": "normal" | "important" | "urgent" | "urgent_important"
+}
+Никакого markdown, только сырой валидный JSON.
+
+Логика наград:
+- Если прямо просят поощрить деньгами, ставь "money" и сумму.
+- Если задача рутинная/рабочая обязанность - ставь "duty" и 0.
+- В остальных случаях - "points" (от 10 до 500 в зависимости от сложности).
+
+Логика Эйзенхауэра (category):
+- normal: обычная задача
+- important: стратегическая, на развитие
+- urgent: горит, нужно быстро (например, обзвон, баги)
+- urgent_important: критически важно и срочно`;
+
+            const baseUrl = aiProvider === 'google' ? GOOGLE_OPENAI_BASE : proxyParams?.url;
+            const modelToUse = aiProvider === 'google' ? googleModel : proxyParams?.model;
+
+            let finalKey = apiKey;
+            if (aiProvider === 'custom') {
+                finalKey = proxyParams?.key || apiKey;
+            }
+
+            const responseText = await callAI({
+                baseUrl,
+                apiKey: finalKey,
+                model: modelToUse,
+                systemPrompt,
+                history: [],
+                userMessage: aiQuery.trim(),
+                maxTokens: 800
+            });
+
+            const cleanJson = responseText.replace(/```json/g, '').replace(/```/g, '').trim();
+            const taskData = JSON.parse(cleanJson);
+
+            setNewTaskTitle(taskData.title || '');
+            setNewTaskDesc(taskData.description || '');
+            setNewTaskRewardType(taskData.rewardType || 'points');
+            setNewTaskCategory(taskData.category || 'normal');
+            setNewTaskValue(taskData.rewardValue || 100);
+
+            setAiQuery('');
+            setShowAiHelper(false);
+
+        } catch (err) {
+            console.error('AI Generation Error:', err);
+            alert('Не удалось сгенерировать задачу. Проверьте настройки API или повторите запрос.');
+        } finally {
+            setIsGeneratingTask(false);
         }
     };
 
@@ -740,12 +849,54 @@ export default function GroupChatView({ group, user, onBack, onGroupUpdate }) {
                             {/* AI Helper Button */}
                             <button
                                 type="button"
-                                className="absolute right-5 top-5 text-xs flex items-center gap-1 font-bold bg-gradient-to-r from-indigo-500/20 to-purple-500/20 text-purple-300 hover:text-white px-3 py-1.5 rounded-lg border border-purple-500/30 hover:border-purple-400 transition-colors"
+                                onClick={() => setShowAiHelper(!showAiHelper)}
+                                className={`absolute right-5 top-5 text-xs flex items-center gap-1 font-bold px-3 py-1.5 rounded-lg transition-colors border ${showAiHelper
+                                    ? 'bg-purple-500/30 text-white border-purple-400'
+                                    : 'bg-gradient-to-r from-indigo-500/20 to-purple-500/20 text-purple-300 hover:text-white border-purple-500/30 hover:border-purple-400'
+                                    }`}
                             >
-                                <Sparkles size={14} /> Помощь ИИ
+                                <Sparkles size={14} /> {showAiHelper ? 'Скрыть ИИ' : 'Помощь ИИ'}
                             </button>
 
                             <h5 className="text-white font-bold mb-4">Новая задача</h5>
+
+                            {/* AI Mini Chat */}
+                            {showAiHelper && (
+                                <div className="mb-6 bg-purple-500/10 border border-purple-500/20 rounded-xl p-4 animate-fade-in">
+                                    <div className="flex items-start gap-3">
+                                        <div className="w-8 h-8 rounded-full bg-purple-500/20 flex items-center justify-center shrink-0">
+                                            <Bot size={16} className="text-purple-300" />
+                                        </div>
+                                        <div className="flex-1">
+                                            <p className="text-sm text-purple-200 mb-2">Напишите своими словами, что нужно сделать. Я сам всё заполню и подберу категорию.</p>
+                                            <div className="flex gap-2">
+                                                <input
+                                                    type="text"
+                                                    value={aiQuery}
+                                                    onChange={(e) => setAiQuery(e.target.value)}
+                                                    onKeyDown={(e) => {
+                                                        if (e.key === 'Enter') {
+                                                            e.preventDefault();
+                                                            handleGenerateTask();
+                                                        }
+                                                    }}
+                                                    placeholder="Например: Пусть кто-нибудь обзвонит 10 теплых клиентов за 200 очков..."
+                                                    className="flex-1 bg-black/40 border border-purple-500/30 rounded-lg px-3 py-2 text-sm text-white focus:border-purple-400 outline-none"
+                                                />
+                                                <button
+                                                    type="button"
+                                                    onClick={handleGenerateTask}
+                                                    disabled={isGeneratingTask || !aiQuery.trim()}
+                                                    className="px-4 py-2 bg-purple-500 text-white rounded-lg text-sm font-bold hover:bg-purple-600 transition-colors disabled:opacity-50 flex items-center gap-2"
+                                                >
+                                                    {isGeneratingTask ? <div className="w-4 h-4 border-2 border-white/40 border-t-white rounded-full animate-spin"></div> : <Send size={14} />}
+                                                </button>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            )}
+
                             <div className="space-y-4">
                                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                                     <div className="sm:col-span-2">
@@ -832,11 +983,23 @@ export default function GroupChatView({ group, user, onBack, onGroupUpdate }) {
                                 </div>
                                 <div className="flex justify-end pt-2">
                                     <button
+                                        type="button"
+                                        onClick={() => {
+                                            setShowTaskForm(false);
+                                            setEditingTaskId(null);
+                                            setNewTaskTitle('');
+                                            setNewTaskDesc('');
+                                        }}
+                                        className="px-6 py-2 bg-white/5 border border-white/10 text-white rounded-xl text-sm hover:bg-white/10 transition-colors mr-2"
+                                    >
+                                        Отмена
+                                    </button>
+                                    <button
                                         type="submit"
                                         disabled={!newTaskTitle.trim()}
                                         className="px-6 py-2 bg-accent text-white rounded-xl text-sm font-semibold hover:bg-accent/80 transition-colors disabled:opacity-50"
                                     >
-                                        Создать задачу
+                                        {editingTaskId ? 'Сохранить изменения' : 'Создать задачу'}
                                     </button>
                                 </div>
                             </div>
@@ -926,12 +1089,20 @@ export default function GroupChatView({ group, user, onBack, onGroupUpdate }) {
                                                     </div>
 
                                                     {canDelete && (
-                                                        <button
-                                                            onClick={() => handleDeleteTask(task.id)}
-                                                            className="text-white/20 hover:text-danger hover:bg-danger/10 p-1.5 rounded-lg transition-colors ml-auto"
-                                                        >
-                                                            <Trash2 size={14} />
-                                                        </button>
+                                                        <div className="flex items-center gap-1 ml-auto">
+                                                            <button
+                                                                onClick={() => handleEditTask(task)}
+                                                                className="text-white/20 hover:text-accent hover:bg-accent/10 p-1.5 rounded-lg transition-colors"
+                                                            >
+                                                                <Edit2 size={14} />
+                                                            </button>
+                                                            <button
+                                                                onClick={() => handleDeleteTask(task.id)}
+                                                                className="text-white/20 hover:text-danger hover:bg-danger/10 p-1.5 rounded-lg transition-colors"
+                                                            >
+                                                                <Trash2 size={14} />
+                                                            </button>
+                                                        </div>
                                                     )}
                                                 </div>
                                             </div>

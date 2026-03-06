@@ -45,7 +45,7 @@ export default function AISettingsModal({ isOpen, onClose }) {
             if (!user) return;
 
             const { data, error } = await supabase
-                .from('user_profiles')
+                .from('profiles')
                 .select('*')
                 .eq('id', user.id)
                 .single();
@@ -72,7 +72,7 @@ export default function AISettingsModal({ isOpen, onClose }) {
             setProfileError('');
             setIsSavingProfile(true);
 
-            if (file.size > 2 * 1024 * 1024) throw new Error('Файл слишком большой (макс. 2МБ)');
+            if (file.size > 10 * 1024 * 1024) throw new Error('Файл слишком большой (макс. 10МБ)');
 
             const reader = new FileReader();
             reader.onloadend = async () => {
@@ -100,7 +100,7 @@ export default function AISettingsModal({ isOpen, onClose }) {
                 const { data: { user } } = await supabase.auth.getUser();
                 if (user) {
                     const { error } = await supabase
-                        .from('user_profiles')
+                        .from('profiles')
                         .update({
                             display_name: displayName.trim(),
                             avatar_url: avatarUrl.trim()
