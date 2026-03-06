@@ -44,7 +44,13 @@ export default function AIGroupAssistant({ group, user, members, profiles, tasks
 2. Создание задач ДЛЯ ГРУППЫ по запросу.
 
 ЧТОБЫ СОЗДАТЬ ЗАДАЧУ ДЛЯ ГРУППЫ:
-Если руководитель просит создать задачу (например "пусть кто-то обзвонит клиентов", "создай задачу на уборку"), ты ДОЛЖЕН в конце своего ответа добавить специальную команду:
+Если руководитель просит создать задачу (например "пусть кто-то обзвонит клиентов", "создай задачу на уборку"):
+Шаг 1. ОБЯЗАТЕЛЬНО задай уточняющие вопросы, если информации недостаточно:
+- Для кого именно эта задача (или кто угодно из команды может взять)?
+- Какая награда за задачу (деньги, очки, или это просто рутинная обязанность без награды)?
+- Насколько задача срочная или важная?
+
+Шаг 2. ТОЛЬКО когда руководитель даст все нужные подробности (или если он сразу написал всё в первом сообщении), в конце своего ответа добавь специальную команду (в квадратных скобках):
 [ADD_GROUP_TASK: Название задачи | Подробное описание | points/money/duty | 100 | normal/important/urgent/urgent_important]
 
 Например:
@@ -52,9 +58,9 @@ export default function AIGroupAssistant({ group, user, members, profiles, tasks
 [ADD_GROUP_TASK: Обзвон холодной базы | Нужно обзвонить 50 клиентов из нового списка | points | 150 | urgent_important]
 
 Логика наград:
-- "money" и сумма (если просят поощрить деньгами)
+- "money" и сумма (если поощрение деньгами)
 - "duty" и 0 (если это обычная обязанность)
-- "points" и от 10 до 500 (по умолчанию для геймификации)
+- "points" и от 10 до 500 (стандартная геймификация)
 
 Текущий контекст группы:
 ${groupContext}
@@ -169,14 +175,14 @@ ${groupContext}
                             <div key={idx} className={`flex max-w-[85%] ${msg.role === 'user' ? 'ml-auto justify-end' : 'mr-auto justify-start'}`}>
                                 <div className={`flex gap-3 ${msg.role === 'user' ? 'flex-row-reverse' : 'flex-row'}`}>
                                     <div className={`shrink-0 w-8 h-8 rounded-full flex items-center justify-center border ${msg.role === 'user'
-                                            ? 'bg-accent/20 border-accent/30 text-accent'
-                                            : 'bg-purple-500/20 border-purple-500/30 text-purple-400 shadow-[0_0_15px_rgba(168,85,247,0.2)]'
+                                        ? 'bg-accent/20 border-accent/30 text-accent'
+                                        : 'bg-purple-500/20 border-purple-500/30 text-purple-400 shadow-[0_0_15px_rgba(168,85,247,0.2)]'
                                         }`}>
                                         {msg.role === 'user' ? <User size={16} /> : <Bot size={16} />}
                                     </div>
                                     <div className={`px-4 py-3 rounded-2xl text-sm leading-relaxed ${msg.role === 'user'
-                                            ? 'bg-accent text-white rounded-tr-sm shadow-sm'
-                                            : 'bg-white/5 border border-white/10 text-white rounded-tl-sm shadow-sm'
+                                        ? 'bg-accent text-white rounded-tr-sm shadow-sm'
+                                        : 'bg-white/5 border border-white/10 text-white rounded-tl-sm shadow-sm'
                                         }`}>
                                         <div className="prose prose-invert prose-sm max-w-none">
                                             {msg.role === 'user' ? (

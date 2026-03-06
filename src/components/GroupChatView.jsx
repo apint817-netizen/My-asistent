@@ -509,14 +509,6 @@ export default function GroupChatView({ group, user, onBack, onGroupUpdate }) {
                     >
                         Задачи
                     </button>
-                    {canManage && (
-                        <button
-                            onClick={() => setActiveTab('ai')}
-                            className={`px-4 sm:px-6 py-2 text-sm font-semibold rounded-lg transition-all whitespace-nowrap flex items-center gap-2 ${activeTab === 'ai' ? 'bg-purple-500/20 text-purple-300 shadow-md' : 'text-purple-400/50 hover:text-purple-300'}`}
-                        >
-                            <Bot size={16} /> ИИ Ассистент
-                        </button>
-                    )}
                 </div>
             </header>
 
@@ -774,276 +766,280 @@ export default function GroupChatView({ group, user, onBack, onGroupUpdate }) {
 
             {/* Tasks Tab */}
             {activeTab === 'tasks' && (
-                <div className="flex-1 overflow-y-auto p-4 sm:p-6 bg-black/20 flex flex-col relative w-full">
-                    <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between mb-6 gap-4">
-                        <div>
-                            <h4 className="text-white font-bold text-lg flex items-center gap-2"><ListTodo size={20} className="text-accent" /> Задачи команды</h4>
-                            <p className="text-xs text-text-secondary mt-1">Работайте сообща и достигайте целей</p>
-                        </div>
-                        <button
-                            onClick={() => setShowTaskForm(!showTaskForm)}
-                            className={`px-4 py-2 rounded-xl text-sm font-semibold transition-all flex items-center gap-2 ${showTaskForm
-                                ? 'bg-white/10 text-white hover:bg-white/20'
-                                : 'bg-accent text-white hover:bg-accent/80 shadow-lg shadow-accent/20'
-                                }`}
-                        >
-                            {showTaskForm ? 'Отмена' : <><Plus size={16} /> Создать задачу</>}
-                        </button>
-                    </div>
-
-                    {showTaskForm && (
-                        <form onSubmit={handleCreateTask} className="bg-white/5 border border-white/10 rounded-2xl p-5 mb-6 animate-fade-in relative">
-                            <h5 className="text-white font-bold mb-4">Новая задача</h5>
-
-                            <div className="space-y-4">
-                                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                                    <div className="sm:col-span-2">
-                                        <label className="block text-xs font-semibold text-text-secondary uppercase tracking-wider mb-1.5">Название задачи</label>
-                                        <input
-                                            type="text"
-                                            value={newTaskTitle}
-                                            onChange={(e) => setNewTaskTitle(e.target.value)}
-                                            className="w-full bg-black/40 border border-white/10 rounded-xl px-4 py-2.5 text-sm text-white focus:border-accent outline-none transition-colors"
-                                            placeholder="Что нужно сделать?"
-                                            required
-                                        />
-                                    </div>
-                                    <div className="sm:col-span-2">
-                                        <label className="block text-xs font-semibold text-text-secondary uppercase tracking-wider mb-1.5">Описание (необязательно)</label>
-                                        <input
-                                            type="text"
-                                            value={newTaskDesc}
-                                            onChange={(e) => setNewTaskDesc(e.target.value)}
-                                            className="w-full bg-black/40 border border-white/10 rounded-xl px-4 py-2.5 text-sm text-white focus:border-accent outline-none transition-colors"
-                                            placeholder="Подробности задачи"
-                                        />
-                                    </div>
-
-                                    <div>
-                                        <label className="block text-xs font-semibold text-text-secondary uppercase tracking-wider mb-1.5">Награда</label>
-                                        <div className="flex bg-black/40 rounded-xl border border-white/10 p-1">
-                                            <select
-                                                value={newTaskRewardType}
-                                                onChange={(e) => setNewTaskRewardType(e.target.value)}
-                                                className="bg-transparent border-none text-white text-sm outline-none px-2 py-1.5 w-full cursor-pointer appearance-none"
-                                            >
-                                                <option value="points" className="bg-bg-primary text-white">Очки ✨</option>
-                                                <option value="money" className="bg-bg-primary text-white">К ЗП 💵</option>
-                                                <option value="duty" className="bg-bg-primary text-white">Обязанность 👔</option>
-                                            </select>
-                                        </div>
-                                    </div>
-                                    <div>
-                                        <label className="block text-xs font-semibold text-text-secondary uppercase tracking-wider mb-1.5">
-                                            {newTaskRewardType === 'points' ? 'Количество очков' : newTaskRewardType === 'money' ? 'Сумма ($/₽)' : 'Ценность (Скрыта)'}
-                                        </label>
-                                        <input
-                                            type="number"
-                                            min="0"
-                                            disabled={newTaskRewardType === 'duty'}
-                                            value={newTaskValue}
-                                            onChange={(e) => setNewTaskValue(e.target.value ? parseInt(e.target.value) : 0)}
-                                            className={`w-full bg-black/40 border border-white/10 rounded-xl px-4 py-2.5 text-sm text-center font-bold outline-none transition-colors ${newTaskRewardType === 'duty' ? 'opacity-50 text-text-secondary' : 'text-accent focus:border-accent'}`}
-                                        />
-                                    </div>
-
-                                    <div>
-                                        <label className="block text-xs font-semibold text-text-secondary uppercase tracking-wider mb-1.5">Исполнитель</label>
-                                        <div className="flex bg-black/40 rounded-xl border border-white/10 p-1">
-                                            <select
-                                                value={newTaskAssignedTo}
-                                                onChange={(e) => setNewTaskAssignedTo(e.target.value)}
-                                                className="bg-transparent border-none text-white text-sm outline-none px-2 py-1.5 w-full cursor-pointer appearance-none"
-                                            >
-                                                <option value="" className="bg-bg-primary text-white">Все участники</option>
-                                                {members.map(m => {
-                                                    const p = profiles[m.user_id];
-                                                    return <option key={m.user_id} value={m.user_id} className="bg-bg-primary text-white">{p?.display_name || m.user_id}</option>
-                                                })}
-                                            </select>
-                                        </div>
-                                    </div>
-                                    <div>
-                                        <label className="block text-xs font-semibold text-text-secondary uppercase tracking-wider mb-1.5">Матрица Эйзенхауэра</label>
-                                        <div className="flex bg-black/40 rounded-xl border border-white/10 p-1">
-                                            <select
-                                                value={newTaskCategory}
-                                                onChange={(e) => setNewTaskCategory(e.target.value)}
-                                                className="bg-transparent border-none text-white text-sm outline-none px-2 py-1.5 w-full cursor-pointer appearance-none"
-                                            >
-                                                <option value="normal" className="bg-bg-primary text-white">Обычная</option>
-                                                <option value="important" className="bg-bg-primary text-white">Важно, не срочно (План)</option>
-                                                <option value="urgent" className="bg-bg-primary text-white">Срочно, не важно (Делегировать)</option>
-                                                <option value="urgent_important" className="bg-bg-primary text-white text-warning">Важно и Срочно (Сделать сейчас)</option>
-                                            </select>
-                                        </div>
-                                    </div>
-                                </div>
-                                <div className="flex justify-end pt-2">
-                                    <button
-                                        type="button"
-                                        onClick={() => {
-                                            setShowTaskForm(false);
-                                            setEditingTaskId(null);
-                                            setNewTaskTitle('');
-                                            setNewTaskDesc('');
-                                        }}
-                                        className="px-6 py-2 bg-white/5 border border-white/10 text-white rounded-xl text-sm hover:bg-white/10 transition-colors mr-2"
-                                    >
-                                        Отмена
-                                    </button>
-                                    <button
-                                        type="submit"
-                                        disabled={!newTaskTitle.trim()}
-                                        className="px-6 py-2 bg-accent text-white rounded-xl text-sm font-semibold hover:bg-accent/80 transition-colors disabled:opacity-50"
-                                    >
-                                        {editingTaskId ? 'Сохранить изменения' : 'Создать задачу'}
-                                    </button>
-                                </div>
+                <div className="flex-1 overflow-hidden p-0 bg-black/20 flex flex-col lg:flex-row w-full relative">
+                    <div className="flex-1 overflow-y-auto p-4 sm:p-6 w-full custom-scrollbar">
+                        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between mb-6 gap-4">
+                            <div>
+                                <h4 className="text-white font-bold text-lg flex items-center gap-2"><ListTodo size={20} className="text-accent" /> Задачи команды</h4>
+                                <p className="text-xs text-text-secondary mt-1">Работайте сообща и достигайте целей</p>
                             </div>
-                        </form>
-                    )}
-
-                    {tasks.length === 0 && !showTaskForm ? (
-                        <div className="flex flex-col items-center justify-center flex-1 py-12 opacity-60">
-                            <ListTodo size={48} className="text-white/30 mb-4" />
-                            <p className="text-white font-medium">Нет активных задач</p>
-                            <p className="text-sm text-text-secondary mt-1 text-center">Создайте первую задачу для команды</p>
+                            <button
+                                onClick={() => setShowTaskForm(!showTaskForm)}
+                                className={`px-4 py-2 rounded-xl text-sm font-semibold transition-all flex items-center gap-2 ${showTaskForm
+                                    ? 'bg-white/10 text-white hover:bg-white/20'
+                                    : 'bg-accent text-white hover:bg-accent/80 shadow-lg shadow-accent/20'
+                                    }`}
+                            >
+                                {showTaskForm ? 'Отмена' : <><Plus size={16} /> Создать задачу</>}
+                            </button>
                         </div>
-                    ) : (
-                        <div className="space-y-3">
-                            {tasks.map(task => {
-                                const creator = profiles[task.created_by];
-                                const completer = task.completed_by ? profiles[task.completed_by] : null;
-                                const canDelete = task.created_by === user.id || myRole === 'owner' || myRole === 'admin';
 
-                                return (
-                                    <div
-                                        key={task.id}
-                                        className={`p-4 rounded-2xl border transition-all ${task.completed
-                                            ? 'bg-white/[0.02] border-white/5 opacity-70'
-                                            : 'bg-white/5 border-white/10 hover:border-accent/40 shadow-sm'
-                                            }`}
-                                    >
-                                        <div className="flex items-start gap-4">
-                                            <button
-                                                onClick={() => handleToggleTask(task)}
-                                                className={`mt-1 shrink-0 transition-all ${task.completed ? 'text-success' : 'text-text-secondary hover:text-accent'
-                                                    }`}
-                                            >
-                                                {task.completed ? <CheckCircle size={22} className="fill-success/20" /> : <Circle size={22} />}
-                                            </button>
+                        {showTaskForm && (
+                            <form onSubmit={handleCreateTask} className="bg-white/5 border border-white/10 rounded-2xl p-5 mb-6 animate-fade-in relative">
+                                <h5 className="text-white font-bold mb-4">Новая задача</h5>
 
-                                            <div className="flex-1 min-w-0">
-                                                <div className="flex items-center gap-2 flex-wrap">
-                                                    <h5 className={`font-bold text-base truncate ${task.completed ? 'text-white/50 line-through' : 'text-white'}`}>
-                                                        {task.title}
-                                                    </h5>
-                                                    <span className={`shrink-0 text-[10px] font-bold px-2 py-0.5 rounded-full ${task.reward_type === 'points' ? 'bg-accent/20 text-accent' :
-                                                        task.reward_type === 'money' ? 'bg-emerald-500/20 text-emerald-400' :
-                                                            'bg-white/10 text-white/50'
-                                                        }`}>
-                                                        {task.reward_type === 'points' ? `+${task.reward_amount || task.value} ✨` :
-                                                            task.reward_type === 'money' ? `+${task.reward_amount || task.value} 💵` :
-                                                                '👔 Обязанность'}
-                                                    </span>
-                                                    {task.category && task.category !== 'normal' && (
-                                                        <span className={`shrink-0 text-[9px] font-bold px-1.5 py-0.5 rounded-sm uppercase tracking-widest border ${task.category === 'urgent_important' ? 'border-danger text-danger bg-danger/10' :
-                                                            task.category === 'important' ? 'border-warning text-warning bg-warning/10' :
-                                                                'border-blue-400 text-blue-400 bg-blue-400/10'
-                                                            }`}>
-                                                            {task.category === 'urgent_important' ? 'Срочно & Важно' :
-                                                                task.category === 'important' ? 'Важно' : 'Срочно'}
-                                                        </span>
-                                                    )}
-                                                </div>
+                                <div className="space-y-4">
+                                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                                        <div className="sm:col-span-2">
+                                            <label className="block text-xs font-semibold text-text-secondary uppercase tracking-wider mb-1.5">Название задачи</label>
+                                            <input
+                                                type="text"
+                                                value={newTaskTitle}
+                                                onChange={(e) => setNewTaskTitle(e.target.value)}
+                                                className="w-full bg-black/40 border border-white/10 rounded-xl px-4 py-2.5 text-sm text-white focus:border-accent outline-none transition-colors"
+                                                placeholder="Что нужно сделать?"
+                                                required
+                                            />
+                                        </div>
+                                        <div className="sm:col-span-2">
+                                            <label className="block text-xs font-semibold text-text-secondary uppercase tracking-wider mb-1.5">Описание (необязательно)</label>
+                                            <input
+                                                type="text"
+                                                value={newTaskDesc}
+                                                onChange={(e) => setNewTaskDesc(e.target.value)}
+                                                className="w-full bg-black/40 border border-white/10 rounded-xl px-4 py-2.5 text-sm text-white focus:border-accent outline-none transition-colors"
+                                                placeholder="Подробности задачи"
+                                            />
+                                        </div>
 
-                                                {task.description && (
-                                                    <p className={`text-sm mt-1 mb-2 ${task.completed ? 'text-white/30 truncate' : 'text-text-secondary line-clamp-2'}`}>
-                                                        {task.description}
-                                                    </p>
-                                                )}
+                                        <div>
+                                            <label className="block text-xs font-semibold text-text-secondary uppercase tracking-wider mb-1.5">Награда</label>
+                                            <div className="flex bg-black/40 rounded-xl border border-white/10 p-1">
+                                                <select
+                                                    value={newTaskRewardType}
+                                                    onChange={(e) => setNewTaskRewardType(e.target.value)}
+                                                    className="bg-transparent border-none text-white text-sm outline-none px-2 py-1.5 w-full cursor-pointer appearance-none"
+                                                >
+                                                    <option value="points" className="bg-bg-primary text-white">Очки ✨</option>
+                                                    <option value="money" className="bg-bg-primary text-white">К ЗП 💵</option>
+                                                    <option value="duty" className="bg-bg-primary text-white">Обязанность 👔</option>
+                                                </select>
+                                            </div>
+                                        </div>
+                                        <div>
+                                            <label className="block text-xs font-semibold text-text-secondary uppercase tracking-wider mb-1.5">
+                                                {newTaskRewardType === 'points' ? 'Количество очков' : newTaskRewardType === 'money' ? 'Сумма ($/₽)' : 'Ценность (Скрыта)'}
+                                            </label>
+                                            <input
+                                                type="number"
+                                                min="0"
+                                                disabled={newTaskRewardType === 'duty'}
+                                                value={newTaskValue}
+                                                onChange={(e) => setNewTaskValue(e.target.value ? parseInt(e.target.value) : 0)}
+                                                className={`w-full bg-black/40 border border-white/10 rounded-xl px-4 py-2.5 text-sm text-center font-bold outline-none transition-colors ${newTaskRewardType === 'duty' ? 'opacity-50 text-text-secondary' : 'text-accent focus:border-accent'}`}
+                                            />
+                                        </div>
 
-                                                <div className="mt-3 flex items-center justify-between text-xs font-medium text-text-secondary flex-wrap gap-2">
-                                                    <div className="flex items-center gap-4 flex-wrap">
-                                                        <div className="flex items-center gap-1.5" title="Кем создана">
-                                                            <div className="w-4 h-4 rounded-full bg-white/10 flex items-center justify-center overflow-hidden">
-                                                                {creator?.avatar_url ? <img src={creator.avatar_url} alt="" className="w-full h-full object-cover" /> : <span className="text-[8px] text-white/50">{creator?.display_name?.charAt(0) || '?'}</span>}
-                                                            </div>
-                                                            <span>От: {creator?.display_name?.split(' ')[0] || '...'}</span>
-                                                        </div>
-                                                        {task.assigned_to && (
-                                                            <div className="flex items-center gap-1 text-white/60">
-                                                                <span>→</span>
-                                                                <span>Кому: {profiles[task.assigned_to]?.display_name?.split(' ')[0] || '...'}</span>
-                                                            </div>
-                                                        )}
-                                                        {task.completed && completer && (
-                                                            <div className="flex items-center gap-1.5 text-success/80" title={`Выполнена: ${formatTime(task.completed_at)}`}>
-                                                                <Check size={12} />
-                                                                <span>Сделал(а): {completer?.display_name?.split(' ')[0] || '...'}</span>
-                                                            </div>
-                                                        )}
-                                                    </div>
-
-                                                    {canDelete && (
-                                                        <div className="flex items-center gap-1 ml-auto">
-                                                            <button
-                                                                onClick={() => handleEditTask(task)}
-                                                                className="text-white/20 hover:text-accent hover:bg-accent/10 p-1.5 rounded-lg transition-colors"
-                                                            >
-                                                                <Edit2 size={14} />
-                                                            </button>
-                                                            <button
-                                                                onClick={() => handleDeleteTask(task.id)}
-                                                                className="text-white/20 hover:text-danger hover:bg-danger/10 p-1.5 rounded-lg transition-colors"
-                                                            >
-                                                                <Trash2 size={14} />
-                                                            </button>
-                                                        </div>
-                                                    )}
-                                                </div>
+                                        <div>
+                                            <label className="block text-xs font-semibold text-text-secondary uppercase tracking-wider mb-1.5">Исполнитель</label>
+                                            <div className="flex bg-black/40 rounded-xl border border-white/10 p-1">
+                                                <select
+                                                    value={newTaskAssignedTo}
+                                                    onChange={(e) => setNewTaskAssignedTo(e.target.value)}
+                                                    className="bg-transparent border-none text-white text-sm outline-none px-2 py-1.5 w-full cursor-pointer appearance-none"
+                                                >
+                                                    <option value="" className="bg-bg-primary text-white">Все участники</option>
+                                                    {members.map(m => {
+                                                        const p = profiles[m.user_id];
+                                                        return <option key={m.user_id} value={m.user_id} className="bg-bg-primary text-white">{p?.display_name || m.user_id}</option>
+                                                    })}
+                                                </select>
+                                            </div>
+                                        </div>
+                                        <div>
+                                            <label className="block text-xs font-semibold text-text-secondary uppercase tracking-wider mb-1.5">Матрица Эйзенхауэра</label>
+                                            <div className="flex bg-black/40 rounded-xl border border-white/10 p-1">
+                                                <select
+                                                    value={newTaskCategory}
+                                                    onChange={(e) => setNewTaskCategory(e.target.value)}
+                                                    className="bg-transparent border-none text-white text-sm outline-none px-2 py-1.5 w-full cursor-pointer appearance-none"
+                                                >
+                                                    <option value="normal" className="bg-bg-primary text-white">Обычная</option>
+                                                    <option value="important" className="bg-bg-primary text-white">Важно, не срочно (План)</option>
+                                                    <option value="urgent" className="bg-bg-primary text-white">Срочно, не важно (Делегировать)</option>
+                                                    <option value="urgent_important" className="bg-bg-primary text-white text-warning">Важно и Срочно (Сделать сейчас)</option>
+                                                </select>
                                             </div>
                                         </div>
                                     </div>
-                                );
-                            })}
+                                    <div className="flex justify-end pt-2">
+                                        <button
+                                            type="button"
+                                            onClick={() => {
+                                                setShowTaskForm(false);
+                                                setEditingTaskId(null);
+                                                setNewTaskTitle('');
+                                                setNewTaskDesc('');
+                                            }}
+                                            className="px-6 py-2 bg-white/5 border border-white/10 text-white rounded-xl text-sm hover:bg-white/10 transition-colors mr-2"
+                                        >
+                                            Отмена
+                                        </button>
+                                        <button
+                                            type="submit"
+                                            disabled={!newTaskTitle.trim()}
+                                            className="px-6 py-2 bg-accent text-white rounded-xl text-sm font-semibold hover:bg-accent/80 transition-colors disabled:opacity-50"
+                                        >
+                                            {editingTaskId ? 'Сохранить изменения' : 'Создать задачу'}
+                                        </button>
+                                    </div>
+                                </div>
+                            </form>
+                        )}
+
+                        {tasks.length === 0 && !showTaskForm ? (
+                            <div className="flex flex-col items-center justify-center flex-1 py-12 opacity-60">
+                                <ListTodo size={48} className="text-white/30 mb-4" />
+                                <p className="text-white font-medium">Нет активных задач</p>
+                                <p className="text-sm text-text-secondary mt-1 text-center">Создайте первую задачу для команды</p>
+                            </div>
+                        ) : (
+                            <div className="space-y-3">
+                                {tasks.map(task => {
+                                    const creator = profiles[task.created_by];
+                                    const completer = task.completed_by ? profiles[task.completed_by] : null;
+                                    const canDelete = task.created_by === user.id || myRole === 'owner' || myRole === 'admin';
+
+                                    return (
+                                        <div
+                                            key={task.id}
+                                            className={`p-4 rounded-2xl border transition-all ${task.completed
+                                                ? 'bg-white/[0.02] border-white/5 opacity-70'
+                                                : 'bg-white/5 border-white/10 hover:border-accent/40 shadow-sm'
+                                                }`}
+                                        >
+                                            <div className="flex items-start gap-4">
+                                                <button
+                                                    onClick={() => handleToggleTask(task)}
+                                                    className={`mt-1 shrink-0 transition-all ${task.completed ? 'text-success' : 'text-text-secondary hover:text-accent'
+                                                        }`}
+                                                >
+                                                    {task.completed ? <CheckCircle size={22} className="fill-success/20" /> : <Circle size={22} />}
+                                                </button>
+
+                                                <div className="flex-1 min-w-0">
+                                                    <div className="flex items-center gap-2 flex-wrap">
+                                                        <h5 className={`font-bold text-base truncate ${task.completed ? 'text-white/50 line-through' : 'text-white'}`}>
+                                                            {task.title}
+                                                        </h5>
+                                                        <span className={`shrink-0 text-[10px] font-bold px-2 py-0.5 rounded-full ${task.reward_type === 'points' ? 'bg-accent/20 text-accent' :
+                                                            task.reward_type === 'money' ? 'bg-emerald-500/20 text-emerald-400' :
+                                                                'bg-white/10 text-white/50'
+                                                            }`}>
+                                                            {task.reward_type === 'points' ? `+${task.reward_amount || task.value} ✨` :
+                                                                task.reward_type === 'money' ? `+${task.reward_amount || task.value} 💵` :
+                                                                    '👔 Обязанность'}
+                                                        </span>
+                                                        {task.category && task.category !== 'normal' && (
+                                                            <span className={`shrink-0 text-[9px] font-bold px-1.5 py-0.5 rounded-sm uppercase tracking-widest border ${task.category === 'urgent_important' ? 'border-danger text-danger bg-danger/10' :
+                                                                task.category === 'important' ? 'border-warning text-warning bg-warning/10' :
+                                                                    'border-blue-400 text-blue-400 bg-blue-400/10'
+                                                                }`}>
+                                                                {task.category === 'urgent_important' ? 'Срочно & Важно' :
+                                                                    task.category === 'important' ? 'Важно' : 'Срочно'}
+                                                            </span>
+                                                        )}
+                                                    </div>
+
+                                                    {task.description && (
+                                                        <p className={`text-sm mt-1 mb-2 ${task.completed ? 'text-white/30 truncate' : 'text-text-secondary line-clamp-2'}`}>
+                                                            {task.description}
+                                                        </p>
+                                                    )}
+
+                                                    <div className="mt-3 flex items-center justify-between text-xs font-medium text-text-secondary flex-wrap gap-2">
+                                                        <div className="flex items-center gap-4 flex-wrap">
+                                                            <div className="flex items-center gap-1.5" title="Кем создана">
+                                                                <div className="w-4 h-4 rounded-full bg-white/10 flex items-center justify-center overflow-hidden">
+                                                                    {creator?.avatar_url ? <img src={creator.avatar_url} alt="" className="w-full h-full object-cover" /> : <span className="text-[8px] text-white/50">{creator?.display_name?.charAt(0) || '?'}</span>}
+                                                                </div>
+                                                                <span>От: {creator?.display_name?.split(' ')[0] || '...'}</span>
+                                                            </div>
+                                                            {task.assigned_to && (
+                                                                <div className="flex items-center gap-1 text-white/60">
+                                                                    <span>→</span>
+                                                                    <span>Кому: {profiles[task.assigned_to]?.display_name?.split(' ')[0] || '...'}</span>
+                                                                </div>
+                                                            )}
+                                                            {task.completed && completer && (
+                                                                <div className="flex items-center gap-1.5 text-success/80" title={`Выполнена: ${formatTime(task.completed_at)}`}>
+                                                                    <Check size={12} />
+                                                                    <span>Сделал(а): {completer?.display_name?.split(' ')[0] || '...'}</span>
+                                                                </div>
+                                                            )}
+                                                        </div>
+
+                                                        {canDelete && (
+                                                            <div className="flex items-center gap-1 ml-auto">
+                                                                <button
+                                                                    onClick={() => handleEditTask(task)}
+                                                                    className="text-white/20 hover:text-accent hover:bg-accent/10 p-1.5 rounded-lg transition-colors"
+                                                                >
+                                                                    <Edit2 size={14} />
+                                                                </button>
+                                                                <button
+                                                                    onClick={() => handleDeleteTask(task.id)}
+                                                                    className="text-white/20 hover:text-danger hover:bg-danger/10 p-1.5 rounded-lg transition-colors"
+                                                                >
+                                                                    <Trash2 size={14} />
+                                                                </button>
+                                                            </div>
+                                                        )}
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    );
+                                })}
+                            </div>
+                        )}
+                    </div>
+
+                    {/* AI Assistant Sidebar (Admin/Owner only) */}
+                    {canManage && (
+                        <div className="w-full lg:w-96 shrink-0 border-t lg:border-t-0 lg:border-l border-white/5 bg-black/20 flex flex-col h-[500px] lg:h-auto relative z-10">
+                            <AIGroupAssistant
+                                group={group}
+                                user={user}
+                                members={members}
+                                profiles={profiles}
+                                tasks={tasks}
+                            />
                         </div>
                     )}
-                </div>
-            )}
-
-            {/* AI Assistant Tab (Admin/Owner only) */}
-            {activeTab === 'ai' && canManage && (
-                <div className="flex-1 overflow-hidden p-0 bg-black/20 flex flex-col relative w-full">
-                    <AIGroupAssistant
-                        group={group}
-                        user={user}
-                        members={members}
-                        profiles={profiles}
-                        tasks={tasks}
-                    />
                 </div>
             )}
 
             {/* Avatar Viewer Modal */}
             {viewingAvatar && (
                 <div
-                    className="fixed inset-0 z-[100] bg-black/90 backdrop-blur-sm flex items-center justify-center p-4 cursor-zoom-out animate-fade-in"
+                    className="fixed inset-0 z-[100] bg-black/80 backdrop-blur-md flex items-center justify-center p-4 sm:p-8 cursor-zoom-out animate-fade-in"
                     onClick={() => setViewingAvatar(null)}
                 >
                     <button
-                        className="absolute top-4 right-4 p-2 text-white/50 hover:text-white bg-black/50 rounded-full transition-colors"
+                        className="absolute top-4 right-4 sm:top-8 sm:right-8 p-3 text-white/50 hover:text-white bg-black/20 hover:bg-black/40 border border-white/10 rounded-full transition-all"
                         onClick={() => setViewingAvatar(null)}
                     >
                         <X size={24} />
                     </button>
-                    <img
-                        src={viewingAvatar}
-                        alt="Profile Fullsize"
-                        className="max-w-full max-h-[90vh] rounded-2xl object-contain shadow-2xl cursor-default"
-                        onClick={(e) => e.stopPropagation()}
-                    />
+                    <div className="relative max-w-full max-h-full flex items-center justify-center p-2 rounded-[2rem] bg-white/5 border border-white/10 shadow-2xl overflow-hidden pointer-events-none">
+                        <img
+                            src={viewingAvatar}
+                            alt="Profile Fullsize"
+                            className="max-w-full max-h-[85vh] rounded-[1.5rem] object-contain pointer-events-auto shadow-[0_0_100px_rgba(255,255,255,0.05)] cursor-default"
+                            onClick={(e) => e.stopPropagation()}
+                        />
+                    </div>
                 </div>
             )}
         </div>

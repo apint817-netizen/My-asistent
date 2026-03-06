@@ -28,6 +28,11 @@ async function getCroppedImg(imageSrc, pixelCrop) {
     canvas.width = pixelCrop.width
     canvas.height = pixelCrop.height
 
+    // Делаем обрезку по кругу
+    ctx.beginPath()
+    ctx.arc(pixelCrop.width / 2, pixelCrop.height / 2, pixelCrop.width / 2, 0, 2 * Math.PI)
+    ctx.clip()
+
     // Отрисовываем нужную часть картинки
     ctx.drawImage(
         image,
@@ -49,7 +54,7 @@ async function getCroppedImg(imageSrc, pixelCrop) {
                 resolve(reader.result); // Base64 строка
             };
             reader.readAsDataURL(blob);
-        }, 'image/jpeg', 0.9)
+        }, 'image/png')
     })
 }
 
@@ -200,7 +205,10 @@ export default function AISettingsModal({ isOpen, onClose }) {
         <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4 animate-fade-in" onClick={onClose}>
             {/* Cropper Modal Overlay */}
             {showCropper && imageSrc && (
-                <div className="fixed inset-0 bg-black/90 z-[60] flex flex-col items-center justify-center p-4">
+                <div
+                    className="fixed inset-0 bg-black/90 z-[60] flex flex-col items-center justify-center p-4"
+                    onClick={e => e.stopPropagation()}
+                >
                     <div className="bg-bg-secondary w-full max-w-md rounded-2xl overflow-hidden shadow-2xl border border-white/10 flex flex-col">
                         <div className="p-4 border-b border-white/10 flex justify-between items-center bg-black/20">
                             <h3 className="text-white font-bold flex items-center gap-2"><Crop size={18} className="text-accent" /> Кадрирование фото</h3>
