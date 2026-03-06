@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { supabase } from '../lib/supabase';
 import { useStore } from '../store/useStore';
-import { ArrowLeft, Send, Users, Shield, UserPlus, Settings, LogOut, CheckCheck, Check, Search, Trash2, X, ListTodo, Plus, Circle, CheckCircle } from 'lucide-react';
+import { ArrowLeft, Send, Users, Shield, UserPlus, Settings, LogOut, CheckCheck, Check, Search, Trash2, X, ListTodo, Plus, Circle, CheckCircle, Sparkles } from 'lucide-react';
 
 export default function GroupChatView({ group, user, onBack, onGroupUpdate }) {
     const [messages, setMessages] = useState([]);
@@ -21,6 +21,9 @@ export default function GroupChatView({ group, user, onBack, onGroupUpdate }) {
     const [newTaskTitle, setNewTaskTitle] = useState('');
     const [newTaskDesc, setNewTaskDesc] = useState('');
     const [newTaskValue, setNewTaskValue] = useState(10);
+    const [newTaskRewardType, setNewTaskRewardType] = useState('points');
+    const [newTaskCategory, setNewTaskCategory] = useState('normal');
+    const [newTaskAssignedTo, setNewTaskAssignedTo] = useState('');
 
     // search & invite
     const [friends, setFriends] = useState([]);
@@ -148,6 +151,7 @@ export default function GroupChatView({ group, user, onBack, onGroupUpdate }) {
                 data.forEach(t => {
                     if (t.created_by) userIds.push(t.created_by);
                     if (t.completed_by) userIds.push(t.completed_by);
+                    if (t.assigned_to) userIds.push(t.assigned_to);
                 });
                 if (userIds.length > 0) loadProfiles([...new Set(userIds)]);
             }
@@ -355,12 +359,19 @@ export default function GroupChatView({ group, user, onBack, onGroupUpdate }) {
                     title: newTaskTitle.trim(),
                     description: newTaskDesc.trim(),
                     value: newTaskValue,
+                    reward_amount: newTaskValue,
+                    reward_type: newTaskRewardType,
+                    category: newTaskCategory,
+                    assigned_to: newTaskAssignedTo || null,
                     created_by: user.id
                 });
             if (error) throw error;
             setNewTaskTitle('');
             setNewTaskDesc('');
             setNewTaskValue(10);
+            setNewTaskRewardType('points');
+            setNewTaskCategory('normal');
+            setNewTaskAssignedTo('');
             setShowTaskForm(false);
             loadTasks();
         } catch (err) {
@@ -370,6 +381,11 @@ export default function GroupChatView({ group, user, onBack, onGroupUpdate }) {
     };
 
     const handleToggleTask = async (task) => {
+        if (!canManage && task.assigned_to && task.assigned_to !== user.id) {
+            alert('Эту задачу может выполнить только назначенный исполнитель или админ.');
+            return;
+        }
+
         try {
             const isCompleted = !task.completed;
             const updates = {
@@ -720,21 +736,29 @@ export default function GroupChatView({ group, user, onBack, onGroupUpdate }) {
                     </div>
 
                     {showTaskForm && (
-                        <form onSubmit={handleCreateTask} className="bg-white/5 border border-white/10 rounded-2xl p-5 mb-6 animate-fade-in">
+                        <form onSubmit={handleCreateTask} className="bg-white/5 border border-white/10 rounded-2xl p-5 mb-6 animate-fade-in relative">
+                            {/* AI Helper Button */}
+                            <button
+                                type="button"
+                                className="absolute right-5 top-5 text-xs flex items-center gap-1 font-bold bg-gradient-to-r from-indigo-500/20 to-purple-500/20 text-purple-300 hover:text-white px-3 py-1.5 rounded-lg border border-purple-500/30 hover:border-purple-400 transition-colors"
+                            >
+                                <Sparkles size={14} /> Помощь ИИ
+                            </button>
+
                             <h5 className="text-white font-bold mb-4">Новая задача</h5>
                             <div className="space-y-4">
-                                <div>
-                                    <label className="block text-xs font-semibold text-text-secondary uppercase tracking-wider mb-1.5">Название задачи</label>
-                                    <input
-                                        type="text"
-                                        value={newTaskTitle}
-                                        onChange={(e) => setNewTaskTitle(e.target.value)}
-                                        className="w-full bg-black/40 border border-white/10 rounded-xl px-4 py-2.5 text-sm text-white focus:border-accent outline-none transition-colors"
-                                        placeholder="Что нужно сделать?"
-                                        required
-                                    />
-                                </div>
-                                <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                                    <div className="sm:col-span-2">
+                                        <label className="block text-xs font-semibold text-text-secondary uppercase tracking-wider mb-1.5">Название задачи</label>
+                                        <input
+                                            type="text"
+                                            value={newTaskTitle}
+                                            onChange={(e) => setNewTaskTitle(e.target.value)}
+                                            className="w-full bg-black/40 border border-white/10 rounded-xl px-4 py-2.5 text-sm text-white focus:border-accent outline-none transition-colors"
+                                            placeholder="Что нужно сделать?"
+                                            required
+                                        />
+                                    </div>
                                     <div className="sm:col-span-2">
                                         <label className="block text-xs font-semibold text-text-secondary uppercase tracking-wider mb-1.5">Описание (необязательно)</label>
                                         <input
@@ -745,16 +769,65 @@ export default function GroupChatView({ group, user, onBack, onGroupUpdate }) {
                                             placeholder="Подробности задачи"
                                         />
                                     </div>
+
                                     <div>
-                                        <label className="block text-xs font-semibold text-text-secondary uppercase tracking-wider mb-1.5">Ценность (очки)</label>
+                                        <label className="block text-xs font-semibold text-text-secondary uppercase tracking-wider mb-1.5">Награда</label>
+                                        <div className="flex bg-black/40 rounded-xl border border-white/10 p-1">
+                                            <select
+                                                value={newTaskRewardType}
+                                                onChange={(e) => setNewTaskRewardType(e.target.value)}
+                                                className="bg-transparent border-none text-white text-sm outline-none px-2 py-1.5 w-full cursor-pointer appearance-none"
+                                            >
+                                                <option value="points" className="bg-bg-primary text-white">Очки ✨</option>
+                                                <option value="money" className="bg-bg-primary text-white">К ЗП 💵</option>
+                                                <option value="duty" className="bg-bg-primary text-white">Обязанность 👔</option>
+                                            </select>
+                                        </div>
+                                    </div>
+                                    <div>
+                                        <label className="block text-xs font-semibold text-text-secondary uppercase tracking-wider mb-1.5">
+                                            {newTaskRewardType === 'points' ? 'Количество очков' : newTaskRewardType === 'money' ? 'Сумма ($/₽)' : 'Ценность (Скрыта)'}
+                                        </label>
                                         <input
                                             type="number"
-                                            min="1"
-                                            max="1000"
+                                            min="0"
+                                            disabled={newTaskRewardType === 'duty'}
                                             value={newTaskValue}
                                             onChange={(e) => setNewTaskValue(e.target.value ? parseInt(e.target.value) : 0)}
-                                            className="w-full bg-black/40 border border-white/10 rounded-xl px-4 py-2.5 text-sm text-center font-bold text-accent focus:border-accent outline-none transition-colors"
+                                            className={`w-full bg-black/40 border border-white/10 rounded-xl px-4 py-2.5 text-sm text-center font-bold outline-none transition-colors ${newTaskRewardType === 'duty' ? 'opacity-50 text-text-secondary' : 'text-accent focus:border-accent'}`}
                                         />
+                                    </div>
+
+                                    <div>
+                                        <label className="block text-xs font-semibold text-text-secondary uppercase tracking-wider mb-1.5">Исполнитель</label>
+                                        <div className="flex bg-black/40 rounded-xl border border-white/10 p-1">
+                                            <select
+                                                value={newTaskAssignedTo}
+                                                onChange={(e) => setNewTaskAssignedTo(e.target.value)}
+                                                className="bg-transparent border-none text-white text-sm outline-none px-2 py-1.5 w-full cursor-pointer appearance-none"
+                                            >
+                                                <option value="" className="bg-bg-primary text-white">Все участники</option>
+                                                {members.map(m => {
+                                                    const p = profiles[m.user_id];
+                                                    return <option key={m.user_id} value={m.user_id} className="bg-bg-primary text-white">{p?.display_name || m.user_id}</option>
+                                                })}
+                                            </select>
+                                        </div>
+                                    </div>
+                                    <div>
+                                        <label className="block text-xs font-semibold text-text-secondary uppercase tracking-wider mb-1.5">Матрица Эйзенхауэра</label>
+                                        <div className="flex bg-black/40 rounded-xl border border-white/10 p-1">
+                                            <select
+                                                value={newTaskCategory}
+                                                onChange={(e) => setNewTaskCategory(e.target.value)}
+                                                className="bg-transparent border-none text-white text-sm outline-none px-2 py-1.5 w-full cursor-pointer appearance-none"
+                                            >
+                                                <option value="normal" className="bg-bg-primary text-white">Обычная</option>
+                                                <option value="important" className="bg-bg-primary text-white">Важно, не срочно (План)</option>
+                                                <option value="urgent" className="bg-bg-primary text-white">Срочно, не важно (Делегировать)</option>
+                                                <option value="urgent_important" className="bg-bg-primary text-white text-warning">Важно и Срочно (Сделать сейчас)</option>
+                                            </select>
+                                        </div>
                                     </div>
                                 </div>
                                 <div className="flex justify-end pt-2">
@@ -805,9 +878,23 @@ export default function GroupChatView({ group, user, onBack, onGroupUpdate }) {
                                                     <h5 className={`font-bold text-base truncate ${task.completed ? 'text-white/50 line-through' : 'text-white'}`}>
                                                         {task.title}
                                                     </h5>
-                                                    <span className="shrink-0 bg-accent/20 text-accent text-[10px] font-bold px-2 py-0.5 rounded-full">
-                                                        +{task.value} очков
+                                                    <span className={`shrink-0 text-[10px] font-bold px-2 py-0.5 rounded-full ${task.reward_type === 'points' ? 'bg-accent/20 text-accent' :
+                                                        task.reward_type === 'money' ? 'bg-emerald-500/20 text-emerald-400' :
+                                                            'bg-white/10 text-white/50'
+                                                        }`}>
+                                                        {task.reward_type === 'points' ? `+${task.reward_amount || task.value} ✨` :
+                                                            task.reward_type === 'money' ? `+${task.reward_amount || task.value} 💵` :
+                                                                '👔 Обязанность'}
                                                     </span>
+                                                    {task.category && task.category !== 'normal' && (
+                                                        <span className={`shrink-0 text-[9px] font-bold px-1.5 py-0.5 rounded-sm uppercase tracking-widest border ${task.category === 'urgent_important' ? 'border-danger text-danger bg-danger/10' :
+                                                            task.category === 'important' ? 'border-warning text-warning bg-warning/10' :
+                                                                'border-blue-400 text-blue-400 bg-blue-400/10'
+                                                            }`}>
+                                                            {task.category === 'urgent_important' ? 'Срочно & Важно' :
+                                                                task.category === 'important' ? 'Важно' : 'Срочно'}
+                                                        </span>
+                                                    )}
                                                 </div>
 
                                                 {task.description && (
@@ -816,18 +903,24 @@ export default function GroupChatView({ group, user, onBack, onGroupUpdate }) {
                                                     </p>
                                                 )}
 
-                                                <div className="mt-3 flex items-center justify-between text-xs font-medium text-text-secondary">
-                                                    <div className="flex items-center gap-4">
+                                                <div className="mt-3 flex items-center justify-between text-xs font-medium text-text-secondary flex-wrap gap-2">
+                                                    <div className="flex items-center gap-4 flex-wrap">
                                                         <div className="flex items-center gap-1.5" title="Кем создана">
                                                             <div className="w-4 h-4 rounded-full bg-white/10 flex items-center justify-center overflow-hidden">
                                                                 {creator?.avatar_url ? <img src={creator.avatar_url} alt="" className="w-full h-full object-cover" /> : <span className="text-[8px] text-white/50">{creator?.display_name?.charAt(0) || '?'}</span>}
                                                             </div>
-                                                            <span>Создал(а): {creator?.display_name?.split(' ')[0] || '...'}</span>
+                                                            <span>От: {creator?.display_name?.split(' ')[0] || '...'}</span>
                                                         </div>
+                                                        {task.assigned_to && (
+                                                            <div className="flex items-center gap-1 text-white/60">
+                                                                <span>→</span>
+                                                                <span>Кому: {profiles[task.assigned_to]?.display_name?.split(' ')[0] || '...'}</span>
+                                                            </div>
+                                                        )}
                                                         {task.completed && completer && (
                                                             <div className="flex items-center gap-1.5 text-success/80" title={`Выполнена: ${formatTime(task.completed_at)}`}>
                                                                 <Check size={12} />
-                                                                <span>Выполнил(а): {completer?.display_name?.split(' ')[0] || '...'}</span>
+                                                                <span>Сделал(а): {completer?.display_name?.split(' ')[0] || '...'}</span>
                                                             </div>
                                                         )}
                                                     </div>
