@@ -2,6 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { supabase } from '../lib/supabase';
 import { useStore } from '../store/useStore';
 import { ArrowLeft, Send, Users, Shield, UserPlus, Settings, LogOut, CheckCheck, Check, Search, Trash2, X, ListTodo, Plus, Circle, CheckCircle, Sparkles, Bot, Edit2 } from 'lucide-react';
+import AIGroupAssistant from './AIGroupAssistant';
 
 export default function GroupChatView({ group, user, onBack, onGroupUpdate }) {
     const [messages, setMessages] = useState([]);
@@ -25,13 +26,13 @@ export default function GroupChatView({ group, user, onBack, onGroupUpdate }) {
     const [newTaskCategory, setNewTaskCategory] = useState('normal');
     const [newTaskAssignedTo, setNewTaskAssignedTo] = useState('');
 
-    // AI Helper state
-    const [showAiHelper, setShowAiHelper] = useState(false);
-    const [aiQuery, setAiQuery] = useState('');
-    const [isGeneratingTask, setIsGeneratingTask] = useState(false);
+
 
     // Edit task state
     const [editingTaskId, setEditingTaskId] = useState(null);
+
+    // Avatar viewer state
+    const [viewingAvatar, setViewingAvatar] = useState(null);
 
     // Global settings for AI
     const googleModel = useStore(state => state.googleModel);
@@ -424,71 +425,6 @@ export default function GroupChatView({ group, user, onBack, onGroupUpdate }) {
         window.scrollTo({ top: 0, behavior: 'smooth' });
     };
 
-    const handleGenerateTask = async () => {
-        if (!aiQuery.trim()) return;
-        setIsGeneratingTask(true);
-        try {
-            const { callAI, GOOGLE_OPENAI_BASE } = await import('../utils/geminiApi');
-            const systemPrompt = `Ты помощник командира/руководителя. Пользователь пишет тебе, что нужно сделать. Твоя задача - превратить это в структурированную задачу.
-Верни ТОЛЬКО JSON строго в таком формате:
-{
-  "title": "Краткое и четкое название задачи",
-  "description": "Подробное, пошаговое описание задачи на основе запроса",
-  "rewardType": "points" | "money" | "duty",
-  "rewardValue": 100,
-  "category": "normal" | "important" | "urgent" | "urgent_important"
-}
-Никакого markdown, только сырой валидный JSON.
-
-Логика наград:
-- Если прямо просят поощрить деньгами, ставь "money" и сумму.
-- Если задача рутинная/рабочая обязанность - ставь "duty" и 0.
-- В остальных случаях - "points" (от 10 до 500 в зависимости от сложности).
-
-Логика Эйзенхауэра (category):
-- normal: обычная задача
-- important: стратегическая, на развитие
-- urgent: горит, нужно быстро (например, обзвон, баги)
-- urgent_important: критически важно и срочно`;
-
-            const baseUrl = aiProvider === 'google' ? GOOGLE_OPENAI_BASE : proxyParams?.url;
-            const modelToUse = aiProvider === 'google' ? googleModel : proxyParams?.model;
-
-            let finalKey = apiKey;
-            if (aiProvider === 'custom') {
-                finalKey = proxyParams?.key || apiKey;
-            }
-
-            const responseText = await callAI({
-                baseUrl,
-                apiKey: finalKey,
-                model: modelToUse,
-                systemPrompt,
-                history: [],
-                userMessage: aiQuery.trim(),
-                maxTokens: 800
-            });
-
-            const cleanJson = responseText.replace(/```json/g, '').replace(/```/g, '').trim();
-            const taskData = JSON.parse(cleanJson);
-
-            setNewTaskTitle(taskData.title || '');
-            setNewTaskDesc(taskData.description || '');
-            setNewTaskRewardType(taskData.rewardType || 'points');
-            setNewTaskCategory(taskData.category || 'normal');
-            setNewTaskValue(taskData.rewardValue || 100);
-
-            setAiQuery('');
-            setShowAiHelper(false);
-
-        } catch (err) {
-            console.error('AI Generation Error:', err);
-            alert('Не удалось сгенерировать задачу. Проверьте настройки API или повторите запрос.');
-        } finally {
-            setIsGeneratingTask(false);
-        }
-    };
-
     const handleToggleTask = async (task) => {
         if (!canManage && task.assigned_to && task.assigned_to !== user.id) {
             alert('Эту задачу может выполнить только назначенный исполнитель или админ.');
@@ -554,25 +490,33 @@ export default function GroupChatView({ group, user, onBack, onGroupUpdate }) {
                     </div>
                 </div>
 
-                <div className="flex bg-black/40 p-1 rounded-xl border border-white/5">
+                <div className="flex bg-black/40 rounded-xl p-1 shrink-0 overflow-x-auto scrollbar-hide">
                     <button
                         onClick={() => setActiveTab('chat')}
-                        className={`px-4 py-1.5 rounded-lg text-sm font-medium transition-all ${activeTab === 'chat' ? 'bg-white/10 text-white shadow-sm' : 'text-text-secondary hover:text-white'}`}
+                        className={`px-4 sm:px-6 py-2 text-sm font-semibold rounded-lg transition-all whitespace-nowrap ${activeTab === 'chat' ? 'bg-white/10 text-white shadow-md' : 'text-text-secondary hover:text-white'}`}
                     >
                         Чат
                     </button>
                     <button
                         onClick={() => setActiveTab('members')}
-                        className={`px-4 py-1.5 rounded-lg text-sm font-medium transition-all ${activeTab === 'members' ? 'bg-white/10 text-white shadow-sm' : 'text-text-secondary hover:text-white'}`}
+                        className={`px-4 sm:px-6 py-2 text-sm font-semibold rounded-lg transition-all whitespace-nowrap ${activeTab === 'members' ? 'bg-white/10 text-white shadow-md' : 'text-text-secondary hover:text-white'}`}
                     >
                         Участники
                     </button>
                     <button
                         onClick={() => setActiveTab('tasks')}
-                        className={`px-4 py-1.5 rounded-lg text-sm font-medium transition-all ${activeTab === 'tasks' ? 'bg-white/10 text-white shadow-sm' : 'text-text-secondary hover:text-white'}`}
+                        className={`px-4 sm:px-6 py-2 text-sm font-semibold rounded-lg transition-all whitespace-nowrap ${activeTab === 'tasks' ? 'bg-white/10 text-white shadow-md' : 'text-text-secondary hover:text-white'}`}
                     >
                         Задачи
                     </button>
+                    {canManage && (
+                        <button
+                            onClick={() => setActiveTab('ai')}
+                            className={`px-4 sm:px-6 py-2 text-sm font-semibold rounded-lg transition-all whitespace-nowrap flex items-center gap-2 ${activeTab === 'ai' ? 'bg-purple-500/20 text-purple-300 shadow-md' : 'text-purple-400/50 hover:text-purple-300'}`}
+                        >
+                            <Bot size={16} /> ИИ Ассистент
+                        </button>
+                    )}
                 </div>
             </header>
 
@@ -675,7 +619,10 @@ export default function GroupChatView({ group, user, onBack, onGroupUpdate }) {
                                 return (
                                     <div key={m.user_id} className="flex flex-col sm:flex-row sm:items-center justify-between bg-white/5 p-4 rounded-2xl border border-white/5 hover:border-white/10 transition-colors gap-4">
                                         <div className="flex items-center gap-4">
-                                            <div className="w-12 h-12 rounded-full bg-gradient-to-br from-indigo-500 to-purple-500 flex items-center justify-center text-white font-bold overflow-hidden shadow-inner">
+                                            <div
+                                                className={`w-12 h-12 rounded-full bg-gradient-to-br from-indigo-500 to-purple-500 flex items-center justify-center text-white font-bold overflow-hidden shadow-inner shrink-0 ${profile?.avatar_url ? 'cursor-pointer hover:opacity-80 transition-opacity' : ''}`}
+                                                onClick={() => profile?.avatar_url && setViewingAvatar(profile.avatar_url)}
+                                            >
                                                 {profile?.avatar_url ? (
                                                     <img src={profile.avatar_url} alt="" className="w-full h-full object-cover" />
                                                 ) : (
@@ -846,56 +793,7 @@ export default function GroupChatView({ group, user, onBack, onGroupUpdate }) {
 
                     {showTaskForm && (
                         <form onSubmit={handleCreateTask} className="bg-white/5 border border-white/10 rounded-2xl p-5 mb-6 animate-fade-in relative">
-                            {/* AI Helper Button */}
-                            <button
-                                type="button"
-                                onClick={() => setShowAiHelper(!showAiHelper)}
-                                className={`absolute right-5 top-5 text-xs flex items-center gap-1 font-bold px-3 py-1.5 rounded-lg transition-colors border ${showAiHelper
-                                    ? 'bg-purple-500/30 text-white border-purple-400'
-                                    : 'bg-gradient-to-r from-indigo-500/20 to-purple-500/20 text-purple-300 hover:text-white border-purple-500/30 hover:border-purple-400'
-                                    }`}
-                            >
-                                <Sparkles size={14} /> {showAiHelper ? 'Скрыть ИИ' : 'Помощь ИИ'}
-                            </button>
-
                             <h5 className="text-white font-bold mb-4">Новая задача</h5>
-
-                            {/* AI Mini Chat */}
-                            {showAiHelper && (
-                                <div className="mb-6 bg-purple-500/10 border border-purple-500/20 rounded-xl p-4 animate-fade-in">
-                                    <div className="flex items-start gap-3">
-                                        <div className="w-8 h-8 rounded-full bg-purple-500/20 flex items-center justify-center shrink-0">
-                                            <Bot size={16} className="text-purple-300" />
-                                        </div>
-                                        <div className="flex-1">
-                                            <p className="text-sm text-purple-200 mb-2">Напишите своими словами, что нужно сделать. Я сам всё заполню и подберу категорию.</p>
-                                            <div className="flex gap-2">
-                                                <input
-                                                    type="text"
-                                                    value={aiQuery}
-                                                    onChange={(e) => setAiQuery(e.target.value)}
-                                                    onKeyDown={(e) => {
-                                                        if (e.key === 'Enter') {
-                                                            e.preventDefault();
-                                                            handleGenerateTask();
-                                                        }
-                                                    }}
-                                                    placeholder="Например: Пусть кто-нибудь обзвонит 10 теплых клиентов за 200 очков..."
-                                                    className="flex-1 bg-black/40 border border-purple-500/30 rounded-lg px-3 py-2 text-sm text-white focus:border-purple-400 outline-none"
-                                                />
-                                                <button
-                                                    type="button"
-                                                    onClick={handleGenerateTask}
-                                                    disabled={isGeneratingTask || !aiQuery.trim()}
-                                                    className="px-4 py-2 bg-purple-500 text-white rounded-lg text-sm font-bold hover:bg-purple-600 transition-colors disabled:opacity-50 flex items-center gap-2"
-                                                >
-                                                    {isGeneratingTask ? <div className="w-4 h-4 border-2 border-white/40 border-t-white rounded-full animate-spin"></div> : <Send size={14} />}
-                                                </button>
-                                            </div>
-                                        </div>
-                                    </div>
-                                </div>
-                            )}
 
                             <div className="space-y-4">
                                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
@@ -1112,6 +1010,40 @@ export default function GroupChatView({ group, user, onBack, onGroupUpdate }) {
                             })}
                         </div>
                     )}
+                </div>
+            )}
+
+            {/* AI Assistant Tab (Admin/Owner only) */}
+            {activeTab === 'ai' && canManage && (
+                <div className="flex-1 overflow-hidden p-0 bg-black/20 flex flex-col relative w-full">
+                    <AIGroupAssistant
+                        group={group}
+                        user={user}
+                        members={members}
+                        profiles={profiles}
+                        tasks={tasks}
+                    />
+                </div>
+            )}
+
+            {/* Avatar Viewer Modal */}
+            {viewingAvatar && (
+                <div
+                    className="fixed inset-0 z-[100] bg-black/90 backdrop-blur-sm flex items-center justify-center p-4 cursor-zoom-out animate-fade-in"
+                    onClick={() => setViewingAvatar(null)}
+                >
+                    <button
+                        className="absolute top-4 right-4 p-2 text-white/50 hover:text-white bg-black/50 rounded-full transition-colors"
+                        onClick={() => setViewingAvatar(null)}
+                    >
+                        <X size={24} />
+                    </button>
+                    <img
+                        src={viewingAvatar}
+                        alt="Profile Fullsize"
+                        className="max-w-full max-h-[90vh] rounded-2xl object-contain shadow-2xl cursor-default"
+                        onClick={(e) => e.stopPropagation()}
+                    />
                 </div>
             )}
         </div>

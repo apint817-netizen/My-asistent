@@ -1,8 +1,57 @@
 import { useState, useEffect, useRef } from 'react';
 import { useStore } from '../store/useStore';
-import { Settings, Bot, X, Link as LinkIcon, Zap, HelpCircle, ChevronDown, Sparkles, Heart, Code, Trash2, User, LogOut, Upload, Loader, Save, Edit2 } from 'lucide-react';
+import { Settings, Bot, X, Link as LinkIcon, Zap, HelpCircle, ChevronDown, Sparkles, Heart, Code, Trash2, User, LogOut, Upload, Loader, Save, Edit2, Crop } from 'lucide-react';
 import { PROXY_MODELS } from '../utils/geminiApi';
 import { isSupabaseConfigured, supabase } from '../lib/supabase';
+import Cropper from 'react-easy-crop';
+
+// Вспомогательная функция для кадрирования
+const createImage = (url) =>
+    new Promise((resolve, reject) => {
+        const image = new Image()
+        image.addEventListener('load', () => resolve(image))
+        image.addEventListener('error', (error) => reject(error))
+        image.setAttribute('crossOrigin', 'anonymous')
+        image.src = url
+    })
+
+async function getCroppedImg(imageSrc, pixelCrop) {
+    const image = await createImage(imageSrc)
+    const canvas = document.createElement('canvas')
+    const ctx = canvas.getContext('2d')
+
+    if (!ctx) {
+        return null
+    }
+
+    // Устанавливаем размер канваса равным размеру кропа
+    canvas.width = pixelCrop.width
+    canvas.height = pixelCrop.height
+
+    // Отрисовываем нужную часть картинки
+    ctx.drawImage(
+        image,
+        pixelCrop.x,
+        pixelCrop.y,
+        pixelCrop.width,
+        pixelCrop.height,
+        0,
+        0,
+        pixelCrop.width,
+        pixelCrop.height
+    )
+
+    return new Promise((resolve) => {
+        canvas.toBlob((blob) => {
+            if (!blob) return;
+            const reader = new FileReader();
+            reader.onloadend = () => {
+                resolve(reader.result); // Base64 строка
+            };
+            reader.readAsDataURL(blob);
+        }, 'image/jpeg', 0.9)
+    })
+}
 
 export default function AISettingsModal({ isOpen, onClose }) {
     const apiKey = useStore(state => state.apiKey);
@@ -29,6 +78,13 @@ export default function AISettingsModal({ isOpen, onClose }) {
     const [profileError, setProfileError] = useState('');
     const [profileSuccess, setProfileSuccess] = useState('');
     const avatarInputRef = useRef(null);
+
+    // Cropper State
+    const [imageSrc, setImageSrc] = useState(null);
+    const [crop, setCrop] = useState({ x: 0, y: 0 });
+    const [zoom, setZoom] = useState(1);
+    const [croppedAreaPixels, setCroppedAreaPixels] = useState(null);
+    const [showCropper, setShowCropper] = useState(false);
 
     useEffect(() => {
         if (isOpen) {
@@ -70,20 +126,33 @@ export default function AISettingsModal({ isOpen, onClose }) {
 
         try {
             setProfileError('');
-            setIsSavingProfile(true);
 
             if (file.size > 10 * 1024 * 1024) throw new Error('Файл слишком большой (макс. 10МБ)');
 
             const reader = new FileReader();
-            reader.onloadend = async () => {
-                const base64String = reader.result;
-                setAvatarUrl(base64String);
-                setIsSavingProfile(false);
+            reader.onloadend = () => {
+                setImageSrc(reader.result);
+                setShowCropper(true);
             };
             reader.readAsDataURL(file);
         } catch (err) {
             setProfileError(err.message);
-            setIsSavingProfile(false);
+        }
+    };
+
+    const onCropComplete = (croppedArea, croppedAreaPixels) => {
+        setCroppedAreaPixels(croppedAreaPixels);
+    };
+
+    const showCroppedImage = async () => {
+        try {
+            const croppedImage = await getCroppedImg(imageSrc, croppedAreaPixels);
+            setAvatarUrl(croppedImage);
+            setShowCropper(false);
+            setImageSrc(null);
+        } catch (e) {
+            console.error(e);
+            setProfileError('Ошибка при обрезке фото');
         }
     };
 
@@ -129,6 +198,66 @@ export default function AISettingsModal({ isOpen, onClose }) {
 
     return (
         <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4 animate-fade-in" onClick={onClose}>
+            {/* Cropper Modal Overlay */}
+            {showCropper && imageSrc && (
+                <div className="fixed inset-0 bg-black/90 z-[60] flex flex-col items-center justify-center p-4">
+                    <div className="bg-bg-secondary w-full max-w-md rounded-2xl overflow-hidden shadow-2xl border border-white/10 flex flex-col">
+                        <div className="p-4 border-b border-white/10 flex justify-between items-center bg-black/20">
+                            <h3 className="text-white font-bold flex items-center gap-2"><Crop size={18} className="text-accent" /> Кадрирование фото</h3>
+                            <button onClick={() => { setShowCropper(false); setImageSrc(null); }} className="text-text-secondary hover:text-white transition-colors">
+                                <X size={20} />
+                            </button>
+                        </div>
+
+                        <div className="relative w-full h-80 bg-black">
+                            <Cropper
+                                image={imageSrc}
+                                crop={crop}
+                                zoom={zoom}
+                                aspect={1}
+                                cropShape="round"
+                                showGrid={false}
+                                onCropChange={setCrop}
+                                onCropComplete={onCropComplete}
+                                onZoomChange={setZoom}
+                            />
+                        </div>
+
+                        <div className="p-5 flex flex-col gap-4 bg-black/20">
+                            <div className="flex items-center gap-3">
+                                <span className="text-xs text-text-secondary">Увеличить</span>
+                                <input
+                                    type="range"
+                                    value={zoom}
+                                    min={1}
+                                    max={3}
+                                    step={0.1}
+                                    aria-labelledby="Zoom"
+                                    onChange={(e) => setZoom(e.target.value)}
+                                    className="flex-1 accent-accent"
+                                />
+                            </div>
+                            <div className="flex gap-3 pt-2">
+                                <button
+                                    type="button"
+                                    onClick={() => { setShowCropper(false); setImageSrc(null); }}
+                                    className="flex-1 py-2.5 rounded-xl font-bold bg-white/5 text-text-secondary hover:bg-white/10 hover:text-white transition-all text-sm"
+                                >
+                                    Отмена
+                                </button>
+                                <button
+                                    type="button"
+                                    onClick={showCroppedImage}
+                                    className="flex-1 py-2.5 rounded-xl font-bold bg-accent text-white hover:bg-accent/80 transition-all text-sm shadow-lg shadow-accent/20"
+                                >
+                                    Готово
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            )}
+
             <div
                 id="tour-settings-modal-override"
                 className="glass-panel w-full max-w-2xl max-h-[85vh] overflow-y-auto p-0 relative animate-fade-in custom-scrollbar"
