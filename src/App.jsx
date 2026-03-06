@@ -1,6 +1,6 @@
 import { useEffect, useState, useRef } from 'react';
 import { useStore, setStorageKey } from './store/useStore';
-import { Trophy, CheckCircle, MessageSquare, Plus, Activity, Calendar as CalendarIcon, ListTodo, ChevronUp, ChevronDown, HelpCircle, Settings, FileText, LogOut, Users, Shield } from 'lucide-react';
+import { Trophy, CheckCircle, MessageSquare, Plus, Activity, Calendar as CalendarIcon, ListTodo, ChevronUp, ChevronDown, HelpCircle, Settings, FileText, LogOut, Users, Shield, UserCircle } from 'lucide-react';
 import TaskManager from './components/TaskManager';
 import RewardStore from './components/RewardStore';
 import AIAssistant from './components/AIAssistant';
@@ -291,14 +291,14 @@ function App() {
             Календарь
           </button>
         </Tooltip>
-        <Tooltip text="Загрузите резюме и получите персональный план задач от ИИ" position="bottom">
+        <Tooltip text="Настройте свой профиль и получите персональный план от ИИ" position="bottom">
           <button
             id="tour-resume-tab"
             onClick={() => setActiveTab('resume')}
             className={`px-5 py-2.5 rounded-xl flex items-center gap-2 text-sm font-semibold transition-all ${activeTab === 'resume' ? 'bg-accent/20 text-accent shadow-[0_0_15px_rgba(var(--color-accent),0.2)]' : 'text-text-secondary hover:text-white hover:bg-white/5'}`}
           >
-            <FileText size={18} />
-            Резюме
+            <UserCircle size={18} />
+            Профиль / ИИ
           </button>
         </Tooltip>
         <Tooltip text="Общайтесь с друзьями и следите за их успехами" position="bottom">

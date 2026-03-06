@@ -1,6 +1,7 @@
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { useStore } from '../store/useStore';
-import { Upload, FileText, Loader, CheckCircle, AlertCircle, Send, Briefcase, Brain, Zap, Heart, GraduationCap, Flame } from 'lucide-react';
+import { supabase } from '../lib/supabase';
+import { Upload, FileText, Loader, CheckCircle, AlertCircle, Send, Briefcase, Brain, Zap, Heart, GraduationCap, Flame, UserCircle, Edit2, Save, X } from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
 import { callAI, GOOGLE_OPENAI_BASE } from '../utils/geminiApi';
 import * as pdfjsLib from 'pdfjs-dist';
@@ -76,12 +77,110 @@ export default function ResumeView() {
     const [status, setStatus] = useState('');
     const [isAnalyzing, setIsAnalyzing] = useState(false);
     const [analysis, setAnalysis] = useState(null);
-    const [error, setError] = useState('');
     const [parsedItems, setParsedItems] = useState(null);
     const [committed, setCommitted] = useState(false);
     const [isDragging, setIsDragging] = useState(false);
 
+    // Profile State
+    const [profileMode, setProfileMode] = useState(false);
+    const [displayName, setDisplayName] = useState('');
+    const [avatarUrl, setAvatarUrl] = useState('');
+    const [userTag, setUserTag] = useState('');
+    const [isSavingProfile, setIsSavingProfile] = useState(false);
+    const [profileError, setProfileError] = useState('');
+    const [profileSuccess, setProfileSuccess] = useState('');
+    const avatarInputRef = useRef(null);
+
     const fileRef = useRef(null);
+
+    useEffect(() => {
+        loadProfile();
+    }, []);
+
+    const loadProfile = async () => {
+        try {
+            const { data: { user } } = await supabase.auth.getUser();
+            if (!user) return;
+
+            const { data, error } = await supabase
+                .from('user_profiles')
+                .select('*')
+                .eq('id', user.id)
+                .single();
+
+            if (error && error.code !== 'PGRST116') throw error; // PGRST116 is not found
+
+            if (data) {
+                setDisplayName(data.display_name || '');
+                setAvatarUrl(data.avatar_url || '');
+                setUserTag(data.user_tag || '');
+            }
+        } catch (err) {
+            console.error('Error loading profile:', err);
+        }
+    };
+
+    const handleSaveProfile = async () => {
+        setProfileError('');
+        setProfileSuccess('');
+        if (!displayName.trim()) {
+            setProfileError('Никнейм не может быть пустым');
+            return;
+        }
+
+        setIsSavingProfile(true);
+        try {
+            const { data: { user } } = await supabase.auth.getUser();
+            if (!user) throw new Error('Not authenticated');
+
+            const { error } = await supabase
+                .from('user_profiles')
+                .update({
+                    display_name: displayName.trim(),
+                    avatar_url: avatarUrl.trim()
+                })
+                .eq('id', user.id);
+
+            if (error) throw error;
+            setProfileSuccess('Профиль успешно обновлен!');
+            setProfileMode(false);
+            setTimeout(() => setProfileSuccess(''), 3000);
+        } catch (err) {
+            console.error('Error saving profile:', err);
+            setProfileError('Ошибка при сохранении профиля');
+        } finally {
+            setIsSavingProfile(false);
+        }
+    };
+
+    const handleAvatarUpload = async (e) => {
+        const file = e.target.files?.[0];
+        if (!file) return;
+
+        // В идеале здесь должна быть загрузка в Storage, 
+        // но пока ограничимся предложением вставить URL или (если Storage настроен) сырой Base64.
+        // Так как Storage может быть не настроен, используем простой prompt для URL временно
+        // или если бы мы хотели base64:
+
+        try {
+            setProfileError('');
+            setIsSavingProfile(true);
+
+            // Читаем как data URL (подойдет для маленьких аватарок)
+            if (file.size > 2 * 1024 * 1024) throw new Error('Файл слишком большой (макс. 2МБ)');
+
+            const reader = new FileReader();
+            reader.onloadend = async () => {
+                const base64String = reader.result;
+                setAvatarUrl(base64String);
+                setIsSavingProfile(false);
+            };
+            reader.readAsDataURL(file);
+        } catch (err) {
+            setProfileError(err.message);
+            setIsSavingProfile(false);
+        }
+    };
 
     const handleFileSelection = (f) => {
         if (f.name.toLowerCase().endsWith('.doc')) {
@@ -274,11 +373,11 @@ export default function ResumeView() {
             <div className="glass-panel p-6 flex flex-col lg:h-full lg:overflow-y-auto custom-scrollbar">
                 <div className="flex flex-wrap sm:flex-nowrap items-center gap-3 mb-6 pb-4 border-b border-border">
                     <div className="w-10 h-10 rounded-full bg-gradient-to-br from-emerald-500 to-teal-600 flex items-center justify-center">
-                        <FileText size={20} className="text-white" />
+                        <UserCircle size={20} className="text-white" />
                     </div>
                     <div>
-                        <h3 className="font-bold text-white">Анализ резюме</h3>
-                        <p className="text-xs text-text-secondary">Загрузите резюме и получите план действий</p>
+                        <h3 className="font-bold text-white">Профиль и ИИ-Анализ</h3>
+                        <p className="text-xs text-text-secondary">Настройте профиль или получите план от ИИ</p>
                     </div>
                     <div className="ml-auto">
                         <div className="bg-white/5 border border-white/10 px-3 py-1.5 rounded-lg flex flex-col items-center">
@@ -286,6 +385,102 @@ export default function ResumeView() {
                             <span className="text-sm font-bold text-emerald-400 font-mono tracking-tight">{aiTokensUsed?.toLocaleString() || 0}</span>
                         </div>
                     </div>
+                </div>
+
+                {/* PROFILE SECTION */}
+                <div className="mb-8 bg-black/20 rounded-2xl p-4 border border-border">
+                    <div className="flex items-center justify-between mb-4">
+                        <h4 className="text-sm font-bold text-white flex items-center gap-2">
+                            <UserCircle size={18} className="text-accent" /> Настройки профиля
+                        </h4>
+                        {!profileMode && (
+                            <button
+                                onClick={() => setProfileMode(true)}
+                                className="text-xs text-accent hover:text-white transition-colors flex items-center gap-1 bg-accent/10 px-2 py-1 rounded-lg"
+                            >
+                                <Edit2 size={12} /> Изменить
+                            </button>
+                        )}
+                    </div>
+
+                    {!profileMode ? (
+                        <div className="flex items-center gap-4">
+                            <div className="w-16 h-16 rounded-full bg-gradient-to-br from-indigo-500 to-purple-600 flex items-center justify-center text-white text-xl font-bold overflow-hidden shadow-inner border border-white/10">
+                                {avatarUrl ? (
+                                    <img src={avatarUrl} alt="Avatar" className="w-full h-full object-cover" />
+                                ) : (
+                                    displayName?.charAt(0)?.toUpperCase() || 'U'
+                                )}
+                            </div>
+                            <div>
+                                <h5 className="text-lg font-bold text-white">{displayName || 'Аноним'}</h5>
+                                <div className="flex items-center gap-2 mt-1">
+                                    <span className="text-xs text-text-secondary font-mono bg-white/5 px-2 py-0.5 rounded-md border border-white/5">
+                                        #{userTag || '0000'}
+                                    </span>
+                                    {profileSuccess && <span className="text-xs text-success">{profileSuccess}</span>}
+                                </div>
+                            </div>
+                        </div>
+                    ) : (
+                        <div className="space-y-4 animate-fade-in relative">
+                            <div className="flex gap-4 items-start pb-2">
+                                <div className="relative group cursor-pointer" onClick={() => avatarInputRef.current?.click()}>
+                                    <div className="w-16 h-16 rounded-full bg-black/50 flex items-center justify-center text-white text-xl font-bold overflow-hidden border-2 border-dashed border-white/20 group-hover:border-accent transition-colors">
+                                        {avatarUrl ? (
+                                            <img src={avatarUrl} alt="Avatar" className="w-full h-full object-cover opacity-50 group-hover:opacity-30 transition-opacity" />
+                                        ) : (
+                                            displayName?.charAt(0)?.toUpperCase() || 'U'
+                                        )}
+                                        <div className="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
+                                            <Upload size={20} className="text-white" />
+                                        </div>
+                                    </div>
+                                    <input
+                                        type="file"
+                                        ref={avatarInputRef}
+                                        onChange={handleAvatarUpload}
+                                        accept="image/*"
+                                        className="hidden"
+                                    />
+                                </div>
+                                <div className="flex-1">
+                                    <label className="text-xs text-text-secondary uppercase tracking-wider font-bold mb-1 block">Отображаемое имя (Никнейм)</label>
+                                    <input
+                                        type="text"
+                                        value={displayName}
+                                        onChange={e => setDisplayName(e.target.value)}
+                                        className="w-full bg-black/40 border border-white/10 p-2 rounded-xl text-white text-sm focus:border-accent outline-none"
+                                        placeholder="Как вас будут видеть друзья"
+                                    />
+                                </div>
+                            </div>
+
+                            {profileError && <p className="text-xs text-danger">{profileError}</p>}
+
+                            <div className="flex gap-2 justify-end">
+                                <button
+                                    onClick={() => setProfileMode(false)}
+                                    className="px-3 py-1.5 rounded-lg text-xs font-semibold text-text-secondary hover:text-white bg-white/5 hover:bg-white/10"
+                                >
+                                    Отмена
+                                </button>
+                                <button
+                                    onClick={handleSaveProfile}
+                                    disabled={isSavingProfile}
+                                    className="px-3 py-1.5 rounded-lg text-xs font-semibold text-white bg-accent hover:bg-accent/80 flex items-center gap-1 disabled:opacity-50"
+                                >
+                                    {isSavingProfile ? <Loader size={12} className="animate-spin" /> : <Save size={12} />} Сохранить
+                                </button>
+                            </div>
+                        </div>
+                    )}
+                </div>
+
+                <div className="flex items-center gap-2 mb-4">
+                    <div className="h-px bg-border flex-1"></div>
+                    <span className="text-xs text-text-secondary font-bold uppercase tracking-widest">Анализ резюме</span>
+                    <div className="h-px bg-border flex-1"></div>
                 </div>
 
                 <div className="mb-5">
