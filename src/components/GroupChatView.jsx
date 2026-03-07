@@ -229,24 +229,11 @@ export default function GroupChatView({ group, user, onBack, onGroupUpdate, init
 
         try {
             const { data, error } = await supabase
-                .rpc('get_profiles_by_ids', { user_ids: missingIds });
+                .from('profiles')
+                .select('id, display_name, avatar_url, user_tag')
+                .in('id', missingIds);
 
-            if (error) {
-                // Пытаемся fallback на обычный селект если RPC еще не создана
-                console.warn('RPC get_profiles_by_ids failed, falling back to .in()', error);
-                const fallback = await supabase
-                    .from('profiles')
-                    .select('id, display_name, avatar_url, user_tag')
-                    .in('id', missingIds);
-                if (fallback.error) throw fallback.error;
-
-                setProfiles(prev => {
-                    const newProfiles = { ...prev };
-                    fallback.data.forEach(p => newProfiles[p.id] = p);
-                    return newProfiles;
-                });
-                return;
-            }
+            if (error) throw error;
 
             setProfiles(prev => {
                 const newProfiles = { ...prev };

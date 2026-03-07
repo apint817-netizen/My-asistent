@@ -74,20 +74,11 @@ export default function GroupsView() {
 
             // STEP 2: Fetch profiles for those friends
             const { data: profiles, error: profError } = await supabase
-                .rpc('get_profiles_by_ids', { user_ids: uniqueFriendIds });
+                .from('profiles')
+                .select('id, display_name, avatar_url, user_tag')
+                .in('id', uniqueFriendIds);
 
-            if (profError) {
-                console.warn('RPC failed, trying fallback...', profError);
-                const fallback = await supabase
-                    .from('profiles')
-                    .select('id, display_name, avatar_url, user_tag')
-                    .in('id', uniqueFriendIds);
-
-                if (fallback.error) throw fallback.error;
-                setFriends(fallback.data || []);
-                return;
-            }
-
+            if (profError) throw profError;
             setFriends(profiles || []);
         } catch (err) {
             console.error('Error loading friends in groups:', err);
