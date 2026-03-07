@@ -246,25 +246,35 @@ export default function GroupChatView({ group, user, onBack, onGroupUpdate, init
 
     const loadFriends = async () => {
         try {
-            const { data, error } = await supabase
+            // STEP 1: Fetch raw friendships
+            const { data: rels, error: relsError } = await supabase
                 .from('friendships')
-                .select(`
-                    status, user_id, friend_id,
-                    profile_user:profiles!friendships_user_id_fkey(id, display_name, avatar_url, user_tag),
-                    profile_friend:profiles!friendships_friend_id_fkey(id, display_name, avatar_url, user_tag)
-                `)
+                .select('status, user_id, friend_id')
                 .eq('status', 'accepted')
                 .or(`user_id.eq.${user.id},friend_id.eq.${user.id}`);
 
-            if (error) throw error;
-            const formattedFriends = data.map(rel => {
-                const isInitiator = rel.user_id === user.id;
-                return isInitiator ? rel.profile_friend : rel.profile_user;
-            }).filter(f => f && f.id);
+            if (relsError) throw relsError;
 
-            setFriends(formattedFriends);
+            if (!rels || rels.length === 0) {
+                setFriends([]);
+                return;
+            }
+
+            // Extract unique friend IDs
+            const friendIds = rels.map(rel => rel.user_id === user.id ? rel.friend_id : rel.user_id);
+            const uniqueFriendIds = [...new Set(friendIds)];
+
+            // STEP 2: Fetch profiles for those friends
+            const { data: profiles, error: profError } = await supabase
+                .from('profiles')
+                .select('id, display_name, avatar_url, user_tag')
+                .in('id', uniqueFriendIds);
+
+            if (profError) throw profError;
+
+            setFriends(profiles || []);
         } catch (err) {
-            console.error('Error loading friends:', err);
+            console.error('Error loading friends in group chat:', err);
         }
     };
 
