@@ -112,6 +112,8 @@ function App() {
     });
   };
 
+  const currentUserIdRef = useRef(null);
+
   // Supabase auth listener
   useEffect(() => {
     if (!isSupabaseConfigured() || !supabase) {
@@ -129,6 +131,8 @@ function App() {
       clearTimeout(authTimeout);
       const currentUser = session?.user ?? null;
       setUser(currentUser);
+      currentUserIdRef.current = currentUser?.id || null;
+
       if (currentUser) {
         await initUserData(currentUser.id);
       }
@@ -151,12 +155,18 @@ function App() {
         useStore.getState().resetStoreForNewUser();
         setStorageKey(null);
         setUser(null);
+        currentUserIdRef.current = null;
         return;
       }
 
-      if (newUser && newUser.id !== user?.id) {
+      // Check against ref to avoid stale closure issues causing infinite loops
+      if (newUser && newUser.id !== currentUserIdRef.current) {
+        currentUserIdRef.current = newUser.id;
         setUser(newUser);
         await initUserData(newUser.id);
+      } else if (newUser && newUser.id === currentUserIdRef.current) {
+        // Just update the user object if metadata changed without triggering full re-init
+        setUser(newUser);
       }
     });
 
