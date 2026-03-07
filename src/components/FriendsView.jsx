@@ -93,11 +93,11 @@ export default function FriendsView() {
                 setProfileError(error.message);
             } else if (data) {
                 // Профиль найден, но может не хватать email/tag — дозаполняем
-                if (!data.email || !data.user_tag) {
-                    const updates = {};
-                    if (!data.email) updates.email = user.email;
-                    if (!data.user_tag) updates.user_tag = String(Math.floor(Math.random() * 9999) + 1).padStart(4, '0');
+                const updates = {};
+                if (!data.email && user.email) updates.email = user.email;
+                if (!data.user_tag) updates.user_tag = String(Math.floor(Math.random() * 9999) + 1).padStart(4, '0');
 
+                if (Object.keys(updates).length > 0) {
                     const { data: updated, error: updateErr } = await supabase
                         .from('profiles')
                         .update(updates)

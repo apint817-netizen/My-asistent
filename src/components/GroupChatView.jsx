@@ -752,7 +752,7 @@ export default function GroupChatView({ group, user, onBack, onGroupUpdate, init
                             <h3 className="font-bold text-white flex items-center gap-2"><Users size={18} className="text-accent" /> Участники команды</h3>
                             <button onClick={() => setShowMembers(false)} className="w-8 h-8 flex items-center justify-center rounded-xl bg-white/5 hover:bg-white/10 text-white transition-colors"><X size={18} /></button>
                         </div>
-                        <div className="flex-1 overflow-y-auto p-4 sm:p-6 flex flex-col lg:flex-row gap-6 lg:gap-8 bg-bg-primary">
+                        <div className="flex-1 overflow-y-auto p-4 sm:p-6 flex flex-col gap-6 bg-bg-primary relative">
                             {/* Список участников */}
                             <div className="flex-1">
                                 <h4 className="text-white font-bold mb-4 flex items-center gap-2"><Users size={18} className="text-accent" /> Участники ({members.length})</h4>
@@ -787,7 +787,7 @@ export default function GroupChatView({ group, user, onBack, onGroupUpdate, init
                                                     </div>
                                                 </div>
 
-                                                <div className="flex flex-wrap items-center gap-2">
+                                                <div className="flex flex-wrap items-center gap-2 shrink-0">
                                                     {/* Действия для админов/owner */}
                                                     {myRole === 'owner' && !isMe && (
                                                         <div className="relative">
@@ -823,8 +823,8 @@ export default function GroupChatView({ group, user, onBack, onGroupUpdate, init
 
                             {/* Приглашение новых (только для админов/оунеров) */}
                             {canManage && (
-                                <div className="lg:w-80 shrink-0">
-                                    <div className="bg-white/[0.03] border border-white/5 rounded-2xl p-5 sticky top-0 shadow-lg">
+                                <div className="w-full shrink-0 mt-2">
+                                    <div className="bg-white/[0.03] border border-white/5 rounded-2xl p-5 shadow-lg relative">
                                         <h4 className="text-white font-bold mb-4 flex items-center gap-2"><UserPlus size={18} className="text-accent" /> Пригласить</h4>
 
                                         <div className="space-y-4">
