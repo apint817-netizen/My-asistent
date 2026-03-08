@@ -174,13 +174,12 @@ export default function ResumeView() {
                     const base64 = btoa(
                         new Uint8Array(buffer).reduce((data, byte) => data + String.fromCharCode(byte), '')
                     );
-
-                    const resp = await fetch('/api/resume', {
+                    const baseUrl = import.meta.env.VITE_API_URL || '';
+                    const resp = await fetch(`${baseUrl}/api/resume`, {
                         method: 'POST',
                         headers: { 'Content-Type': 'application/json' },
                         body: JSON.stringify({ fileContent: base64, fileType: file.type || 'application/octet-stream' })
                     });
-
                     const data = await resp.json();
                     if (!resp.ok) {
                         throw new Error(data.error || 'Ошибка загрузки/парсинга файла');

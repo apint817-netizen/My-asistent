@@ -176,13 +176,15 @@ export async function callAI({ baseUrl, apiKey, model, systemPrompt, history, us
 
     } else if (baseUrl === GOOGLE_OPENAI_BASE && !isDevelopment) {
         // Продакшен: бьем в наш надежный сервер Vercel (/api/chat.js с Fallbacks)
+        // Для Capacitor (mobile) используем VITE_API_URL
+        const baseUrl = import.meta.env.VITE_API_URL || '';
         // КРИТИЧЕСКИ ВАЖНО: Удаляем клиентский ключ из заголовков перед отправкой на сервер,
         // чтобы предотвратить 403 ошибку от старого ключа из localStorage.
         // Сервер берет свежий ключ из process.env.GOOGLE_API_KEY
         const serverHeaders = { ...headers };
         delete serverHeaders['Authorization'];
 
-        res = await fetch('/api/chat', {
+        res = await fetch(`${baseUrl}/api/chat`, {
             method: 'POST',
             headers: serverHeaders,
             body: JSON.stringify(body)

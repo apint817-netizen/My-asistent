@@ -196,7 +196,8 @@ export default function TaskManager() {
             const headers = { 'Content-Type': 'application/json' };
             if (apiKey) headers['Authorization'] = `Bearer ${apiKey}`;
 
-            const resp = await fetch('/api/validate', {
+            const baseUrl = import.meta.env.VITE_API_URL || '';
+            const resp = await fetch(`${baseUrl}/api/validate`, {
                 method: 'POST',
                 headers,
                 body: JSON.stringify({ text: newTaskTitle.trim(), type: 'task' })

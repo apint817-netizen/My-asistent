@@ -143,6 +143,35 @@ function App() {
       setAuthLoading(false);
     });
 
+    // Capacitor Deep Link handler for OAuth
+    if (window.Capacitor && window.Capacitor.isNativePlatform()) {
+      import('@capacitor/app').then(({ App }) => {
+        App.addListener('appUrlOpen', async (event) => {
+          if (event.url.includes('login-callback')) {
+            // Закрываем браузер, так как мы вернулись в приложение
+            import('@capacitor/browser').then(({ Browser }) => {
+              Browser.close().catch(console.error);
+            });
+            
+            // Если в URL есть фрагмент вида #access_token=... (явный OAuth)
+            if (event.url.includes('#')) {
+              const hashParams = new URL(event.url).hash.substring(1);
+              const params = new URLSearchParams(hashParams);
+              const accessToken = params.get('access_token');
+              const refreshToken = params.get('refresh_token');
+
+              if (accessToken && refreshToken) {
+                await supabase.auth.setSession({
+                  access_token: accessToken,
+                  refresh_token: refreshToken
+                });
+              }
+            }
+          }
+        });
+      }).catch(console.error);
+    }
+
     const { data: { subscription } } = supabase.auth.onAuthStateChange(async (_event, session) => {
       const newUser = session?.user ?? null;
 

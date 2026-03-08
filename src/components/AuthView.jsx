@@ -66,13 +66,36 @@ export default function AuthView() {
     const handleSocialLogin = async (provider) => {
         try {
             setLoading(true);
-            const { error } = await supabase.auth.signInWithOAuth({
-                provider: provider,
-                options: {
-                    redirectTo: `${window.location.origin}/`
+            const isNative = (window.Capacitor && window.Capacitor.isNativePlatform());
+
+            if (isNative) {
+                // В Capacitor (мобилка) открываем системный браузер, чтобы Google не блочил OAuth 
+                // Создаем специальную ссылку с skipBrowserRedirect
+                const { data, error } = await supabase.auth.signInWithOAuth({
+                    provider: provider,
+                    options: {
+                        redirectTo: 'com.nova.assistant://login-callback',
+                        skipBrowserRedirect: true,
+                    }
+                });
+                
+                if (error) throw error;
+                if (data?.url) {
+                    const { Browser } = await import('@capacitor/browser');
+                    await Browser.open({ url: data.url });
+                    // Слушатель DeepLink (App.addListener) настроен глобально в App.jsx, 
+                    // он перехватит возврат в приложение и вызовет supabase.auth.getSession()
                 }
-            });
-            if (error) throw error;
+            } else {
+                // Обычный Web
+                const { error } = await supabase.auth.signInWithOAuth({
+                    provider: provider,
+                    options: {
+                        redirectTo: `${window.location.origin}/`
+                    }
+                });
+                if (error) throw error;
+            }
         } catch (err) {
             setError(`Ошибка авторизации через ${provider}: ${err.message}`);
             setLoading(false);
