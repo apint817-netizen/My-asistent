@@ -1097,7 +1097,7 @@ export default function GroupChatView({ group, user, onBack, onGroupUpdate, init
                                                 </div>
                                                 
                                                 {showDatePicker && (
-                                                    <div className="absolute top-full mt-2 left-0 right-0 sm:right-auto sm:w-80 bg-bg-secondary border border-white/10 rounded-2xl shadow-2xl p-4 z-50 animate-fade-in" onClick={e => e.stopPropagation()}>
+                                                    <div className="absolute top-full mt-2 left-0 right-0 sm:right-auto sm:w-80 bg-[#0d0a12] border border-white/20 rounded-2xl shadow-2xl p-4 z-50 animate-fade-in" onClick={e => e.stopPropagation()}>
                                                         <div className="flex justify-between items-center mb-4">
                                                             <button 
                                                                 type="button" 
