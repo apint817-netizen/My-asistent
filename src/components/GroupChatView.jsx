@@ -467,6 +467,7 @@ export default function GroupChatView({ group, user, onBack, onGroupUpdate, init
                 finalDueDate = new Date().toISOString().split('T')[0];
             }
 
+            let req;
             if (editingTaskId) {
                 req = supabase.from('group_tasks').update({
                     title: newTaskTitle.trim(),
@@ -1382,11 +1383,11 @@ export default function GroupChatView({ group, user, onBack, onGroupUpdate, init
                                             onClick={() => setSelectedDate(selectedDate === dayStr ? null : dayStr)}
                                             className={`h-16 md:h-24 rounded-2xl flex flex-col items-center justify-start p-1.5 md:p-3 text-sm transition-all duration-300 border relative group overflow-hidden
                                                 ${isSelected ? 'bg-accent/20 border-accent/50 text-accent shadow-[0_0_20px_rgba(var(--color-accent),0.3)] scale-[1.02] z-10' :
-                                                    totalCount > 0 ? 'bg-bg-primary/60 border-accent/20 hover:border-accent/50 text-white hover:-translate-y-1 hover:shadow-[0_4px_15px_rgba(var(--color-accent),0.1)]' :
-                                                        'bg-bg-secondary/40 border-border/50 hover:border-white/20 text-text-secondary hover:bg-bg-secondary/80'}
-                                                ${isToday && !isSelected ? 'ring-2 ring-white/20 bg-white/5' : ''}`}
+                                                    totalCount > 0 ? 'bg-bg-primary border-accent/20 hover:border-accent/50 text-white hover:-translate-y-1 hover:shadow-[0_4px_15px_rgba(var(--color-accent),0.1)]' :
+                                                        'bg-bg-secondary/80 border-border/50 hover:border-white/20 text-text-secondary hover:bg-bg-secondary'}
+                                                ${isToday && !isSelected ? 'ring-2 ring-white/20 bg-white/10' : ''}`}
                                         >
-                                            <div className="absolute inset-0 bg-gradient-to-b from-white/5 to-transparent opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none"></div>
+                                            <div className="absolute inset-0 bg-gradient-to-b from-white/10 to-transparent opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none"></div>
                                             <span className={`font-bold text-lg md:text-xl relative z-10 ${isToday ? 'text-white drop-shadow-md' : ''} ${isSelected ? 'text-accent drop-shadow-[0_0_8px_rgba(var(--color-accent),0.8)]' : ''}`}>{day}</span>
                                             {totalCount > 0 && (
                                                 <div className="mt-auto w-full flex flex-col items-center gap-1 md:gap-1.5 relative z-10">
