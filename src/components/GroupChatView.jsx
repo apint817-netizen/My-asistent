@@ -1007,7 +1007,17 @@ export default function GroupChatView({ group, user, onBack, onGroupUpdate, init
                                                         <option value="" className="bg-bg-primary text-white">Все участники</option>
                                                         {members.map(m => {
                                                             const p = profiles[m.user_id];
-                                                            return <option key={m.user_id} value={m.user_id} className="bg-bg-primary text-white">{p?.display_name || m.user_id}</option>
+                                                            if (!p) {
+                                                                return <option key={m.user_id} value={m.user_id} disabled className="bg-bg-primary text-white/50">⏳ Загрузка...</option>;
+                                                            }
+                                                            const name = p?.display_name 
+                                                                ? `${p.display_name}${p.user_tag ? ' #' + p.user_tag : ''}` 
+                                                                : (p ? 'Без имени' : `Участник (${m.user_id.substring(0,4)}...)`);
+                                                            return (
+                                                                <option key={m.user_id} value={m.user_id} className="bg-bg-primary text-white">
+                                                                    {name}
+                                                                </option>
+                                                            );
                                                         })}
                                                     </select>
                                                 </div>

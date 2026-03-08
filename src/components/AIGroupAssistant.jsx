@@ -284,6 +284,9 @@ ${groupContext}
                                 <option value="">Кто угодно (Авто)</option>
                                 {members.map(m => {
                                     const p = profiles[m.user_id];
+                                    if (!p) {
+                                        return <option key={m.user_id} value={m.user_id} disabled>⏳ Загрузка...</option>;
+                                    }
                                     const name = p?.display_name 
                                         ? `${p.display_name}${p.user_tag ? ' #' + p.user_tag : ''}` 
                                         : (p ? 'Без имени' : `Участник (${m.user_id.substring(0,4)}...)`);
