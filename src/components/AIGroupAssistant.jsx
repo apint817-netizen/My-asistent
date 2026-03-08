@@ -4,6 +4,7 @@ import { Send, Bot, User, Trash2, Settings, X, ChevronDown } from 'lucide-react'
 import { callAI, GOOGLE_OPENAI_BASE } from '../utils/geminiApi';
 import { supabase } from '../lib/supabase';
 import ReactMarkdown from 'react-markdown';
+import ConfirmModal from './ConfirmModal';
 
 export default function AIGroupAssistant({ group, user, members, profiles, tasks }) {
     const [messages, setMessages] = useState([]);
@@ -16,6 +17,8 @@ export default function AIGroupAssistant({ group, user, members, profiles, tasks
     const [aiTaskRewardType, setAiTaskRewardType] = useState('points');
     const [aiTaskRewardAmount, setAiTaskRewardAmount] = useState(10);
     const [aiTaskCategory, setAiTaskCategory] = useState('normal');
+
+    const [confirmConfig, setConfirmConfig] = useState(null);
 
     const storageKey = `ai_group_chat_${group.id}`;
 
@@ -190,10 +193,17 @@ ${groupContext}
     };
 
     const clearChat = () => {
-        if (window.confirm('Очистить историю диалога с ИИ?')) {
-            setMessages([]);
-            localStorage.removeItem(storageKey);
-        }
+        setConfirmConfig({
+            isOpen: true,
+            title: 'Очистить историю?',
+            description: 'Вы уверены, что хотите очистить текущий диалог с ИИ? Ранее созданные задачи никуда не пропадут.',
+            confirmText: 'Да, очистить',
+            danger: true,
+            onConfirm: () => {
+                setMessages([]);
+                localStorage.removeItem(storageKey);
+            }
+        });
     };
 
     return (
@@ -280,23 +290,28 @@ ${groupContext}
                     <div className="mb-3 p-3 bg-black/40 border border-purple-500/20 rounded-xl space-y-3 animate-fade-in shadow-lg">
                         <div className="flex items-center justify-between gap-2">
                             <label className="text-xs text-text-secondary w-[30%]">Исполнитель:</label>
-                            <select value={aiTaskAssignee} onChange={e => setAiTaskAssignee(e.target.value)} className="w-[70%] bg-black/60 border border-white/10 text-white text-xs rounded-lg px-2 py-1.5 outline-none focus:border-purple-500/50">
-                                <option value="">Кто угодно (Авто)</option>
-                                {members.map(m => {
-                                    const p = profiles[m.user_id];
-                                    if (!p) {
-                                        return <option key={m.user_id} value={m.user_id} disabled>⏳ Загрузка...</option>;
-                                    }
-                                    const name = p?.display_name 
-                                        ? `${p.display_name}${p.user_tag ? ' #' + p.user_tag : ''}` 
-                                        : (p ? 'Без имени' : `Участник (${m.user_id.substring(0,4)}...)`);
-                                    return (
-                                        <option key={m.user_id} value={m.user_id}>
-                                            {name}
-                                        </option>
-                                    );
-                                })}
-                            </select>
+                            {members.length > 0 && members.some(m => !profiles[m.user_id]) ? (
+                                <div className="w-[70%] bg-black/60 border border-white/10 text-white/50 text-xs rounded-lg px-2 py-1.5 flex items-center gap-2">
+                                    <div className="w-3 h-3 border-2 border-purple-500/30 border-t-purple-500 rounded-full animate-spin"></div>
+                                    <span>Загрузка...</span>
+                                </div>
+                            ) : (
+                                <select value={aiTaskAssignee} onChange={e => setAiTaskAssignee(e.target.value)} className="w-[70%] bg-black/60 border border-white/10 text-white text-xs rounded-lg px-2 py-1.5 outline-none focus:border-purple-500/50">
+                                    <option value="">Кто угодно (Авто)</option>
+                                    {members.map(m => {
+                                        const p = profiles[m.user_id];
+                                        if (!p) return null;
+                                        const name = p?.display_name 
+                                            ? `${p.display_name}${p.user_tag ? ' #' + p.user_tag : ''}` 
+                                            : (p ? 'Без имени' : `Участник (${m.user_id.substring(0,4)}...)`);
+                                        return (
+                                            <option key={m.user_id} value={m.user_id}>
+                                                {name}
+                                            </option>
+                                        );
+                                    })}
+                                </select>
+                            )}
                         </div>
                         <div className="flex items-center justify-between gap-2">
                             <label className="text-xs text-text-secondary w-[30%]">Награда:</label>
@@ -344,6 +359,13 @@ ${groupContext}
                     </button>
                 </form>
             </div>
+
+            {confirmConfig && (
+                <ConfirmModal
+                    {...confirmConfig}
+                    onClose={() => setConfirmConfig(null)}
+                />
+            )}
         </div>
     );
 }

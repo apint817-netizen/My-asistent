@@ -3,6 +3,8 @@ import { supabase } from '../lib/supabase';
 import { useStore } from '../store/useStore';
 import { ArrowLeft, Send, Users, Shield, UserPlus, Settings, LogOut, CheckCheck, Check, Search, Trash2, X, ListTodo, Plus, Circle, CheckCircle, Sparkles, Bot, Edit2, MessageSquare, Calendar, ChevronLeft, ChevronRight } from 'lucide-react';
 import AIGroupAssistant from './AIGroupAssistant';
+import ConfirmModal from './ConfirmModal';
+import PromptModal from './PromptModal';
 
 export default function GroupChatView({ group, user, onBack, onGroupUpdate, initialOpenSettings }) {
     const [messages, setMessages] = useState([]);
@@ -38,6 +40,10 @@ export default function GroupChatView({ group, user, onBack, onGroupUpdate, init
     const [newTaskCategory, setNewTaskCategory] = useState('normal');
     const [newTaskAssignedTo, setNewTaskAssignedTo] = useState('');
     const [newTaskDueDate, setNewTaskDueDate] = useState('');
+
+    // Modal Confirmations
+    const [confirmConfig, setConfirmConfig] = useState(null);
+    const [promptConfig, setPromptConfig] = useState(null);
 
     // Calendar state
     const [currentDate, setCurrentDate] = useState(new Date());
@@ -382,39 +388,57 @@ export default function GroupChatView({ group, user, onBack, onGroupUpdate, init
     };
 
     const handleRemoveMember = async (targetUserId) => {
-        if (!confirm('Вы уверены?')) return;
-        try {
-            const { error } = await supabase
-                .from('group_members')
-                .delete()
-                .eq('group_id', group.id)
-                .eq('user_id', targetUserId);
-            if (error) throw error;
-            if (targetUserId === user.id) {
-                onBack(); // Я вышел
-                onGroupUpdate();
-            } else {
-                loadMembers();
+        setConfirmConfig({
+            isOpen: true,
+            title: targetUserId === user.id ? 'Покинуть команду?' : 'Исключить участника?',
+            description: targetUserId === user.id ? 'Вы уверены, что хотите покинуть эту команду?' : 'Вы уверены, что хотите исключить этого пользователя из команды?',
+            confirmText: targetUserId === user.id ? 'Да, покинуть' : 'Да, исключить',
+            danger: true,
+            onConfirm: async () => {
+                try {
+                    const { error } = await supabase
+                        .from('group_members')
+                        .delete()
+                        .eq('group_id', group.id)
+                        .eq('user_id', targetUserId);
+                    if (error) throw error;
+                    if (targetUserId === user.id) {
+                        onBack(); // Я вышел
+                        onGroupUpdate();
+                    } else {
+                        loadMembers();
+                    }
+                } catch (error) {
+                    console.error('Error removing member:', error);
+                }
             }
-        } catch (error) {
-            console.error('Error removing member:', error);
-        }
+        });
     };
 
     const handleChangeRole = async (targetUserId, newRole) => {
-        if (!confirm(`Изменить роль на ${newRole}?`)) return;
-        try {
-            const { error } = await supabase
-                .from('group_members')
-                .update({ role: newRole })
-                .eq('group_id', group.id)
-                .eq('user_id', targetUserId);
-            if (error) throw error;
-            loadMembers();
-        } catch (error) {
-            console.error('Error changing role:', error);
-            alert('Ошибка. Возможно, у вас нет прав на это действие.');
-        }
+        const roleLabel = newRole === 'admin' ? 'Администратора' : newRole === 'owner' ? 'Владельца' : 'Участника';
+        setConfirmConfig({
+            isOpen: true,
+            title: 'Смена роли',
+            description: `Вы уверены, что хотите назначить этому пользователю роль <b>${roleLabel}</b>?`,
+            confirmText: 'Да, назначить',
+            danger: false,
+            icon: Shield,
+            onConfirm: async () => {
+                try {
+                    const { error } = await supabase
+                        .from('group_members')
+                        .update({ role: newRole })
+                        .eq('group_id', group.id)
+                        .eq('user_id', targetUserId);
+                    if (error) throw error;
+                    loadMembers();
+                } catch (error) {
+                    console.error('Error changing role:', error);
+                    alert('Ошибка. Возможно, у вас нет прав на это действие.');
+                }
+            }
+        });
     };
 
     const formatTime = (dateStr) => {
@@ -519,18 +543,26 @@ export default function GroupChatView({ group, user, onBack, onGroupUpdate, init
     };
 
     const handleDeleteTask = async (taskId) => {
-        if (!confirm('Удалить задачу?')) return;
-        try {
-            const { error } = await supabase
-                .from('group_tasks')
-                .delete()
-                .eq('id', taskId);
-            if (error) throw error;
-            setTasks(prev => prev.filter(t => t.id !== taskId));
-        } catch (err) {
-            console.error('Error deleting task:', err);
-            alert('Ошибка удаления. Возможно у вас нет прав.');
-        }
+        setConfirmConfig({
+            isOpen: true,
+            title: 'Удалить задачу?',
+            description: 'Вы уверены, что хотите безвозвратно удалить эту командную задачу?',
+            confirmText: 'Да, удалить',
+            danger: true,
+            onConfirm: async () => {
+                try {
+                    const { error } = await supabase
+                        .from('group_tasks')
+                        .delete()
+                        .eq('id', taskId);
+                    if (error) throw error;
+                    setTasks(prev => prev.filter(t => t.id !== taskId));
+                } catch (err) {
+                    console.error('Error deleting task:', err);
+                    alert('Ошибка удаления. Возможно у вас нет прав.');
+                }
+            }
+        });
     };
 
     const handleUpdateGroup = async (e) => {
@@ -550,20 +582,28 @@ export default function GroupChatView({ group, user, onBack, onGroupUpdate, init
     };
 
     const handleDeleteGroup = async () => {
-        const confirmName = prompt('Чтобы удалить команду, введите её точное название:');
-        if (confirmName !== group.name) {
-            if (confirmName !== null) alert('Название не совпадает. Отмена.');
-            return;
-        }
-        try {
-            const { error } = await supabase.from('groups').delete().eq('id', group.id);
-            if (error) throw error;
-            onBack();
-            onGroupUpdate();
-        } catch (err) {
-            console.error('Delete error:', err);
-            alert('Ошибка при удалении');
-        }
+        setPromptConfig({
+            isOpen: true,
+            title: 'Удалить команду?',
+            description: `Это действие необратимо. Будут удалены все участники, календарь и список задач.\nДля подтверждения введите точное название команды: <br/><strong class="text-white">${group.name}</strong>`,
+            placeholder: 'Название команды',
+            expectedValue: group.name,
+            confirmText: 'Удалить навсегда',
+            cancelText: 'Отмена',
+            danger: true,
+            icon: Trash2,
+            onConfirm: async () => {
+                try {
+                    const { error } = await supabase.from('groups').delete().eq('id', group.id);
+                    if (error) throw error;
+                    onBack();
+                    onGroupUpdate();
+                } catch (err) {
+                    console.error('Delete error:', err);
+                    alert('Ошибка при удалении');
+                }
+            }
+        });
     };
 
     return (
@@ -998,29 +1038,36 @@ export default function GroupChatView({ group, user, onBack, onGroupUpdate, init
 
                                             <div>
                                                 <label className="block text-xs font-semibold text-text-secondary uppercase tracking-wider mb-1.5">Исполнитель</label>
-                                                <div className="flex bg-black/40 rounded-xl border border-white/10 p-1">
-                                                    <select
-                                                        value={newTaskAssignedTo}
-                                                        onChange={(e) => setNewTaskAssignedTo(e.target.value)}
-                                                        className="bg-transparent border-none text-white text-sm outline-none px-2 py-1.5 w-full cursor-pointer appearance-none"
-                                                    >
-                                                        <option value="" className="bg-bg-primary text-white">Все участники</option>
-                                                        {members.map(m => {
-                                                            const p = profiles[m.user_id];
-                                                            if (!p) {
-                                                                return <option key={m.user_id} value={m.user_id} disabled className="bg-bg-primary text-white/50">⏳ Загрузка...</option>;
-                                                            }
-                                                            const name = p?.display_name 
-                                                                ? `${p.display_name}${p.user_tag ? ' #' + p.user_tag : ''}` 
-                                                                : (p ? 'Без имени' : `Участник (${m.user_id.substring(0,4)}...)`);
-                                                            return (
-                                                                <option key={m.user_id} value={m.user_id} className="bg-bg-primary text-white">
-                                                                    {name}
-                                                                </option>
-                                                            );
-                                                        })}
-                                                    </select>
-                                                </div>
+                                                {members.length > 0 && members.some(m => !profiles[m.user_id]) ? (
+                                                    <div className="flex bg-black/40 rounded-xl border border-white/10 px-3 py-2.5">
+                                                        <div className="flex items-center gap-2 text-white/50 text-sm">
+                                                            <div className="w-4 h-4 border-2 border-accent/30 border-t-accent rounded-full animate-spin"></div>
+                                                            <span>Загрузка...</span>
+                                                        </div>
+                                                    </div>
+                                                ) : (
+                                                    <div className="flex bg-black/40 rounded-xl border border-white/10 p-1">
+                                                        <select
+                                                            value={newTaskAssignedTo}
+                                                            onChange={(e) => setNewTaskAssignedTo(e.target.value)}
+                                                            className="bg-transparent border-none text-white text-sm outline-none px-2 py-1.5 w-full cursor-pointer appearance-none"
+                                                        >
+                                                            <option value="" className="bg-bg-primary text-white">Все участники</option>
+                                                            {members.map(m => {
+                                                                const p = profiles[m.user_id];
+                                                                if (!p) return null;
+                                                                const name = p?.display_name 
+                                                                    ? `${p.display_name}${p.user_tag ? ' #' + p.user_tag : ''}` 
+                                                                    : (p ? 'Без имени' : `Участник (${m.user_id.substring(0,4)}...)`);
+                                                                return (
+                                                                    <option key={m.user_id} value={m.user_id} className="bg-bg-primary text-white">
+                                                                        {name}
+                                                                    </option>
+                                                                );
+                                                            })}
+                                                        </select>
+                                                    </div>
+                                                )}
                                             </div>
                                             <div>
                                                 <label className="block text-xs font-semibold text-text-secondary uppercase tracking-wider mb-1.5">Крайний срок (Срок сдачи)</label>
@@ -1393,6 +1440,21 @@ export default function GroupChatView({ group, user, onBack, onGroupUpdate, init
                     </div>
                 )
             }
+
+            {/* Modal Confirmations */}
+            {confirmConfig && (
+                <ConfirmModal
+                    {...confirmConfig}
+                    onClose={() => setConfirmConfig(null)}
+                />
+            )}
+            
+            {promptConfig && (
+                <PromptModal
+                    {...promptConfig}
+                    onClose={() => setPromptConfig(null)}
+                />
+            )}
         </div >
     );
 }
