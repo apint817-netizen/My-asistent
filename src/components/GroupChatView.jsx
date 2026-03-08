@@ -127,10 +127,20 @@ export default function GroupChatView({ group, user, onBack, onGroupUpdate, init
             })
             .subscribe();
 
+        const handleProfileUpdate = async () => {
+            if (!user?.id) return;
+            const { data } = await supabase.from('profiles').select('id, display_name, avatar_url, user_tag').eq('id', user.id).single();
+            if (data) {
+                setProfiles(prev => ({ ...prev, [user.id]: data }));
+            }
+        };
+        window.addEventListener('profileUpdated', handleProfileUpdate);
+
         return () => {
             supabase.removeChannel(msgsChannel);
             supabase.removeChannel(membersChannel);
             supabase.removeChannel(tasksChannel);
+            window.removeEventListener('profileUpdated', handleProfileUpdate);
         };
     }, [group.id]);
 

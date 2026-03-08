@@ -43,8 +43,14 @@ export default function FriendsView() {
             })
             .subscribe();
 
+        const handleProfileUpdate = () => {
+            loadMyProfile();
+        };
+        window.addEventListener('profileUpdated', handleProfileUpdate);
+
         return () => {
             supabase.removeChannel(channel);
+            window.removeEventListener('profileUpdated', handleProfileUpdate);
         };
     }, [user]);
 

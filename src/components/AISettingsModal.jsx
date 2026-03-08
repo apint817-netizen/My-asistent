@@ -185,6 +185,8 @@ export default function AISettingsModal({ isOpen, onClose }) {
                         })
                         .eq('id', user.id);
                     if (error) throw error;
+                    
+                    window.dispatchEvent(new Event('profileUpdated'));
                 }
             } catch (err) {
                 console.error('Error saving profile:', err);
