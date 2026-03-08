@@ -282,9 +282,17 @@ ${groupContext}
                             <label className="text-xs text-text-secondary w-[30%]">Исполнитель:</label>
                             <select value={aiTaskAssignee} onChange={e => setAiTaskAssignee(e.target.value)} className="w-[70%] bg-black/60 border border-white/10 text-white text-xs rounded-lg px-2 py-1.5 outline-none focus:border-purple-500/50">
                                 <option value="">Кто угодно (Авто)</option>
-                                {members.map(m => (
-                                    <option key={m.user_id} value={m.user_id}>{profiles[m.user_id]?.display_name || m.user_id}</option>
-                                ))}
+                                {members.map(m => {
+                                    const p = profiles[m.user_id];
+                                    const name = p?.display_name 
+                                        ? `${p.display_name}${p.user_tag ? ' #' + p.user_tag : ''}` 
+                                        : (p ? 'Без имени' : `Участник (${m.user_id.substring(0,4)}...)`);
+                                    return (
+                                        <option key={m.user_id} value={m.user_id}>
+                                            {name}
+                                        </option>
+                                    );
+                                })}
                             </select>
                         </div>
                         <div className="flex items-center justify-between gap-2">
