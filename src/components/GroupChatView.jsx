@@ -241,7 +241,7 @@ export default function GroupChatView({ group, user, onBack, onGroupUpdate, init
     };
 
     const loadProfiles = async (userIds) => {
-        const missingIds = userIds.filter(id => !profiles[id]);
+        const missingIds = userIds.filter(id => profiles[id] === undefined);
         if (missingIds.length === 0) return;
 
         try {
@@ -255,10 +255,26 @@ export default function GroupChatView({ group, user, onBack, onGroupUpdate, init
             setProfiles(prev => {
                 const newProfiles = { ...prev };
                 data.forEach(p => newProfiles[p.id] = p);
+                // Помечаем отсутствующие профили как null, чтобы не было бесконечной загрузки
+                missingIds.forEach(id => {
+                    if (newProfiles[id] === undefined) {
+                        newProfiles[id] = null;
+                    }
+                });
                 return newProfiles;
             });
         } catch (error) {
             console.error('Error loading profiles:', error);
+            // При ошибке также снимаем статус "загрузки", чтобы не блокировать UI полностью
+            setProfiles(prev => {
+                const newProfiles = { ...prev };
+                missingIds.forEach(id => {
+                    if (newProfiles[id] === undefined) {
+                        newProfiles[id] = null;
+                    }
+                });
+                return newProfiles;
+            });
         }
     };
 
@@ -1053,7 +1069,7 @@ export default function GroupChatView({ group, user, onBack, onGroupUpdate, init
 
                                             <div>
                                                 <label className="block text-xs font-semibold text-text-secondary uppercase tracking-wider mb-1.5">Исполнитель</label>
-                                                {members.length > 0 && members.some(m => !profiles[m.user_id]) ? (
+                                                {members.length > 0 && members.some(m => profiles[m.user_id] === undefined) ? (
                                                     <div className="flex bg-black/40 rounded-xl border border-white/10 px-3 py-2.5">
                                                         <div className="flex items-center gap-2 text-white/50 text-sm">
                                                             <div className="w-4 h-4 border-2 border-accent/30 border-t-accent rounded-full animate-spin"></div>
