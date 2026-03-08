@@ -75,10 +75,10 @@ function App() {
         }
       }
 
-      // Then load from Supabase with a timeout (5s max)
+      // Then load from Supabase with a timeout (15s max)
       try {
         const timeoutPromise = new Promise((_, reject) =>
-          setTimeout(() => reject(new Error('Supabase load timeout')), 5000)
+          setTimeout(() => reject(new Error('Supabase load timeout')), 15000)
         );
         const remoteData = await Promise.race([
           loadUserData(userId),
@@ -121,11 +121,11 @@ function App() {
       return;
     }
 
-    // Auth check with timeout (5s max)
+    // Auth check with timeout (15s max)
     const authTimeout = setTimeout(() => {
       console.warn('[App] Auth check timed out, proceeding without auth');
       setAuthLoading(false);
-    }, 5000);
+    }, 15000);
 
     supabase.auth.getSession().then(async ({ data: { session } }) => {
       clearTimeout(authTimeout);

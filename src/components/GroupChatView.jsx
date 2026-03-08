@@ -40,6 +40,7 @@ export default function GroupChatView({ group, user, onBack, onGroupUpdate, init
     const [newTaskCategory, setNewTaskCategory] = useState('normal');
     const [newTaskAssignedTo, setNewTaskAssignedTo] = useState('');
     const [newTaskDueDate, setNewTaskDueDate] = useState('');
+    const [showDatePicker, setShowDatePicker] = useState(false);
 
     // Modal Confirmations
     const [confirmConfig, setConfirmConfig] = useState(null);
@@ -460,7 +461,12 @@ export default function GroupChatView({ group, user, onBack, onGroupUpdate, init
         if (!newTaskTitle.trim()) return;
 
         try {
-            let req;
+            let finalDueDate = newTaskDueDate || null;
+            if (!finalDueDate && activeGroupTab === 'tasks') {
+                // Если не указан срок сдачи, ставим на сегодня
+                finalDueDate = new Date().toISOString().split('T')[0];
+            }
+
             if (editingTaskId) {
                 req = supabase.from('group_tasks').update({
                     title: newTaskTitle.trim(),
@@ -468,7 +474,7 @@ export default function GroupChatView({ group, user, onBack, onGroupUpdate, init
                     value: Number(newTaskValue) || 0,
                     category: newTaskCategory,
                     assigned_to: newTaskAssignedTo || null,
-                    due_date: newTaskDueDate || null
+                    due_date: finalDueDate
                 }).eq('id', editingTaskId);
             } else {
                 req = supabase.from('group_tasks').insert({
@@ -479,7 +485,7 @@ export default function GroupChatView({ group, user, onBack, onGroupUpdate, init
                     created_by: user.id,
                     category: newTaskCategory,
                     assigned_to: newTaskAssignedTo || null,
-                    due_date: newTaskDueDate || null
+                    due_date: finalDueDate
                 });
             }
             const { error } = await req;
@@ -1077,14 +1083,83 @@ export default function GroupChatView({ group, user, onBack, onGroupUpdate, init
                                                     </div>
                                                 )}
                                             </div>
-                                            <div>
-                                                <label className="block text-xs font-semibold text-text-secondary uppercase tracking-wider mb-1.5">Крайний срок (Срок сдачи)</label>
-                                                <input
-                                                    type="date"
-                                                    value={newTaskDueDate}
-                                                    onChange={(e) => setNewTaskDueDate(e.target.value)}
-                                                    className="w-full bg-black/40 border border-white/10 rounded-xl px-4 py-2.5 text-sm text-white focus:border-accent outline-none transition-colors cursor-pointer"
-                                                />
+                                            <div className="relative">
+                                                <label className="block text-xs font-semibold text-text-secondary uppercase tracking-wider mb-1.5">Крайний срок (по умолч. сегодня)</label>
+                                                <div 
+                                                    onClick={() => setShowDatePicker(!showDatePicker)}
+                                                    className="w-full bg-black/40 border border-white/10 rounded-xl px-4 py-2.5 text-sm text-white focus:border-accent outline-none transition-colors cursor-pointer flex justify-between items-center"
+                                                >
+                                                    <span className={newTaskDueDate ? "text-white font-medium" : "text-text-secondary"}>
+                                                        {newTaskDueDate ? newTaskDueDate.split('-').reverse().join('.') : "Сегодня"}
+                                                    </span>
+                                                    <Calendar size={16} className="text-text-secondary" />
+                                                </div>
+                                                
+                                                {showDatePicker && (
+                                                    <div className="absolute top-full mt-2 left-0 right-0 sm:right-auto sm:w-80 bg-bg-secondary border border-white/10 rounded-2xl shadow-2xl p-4 z-50 animate-fade-in" onClick={e => e.stopPropagation()}>
+                                                        <div className="flex justify-between items-center mb-4">
+                                                            <button 
+                                                                type="button" 
+                                                                onClick={(e) => { e.preventDefault(); setCurrentDate(new Date(currentDate.getFullYear(), currentDate.getMonth() - 1, 1)); }}
+                                                                className="text-text-secondary hover:text-white transition-colors"
+                                                            ><ChevronLeft size={20} /></button>
+                                                            <div className="font-bold text-white relative">
+                                                                {monthNames[currentDate.getMonth()]} {currentDate.getFullYear()}
+                                                            </div>
+                                                            <button 
+                                                                type="button" 
+                                                                onClick={(e) => { e.preventDefault(); setCurrentDate(new Date(currentDate.getFullYear(), currentDate.getMonth() + 1, 1)); }}
+                                                                className="text-text-secondary hover:text-white transition-colors"
+                                                            ><ChevronRight size={20} /></button>
+                                                        </div>
+                                                        <div className="grid grid-cols-7 gap-1 mb-2">
+                                                            {weekDays.map(day => (
+                                                                <div key={`d-${day}`} className="text-center text-[10px] font-bold text-text-secondary uppercase">{day}</div>
+                                                            ))}
+                                                        </div>
+                                                        <div className="grid grid-cols-7 gap-1">
+                                                            {Array.from({ length: getFirstDayOfMonth(currentDate.getFullYear(), currentDate.getMonth()) }).map((_, i) => (
+                                                                <div key={`emp-${i}`} className="h-8"></div>
+                                                            ))}
+                                                            {Array.from({ length: getDaysInMonth(currentDate.getFullYear(), currentDate.getMonth()) }).map((_, i) => {
+                                                                const day = i + 1;
+                                                                const dayStr = formatDateString(currentDate.getFullYear(), currentDate.getMonth(), day);
+                                                                const isSelected = newTaskDueDate === dayStr;
+                                                                const isToday = dayStr === new Date().toISOString().split('T')[0];
+                                                                
+                                                                return (
+                                                                    <button
+                                                                        type="button"
+                                                                        key={`day-${day}`}
+                                                                        onClick={() => {
+                                                                            setNewTaskDueDate(dayStr);
+                                                                            setShowDatePicker(false);
+                                                                        }}
+                                                                        className={`h-8 w-full rounded-lg text-xs font-semibold flex items-center justify-center transition-all ${isSelected ? 'bg-accent text-white shadow-md' : isToday ? 'bg-white/10 text-white ring-1 ring-white/20' : 'text-text-secondary hover:bg-white/5 hover:text-white'}`}
+                                                                    >
+                                                                        {day}
+                                                                    </button>
+                                                                )
+                                                            })}
+                                                        </div>
+                                                        <div className="mt-4 pt-3 border-t border-white/10 flex justify-between">
+                                                            <button 
+                                                                type="button"
+                                                                onClick={() => { setNewTaskDueDate(''); setShowDatePicker(false); }}
+                                                                className="text-xs font-semibold text-text-secondary hover:text-white transition-colors px-2 py-1"
+                                                            >
+                                                                Сбросить
+                                                            </button>
+                                                            <button 
+                                                                type="button"
+                                                                onClick={() => setShowDatePicker(false)}
+                                                                className="text-xs font-bold text-accent hover:text-white transition-colors px-3 py-1 bg-accent/10 rounded-lg"
+                                                            >
+                                                                Готово
+                                                            </button>
+                                                        </div>
+                                                    </div>
+                                                )}
                                             </div>
                                             <div className="sm:col-span-2">
                                                 <label className="block text-xs font-semibold text-text-secondary uppercase tracking-wider mb-1.5">Матрица Эйзенхауэра</label>
