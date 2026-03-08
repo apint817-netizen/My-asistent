@@ -454,9 +454,8 @@ export default function GroupChatView({ group, user, onBack, onGroupUpdate, init
             if (editingTaskId) {
                 req = supabase.from('group_tasks').update({
                     title: newTaskTitle.trim(),
-                    description: newTaskDesc.trim(),
-                    reward_type: newTaskRewardType,
-                    value: newTaskValue,
+                    description: newTaskDesc?.trim() || null,
+                    value: Number(newTaskValue) || 0,
                     category: newTaskCategory,
                     assigned_to: newTaskAssignedTo || null,
                     due_date: newTaskDueDate || null
@@ -465,9 +464,8 @@ export default function GroupChatView({ group, user, onBack, onGroupUpdate, init
                 req = supabase.from('group_tasks').insert({
                     group_id: group.id,
                     title: newTaskTitle.trim(),
-                    description: newTaskDesc.trim(),
-                    reward_type: newTaskRewardType,
-                    value: newTaskValue,
+                    description: newTaskDesc?.trim() || null,
+                    value: Number(newTaskValue) || 0,
                     created_by: user.id,
                     category: newTaskCategory,
                     assigned_to: newTaskAssignedTo || null,
@@ -1291,31 +1289,41 @@ export default function GroupChatView({ group, user, onBack, onGroupUpdate, init
                                     const totalCount = tasksForDay.length;
                                     const completedCount = tasksForDay.filter(t => t.completed).length;
                                     const uncompletedCount = totalCount - completedCount;
+                                    const points = tasksForDay.reduce((sum, task) => sum + (task.value || 0), 0);
 
                                     return (
                                         <button
                                             key={day}
                                             onClick={() => setSelectedDate(selectedDate === dayStr ? null : dayStr)}
-                                            className={`h-16 md:h-24 rounded-2xl flex flex-col items-center justify-start py-1.5 md:py-3 transition-all duration-300 border relative group overflow-hidden
+                                            className={`h-16 md:h-24 rounded-2xl flex flex-col items-center justify-start p-1.5 md:p-3 text-sm transition-all duration-300 border relative group overflow-hidden
                                                 ${isSelected ? 'bg-accent/20 border-accent/50 text-accent shadow-[0_0_20px_rgba(var(--color-accent),0.3)] scale-[1.02] z-10' :
-                                                    totalCount > 0 ? 'bg-bg-primary/60 border-accent/20 hover:border-accent/50 text-white hover:-translate-y-1' :
-                                                        'bg-white/5 border-white/5 hover:border-white/20 text-text-secondary hover:bg-white/10'}
-                                                ${isToday && !isSelected ? 'ring-2 ring-white/20' : ''}`}
+                                                    totalCount > 0 ? 'bg-bg-primary/60 border-accent/20 hover:border-accent/50 text-white hover:-translate-y-1 hover:shadow-[0_4px_15px_rgba(var(--color-accent),0.1)]' :
+                                                        'bg-bg-secondary/40 border-border/50 hover:border-white/20 text-text-secondary hover:bg-bg-secondary/80'}
+                                                ${isToday && !isSelected ? 'ring-2 ring-white/20 bg-white/5' : ''}`}
                                         >
-                                            <span className={`font-bold text-sm md:text-lg relative z-10 ${isToday ? 'text-white' : ''}`}>{day}</span>
+                                            <div className="absolute inset-0 bg-gradient-to-b from-white/5 to-transparent opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none"></div>
+                                            <span className={`font-bold text-lg md:text-xl relative z-10 ${isToday ? 'text-white drop-shadow-md' : ''} ${isSelected ? 'text-accent drop-shadow-[0_0_8px_rgba(var(--color-accent),0.8)]' : ''}`}>{day}</span>
                                             {totalCount > 0 && (
-                                                <div className="mt-auto w-full flex flex-col items-center gap-1 relative z-10">
-                                                    <div className="flex gap-1 justify-center max-w-full px-1 flex-wrap h-2 overflow-hidden">
+                                                <div className="mt-auto w-full flex flex-col items-center gap-1 md:gap-1.5 relative z-10">
+                                                    <div className="flex gap-1 justify-center items-center max-w-full px-1">
                                                         {Array.from({ length: Math.min(completedCount, 3) }).map((_, idx) => (
-                                                            <div key={`c-${idx}`} className="w-1.5 h-1.5 md:w-2 md:h-2 rounded-full bg-success"></div>
+                                                            <div key={`c-${idx}`} className="w-1.5 h-1.5 md:w-2 md:h-2 rounded-full bg-success shadow-[0_0_5px_rgba(34,197,94,0.6)] shrink-0"></div>
                                                         ))}
                                                         {Array.from({ length: Math.min(uncompletedCount, Math.max(0, 3 - completedCount)) }).map((_, idx) => (
-                                                            <div key={`u-${idx}`} className="w-1.5 h-1.5 md:w-2 md:h-2 rounded-full bg-accent"></div>
+                                                            <div key={`u-${idx}`} className="w-1.5 h-1.5 md:w-2 md:h-2 rounded-full bg-accent shadow-[0_0_5px_rgba(var(--color-accent),0.6)] shrink-0"></div>
                                                         ))}
+                                                        {totalCount > 3 && (
+                                                            <span className="text-[7px] md:text-[8px] font-bold text-white/80 ml-0.5 leading-none">+{totalCount - 3}</span>
+                                                        )}
                                                     </div>
-                                                    <span className="text-[8px] md:text-[9px] font-bold text-white/70 truncate w-full px-1 text-center">
-                                                        {totalCount} {totalCount === 1 ? 'зад.' : 'зад.'}
-                                                    </span>
+                                                    <div className="flex flex-col items-center justify-center leading-none mt-1 w-[90%] mx-auto">
+                                                        <span className="text-[8px] md:text-[9px] font-black tracking-wider text-white opacity-90 truncate w-full text-center">
+                                                            {totalCount} {totalCount === 1 ? 'задача' : (totalCount % 10 >= 2 && totalCount % 10 <= 4 && (totalCount % 100 < 10 || totalCount % 100 >= 20)) ? 'задачи' : 'задач'}
+                                                        </span>
+                                                        <span className={`text-[7px] md:text-[8px] tracking-wide py-[2px] px-1 md:px-1.5 rounded bg-black/60 shadow-inner mt-[3px] w-full text-center truncate text-accent`}>
+                                                            {tasksForDay.filter(t => t.completed).reduce((s, t) => s + (t.value || 0), 0)} / {points} очк
+                                                        </span>
+                                                    </div>
                                                 </div>
                                             )}
                                         </button>

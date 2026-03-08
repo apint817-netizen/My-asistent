@@ -80,6 +80,7 @@ export default function AISettingsModal({ isOpen, onClose }) {
     const [avatarUrl, setAvatarUrl] = useState('');
     const [userTag, setUserTag] = useState('');
     const [isSavingProfile, setIsSavingProfile] = useState(false);
+    const [isProfileLoading, setIsProfileLoading] = useState(true);
     const [profileError, setProfileError] = useState('');
     const [profileSuccess, setProfileSuccess] = useState('');
     const avatarInputRef = useRef(null);
@@ -101,6 +102,7 @@ export default function AISettingsModal({ isOpen, onClose }) {
     }, [isOpen, apiKey, proxyParams, userProfile]);
 
     const loadProfile = async () => {
+        setIsProfileLoading(true);
         try {
             const { data: { user } } = await supabase.auth.getUser();
             if (!user) return;
@@ -120,6 +122,8 @@ export default function AISettingsModal({ isOpen, onClose }) {
             }
         } catch (err) {
             console.error('Error loading profile:', err);
+        } finally {
+            setIsProfileLoading(false);
         }
     };
 
@@ -176,8 +180,8 @@ export default function AISettingsModal({ isOpen, onClose }) {
                     const { error } = await supabase
                         .from('profiles')
                         .update({
-                            display_name: displayName.trim(),
-                            avatar_url: avatarUrl.trim()
+                            display_name: displayName?.trim() || '',
+                            avatar_url: avatarUrl ? avatarUrl.trim() : null
                         })
                         .eq('id', user.id);
                     if (error) throw error;
@@ -454,15 +458,17 @@ export default function AISettingsModal({ isOpen, onClose }) {
                         <div className="space-y-5 animate-fade-in">
 
                             <div className="flex gap-4 items-start pb-5 border-b border-white/10">
-                                <div className="relative group cursor-pointer" onClick={() => avatarInputRef.current?.click()}>
+                                <div className="relative group cursor-pointer shrink-0" onClick={() => avatarInputRef.current?.click()}>
                                     <div className="w-16 h-16 rounded-full bg-black/50 flex items-center justify-center text-white text-xl font-bold overflow-hidden border-2 border-dashed border-white/20 group-hover:border-accent transition-colors">
-                                        {avatarUrl ? (
+                                        {isProfileLoading ? (
+                                            <div className="w-5 h-5 border-2 border-accent/30 border-t-accent rounded-full animate-spin"></div>
+                                        ) : avatarUrl ? (
                                             <img src={avatarUrl} alt="Avatar" className="w-full h-full object-cover opacity-50 group-hover:opacity-30 transition-opacity" />
                                         ) : (
                                             displayName?.charAt(0)?.toUpperCase() || 'U'
                                         )}
                                         <div className="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
-                                            <Upload size={20} className="text-white" />
+                                            <Upload size={20} className="text-white bg-black/50 p-1 rounded-full" />
                                         </div>
                                     </div>
                                     <input
@@ -475,14 +481,18 @@ export default function AISettingsModal({ isOpen, onClose }) {
                                 </div>
                                 <div className="flex-1">
                                     <label className="text-xs text-text-secondary uppercase tracking-wider font-bold mb-1 block">Отображаемое имя (Никнейм)</label>
-                                    <input
-                                        type="text"
-                                        value={displayName}
-                                        onChange={e => setDisplayName(e.target.value)}
-                                        className="w-full bg-black/40 border border-border px-3 py-2 rounded-xl text-white text-sm focus:border-accent outline-none"
-                                        placeholder="Как вас будут видеть друзья"
-                                    />
-                                    {userTag && <div className="text-[10px] text-text-secondary font-mono mt-1">Тег: #{userTag}</div>}
+                                    {isProfileLoading ? (
+                                        <div className="w-full h-[38px] bg-black/40 rounded-xl animate-pulse"></div>
+                                    ) : (
+                                        <input
+                                            type="text"
+                                            value={displayName}
+                                            onChange={e => setDisplayName(e.target.value)}
+                                            className="w-full bg-black/40 border border-border px-3 py-2 rounded-xl text-white text-sm focus:border-accent outline-none"
+                                            placeholder="Как вас будут видеть друзья"
+                                        />
+                                    )}
+                                    {!isProfileLoading && userTag && <div className="text-[10px] text-text-secondary font-mono mt-1">Тег: #{userTag}</div>}
                                     {profileError && <div className="text-[10px] text-danger mt-1">{profileError}</div>}
                                 </div>
                             </div>
@@ -523,9 +533,9 @@ export default function AISettingsModal({ isOpen, onClose }) {
                                         onChange={(e) => setTempProfile({ ...tempProfile, interests: e.target.value })}
                                     />
                                 </div>
-                                <button type="submit" disabled={isSavingProfile} className="w-full bg-accent text-white px-4 py-3 mt-4 rounded-xl text-sm hover:bg-accent-hover transition-colors font-semibold shadow-lg shadow-accent/20 flex items-center justify-center gap-2 disabled:opacity-50">
+                                <button type="submit" disabled={isSavingProfile || isProfileLoading} className="w-full bg-accent text-white px-4 py-3 mt-4 rounded-xl text-sm hover:bg-accent-hover transition-colors font-semibold shadow-lg shadow-accent/20 flex items-center justify-center gap-2 disabled:opacity-50">
                                     {isSavingProfile ? <Loader size={16} className="animate-spin" /> : null}
-                                    Сохранить профиль
+                                    {isSavingProfile ? 'Сохранение...' : 'Сохранить профиль'}
                                 </button>
                             </form>
 
