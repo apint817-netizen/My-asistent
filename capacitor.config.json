@@ -1,0 +1,13 @@
+{
+  "appId": "com.nova.assistant",
+  "appName": "Ассистент Nova",
+  "webDir": "dist",
+  "server": {
+    "androidScheme": "https"
+  },
+  "plugins": {
+    "CapacitorHttp": {
+      "enabled": true
+    }
+  }
+}
