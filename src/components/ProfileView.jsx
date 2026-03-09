@@ -31,7 +31,7 @@ export default function ProfileView({ user, onLogout, onShowAISettings, onShowHe
     ];
 
     return (
-        <div className="flex flex-col gap-4 animate-fade-in">
+        <div className="flex flex-col gap-4 animate-fade-in max-w-md w-full mx-auto">
             {/* User card */}
             <div className="glass-panel p-5 flex items-center gap-4">
                 <div className="w-14 h-14 rounded-full bg-gradient-to-br from-accent/40 to-accent-hover/40 border border-accent/30 flex items-center justify-center text-white shrink-0">

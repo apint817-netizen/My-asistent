@@ -764,7 +764,7 @@ export default function GroupChatView({ group, user, onBack, onGroupUpdate, init
                                                     )}
                                                     <div className={`px-4 py-2.5 ${isMine
                                                         ? 'bg-accent text-white rounded-2xl rounded-br-md shadow-accent/20 shadow-lg'
-                                                        : 'bg-white/[0.08] text-white rounded-2xl rounded-bl-md shadow-md/50'
+                                                        : 'bg-white/10 border border-white/10 text-white rounded-2xl rounded-bl-md shadow-md/50'
                                                         } relative`}>
                                                         <p className="text-sm leading-relaxed whitespace-pre-wrap break-words">{msg.content}</p>
                                                         <div className="flex items-center justify-end gap-1 mt-1">
