@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { supabase } from '../lib/supabase';
 import { Shield, Plus, Search, User, ArrowRight, Settings, Trash2 } from 'lucide-react';
+import { useStore } from '../store/useStore';
 import GroupChatView from './GroupChatView';
 
 export default function GroupsView() {
@@ -132,7 +133,7 @@ export default function GroupsView() {
             loadGroups(user.id);
         } catch (error) {
             console.error('Error creating group:', error);
-            alert(`Ошибка при создании команды: ${error.message || 'Неизвестная ошибка'}`);
+            useStore.getState().addToast(`Ошибка при создании команды: ${error.message || 'Неизвестная ошибка'}`, 'error');
         }
     };
 
@@ -146,7 +147,7 @@ export default function GroupsView() {
             loadGroups(user.id);
         } catch (error) {
             console.error('Error deleting group:', error);
-            alert(`Ошибка при удалении: ${error.message || 'Неизвестная ошибка'}`);
+            useStore.getState().addToast(`Ошибка при удалении: ${error.message || 'Неизвестная ошибка'}`, 'error');
         } finally {
             setIsDeleting(false);
         }
@@ -297,7 +298,7 @@ export default function GroupsView() {
                             >
                                 {/* Кнопки быстрого управления для админов/оунеров */}
                                 {(myRole === 'owner' || myRole === 'admin') && (
-                                    <div className="absolute top-4 right-4 flex items-center gap-2 opacity-0 group-hover:opacity-100 transition-opacity z-10">
+                                    <div className="absolute top-4 right-4 flex items-center gap-2 md:opacity-0 md:group-hover:opacity-100 transition-opacity z-10">
                                         <button
                                             onClick={(e) => {
                                                 e.stopPropagation();

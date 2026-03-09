@@ -309,7 +309,7 @@ export default function FriendsView() {
             ));
         } catch (error) {
             console.error('Error sending request:', error);
-            alert('Ошибка: ' + (error.message || 'Не удалось отправить заявку'));
+            useStore.getState().addToast('Ошибка: ' + (error.message || 'Не удалось отправить заявку'), 'error');
         }
     };
 
@@ -349,7 +349,7 @@ export default function FriendsView() {
     return (
         <div className="flex flex-col h-full bg-[#0a0a0c]/80 backdrop-blur-3xl border border-white/5 rounded-3xl overflow-hidden shadow-2xl animate-fade-in relative z-10 w-full max-w-4xl mx-auto">
             {/* Header */}
-            <header className="p-6 border-b border-white/5 bg-white/[0.02] flex items-center justify-between pb-0 pt-8 sm:pt-6">
+            <header className="p-6 border-b border-white/5 bg-white/[0.02] flex items-center justify-between pb-0 pt-4 sm:pt-6">
                 <div>
                     <h2 className="text-2xl font-bold text-white flex items-center gap-3">
                         <Users size={24} className="text-accent" />
@@ -360,7 +360,7 @@ export default function FriendsView() {
             </header>
 
             {/* Tabs */}
-            <div className="flex px-6 pt-4 gap-6 border-b border-white/5 text-sm font-semibold">
+            <div className="flex px-6 pt-4 gap-3 sm:gap-6 border-b border-white/5 text-sm font-semibold">
                 <button
                     onClick={() => setActiveTab('friends')}
                     className={`pb-4 border-b-2 transition-colors ${activeTab === 'friends' ? 'border-accent text-accent' : 'border-transparent text-text-secondary hover:text-white'}`}

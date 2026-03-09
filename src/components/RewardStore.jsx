@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useStore } from '../store/useStore';
-import { Gift, Plus, ShoppingBag, RotateCcw, Check, Trash2 } from 'lucide-react';
+import { Gift, Plus, ShoppingBag, RotateCcw, Check, Trash2, Edit2 } from 'lucide-react';
 
 export default function RewardStore() {
     const rewards = useStore(state => state.rewards);
@@ -21,8 +21,10 @@ export default function RewardStore() {
 
     const [refundModal, setRefundModal] = useState({ isOpen: false, purchaseId: null, reason: '' });
     const [deleteRewardModal, setDeleteRewardModal] = useState({ isOpen: false, reward: null, reason: '' });
+    const [editingReward, setEditingReward] = useState(null); // id награды которую редактируем
 
     const deleteRewardWithReason = useStore(state => state.deleteRewardWithReason);
+    const updateReward = useStore(state => state.updateReward); // Нужно будет добавить в стор если нет
 
     const validateInput = (text) => {
         const cleaned = text.trim();
@@ -111,7 +113,7 @@ export default function RewardStore() {
             // Optionally switch to history tab so they see their purchase
             // setActiveTab('history');
         } else {
-            alert('Недостаточно очков!');
+            addToast('Недостаточно очков!', 'error');
         }
     };
 
@@ -152,33 +154,47 @@ export default function RewardStore() {
                 </button>
             </div>
 
-            <div className="overflow-y-auto flex-1 pr-2 space-y-3 custom-scrollbar">
+            <div className="overflow-y-auto flex-1 pr-0 md:pr-2 custom-scrollbar">
                 {activeTab === 'store' && (
                     <>
-                        {rewards.map((reward) => (
-                            <div key={reward.id} className="relative group">
-                                <button
-                                    onClick={() => handleBuy(reward)}
-                                    disabled={tokens < reward.cost}
-                                    className="w-full bg-black/20 border border-border p-4 rounded-xl flex flex-col items-center justify-center gap-2 hover:border-warning/50 hover:bg-warning/5 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
-                                >
-                                    <div className="w-10 h-10 rounded-full bg-warning/10 text-warning flex items-center justify-center mb-2">
-                                        <Gift size={20} />
+                        {/* Horizontal scroll on mobile, vertical grid on desktop */}
+                        <div className="flex md:grid md:grid-cols-2 lg:grid-cols-3 gap-3 overflow-x-auto md:overflow-x-visible no-scrollbar snap-x snap-mandatory pb-2">
+                            {rewards.map((reward) => (
+                                <div key={reward.id} className="relative group shrink-0 snap-center" style={{ width: '100px', minWidth: '100px' }}>
+                                    <div className="md:w-auto md:min-w-0">
+                                        <button
+                                            onClick={() => handleBuy(reward)}
+                                            disabled={tokens < reward.cost}
+                                            className="w-full bg-black/20 border border-border p-2 md:p-4 rounded-xl flex flex-col items-center justify-center gap-1 md:gap-2 hover:border-warning/50 hover:bg-warning/5 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+                                            style={{ height: '100px' }}
+                                        >
+                                            <div className="w-8 h-8 md:w-10 md:h-10 rounded-full bg-warning/10 text-warning flex items-center justify-center">
+                                                <Gift size={16} className="md:w-5 md:h-5" />
+                                            </div>
+                                            <span className="font-semibold text-center leading-tight text-xs md:text-sm line-clamp-2">{reward.title}</span>
+                                            <span className="text-warning text-[11px] md:text-sm font-bold bg-warning/10 px-2 py-0.5 md:px-3 md:py-1 rounded-full whitespace-nowrap">
+                                                {reward.cost} ⚡
+                                            </span>
+                                        </button>
+                                        {/* Edit/Delete — always visible on mobile, hover on desktop */}
+                                        <div className="flex justify-center gap-1 mt-1 md:absolute md:top-2 md:right-2 md:mt-0 md:opacity-0 md:group-hover:opacity-100 transition-opacity">
+                                            <button
+                                                onClick={(e) => { e.stopPropagation(); setEditingReward(reward); setNewRewardTitle(reward.title); setNewRewardCost(reward.cost); }}
+                                                className="p-1.5 rounded-md text-text-secondary active:text-accent active:bg-accent/10 md:hover:text-accent md:hover:bg-accent/10 transition-all"
+                                            >
+                                                <Edit2 size={13} />
+                                            </button>
+                                            <button
+                                                onClick={(e) => { e.stopPropagation(); setDeleteRewardModal({ isOpen: true, reward, reason: '' }); }}
+                                                className="p-1.5 rounded-md text-text-secondary active:text-red-400 active:bg-red-500/10 md:hover:text-red-400 md:hover:bg-red-500/10 transition-all"
+                                            >
+                                                <Trash2 size={13} />
+                                            </button>
+                                        </div>
                                     </div>
-                                    <span className="font-semibold text-center leading-tight">{reward.title}</span>
-                                    <span className="text-warning text-sm font-bold bg-warning/10 px-3 py-1 rounded-full">
-                                        {reward.cost} Очков
-                                    </span>
-                                </button>
-                                <button
-                                    onClick={() => setDeleteRewardModal({ isOpen: true, reward, reason: '' })}
-                                    className="absolute top-2 right-2 p-1.5 rounded-md text-text-secondary hover:text-red-400 hover:bg-red-500/10 transition-all opacity-0 group-hover:opacity-100"
-                                    title="Удалить награду"
-                                >
-                                    <Trash2 size={14} />
-                                </button>
-                            </div>
-                        ))}
+                                </div>
+                            ))}
+                        </div>
                     </>
                 )}
 
@@ -251,7 +267,7 @@ export default function RewardStore() {
                     <div className="flex gap-2 items-center">
                         <input
                             type="text"
-                            placeholder="Новая награда..."
+                            placeholder={editingReward ? "Название..." : "Новая награда..."}
                             className={`flex-[3] min-w-0 bg-black/40 border rounded-lg px-3 sm:px-4 py-2 text-sm sm:text-base outline-none focus:border-warning focus:ring-1 focus:ring-warning transition-all placeholder:text-text-secondary ${error ? 'border-danger' : 'border-border'}`}
                             value={newRewardTitle}
                             onChange={(e) => { setNewRewardTitle(e.target.value); setError(''); }}
@@ -263,13 +279,37 @@ export default function RewardStore() {
                             value={newRewardCost}
                             onChange={(e) => setNewRewardCost(e.target.value)}
                         />
-                        <button
-                            type="submit"
-                            disabled={!newRewardTitle.trim() || isAdding}
-                            className="flex-shrink-0 bg-bg-primary border border-border text-white p-2 sm:p-3 rounded-lg hover:bg-black/60 hover:text-warning hover:border-warning/50 transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center"
-                        >
-                            {isAdding ? <span className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" /> : <Plus size={20} />}
-                        </button>
+                        {editingReward ? (
+                            <div className="flex gap-1">
+                                <button
+                                    type="button"
+                                    onClick={() => { setEditingReward(null); setNewRewardTitle(''); setNewRewardCost(100); }}
+                                    className="bg-black/40 border border-border text-text-secondary p-2 sm:p-3 rounded-lg hover:text-white transition-all flex items-center justify-center font-bold"
+                                >
+                                    Отмена
+                                </button>
+                                <button
+                                    onClick={() => {
+                                        updateReward(editingReward.id, { title: newRewardTitle, cost: Number(newRewardCost) });
+                                        setEditingReward(null);
+                                        setNewRewardTitle('');
+                                        setNewRewardCost(100);
+                                        addToast('Награда обновлена', 'success');
+                                    }}
+                                    className="bg-accent/20 border border-accent/30 text-accent p-2 sm:p-3 rounded-lg hover:bg-accent/30 transition-all flex items-center justify-center font-bold"
+                                >
+                                    ОК
+                                </button>
+                            </div>
+                        ) : (
+                            <button
+                                type="submit"
+                                disabled={!newRewardTitle.trim() || isAdding}
+                                className="flex-shrink-0 bg-bg-primary border border-border text-white p-2 sm:p-3 rounded-lg hover:bg-black/60 hover:text-warning hover:border-warning/50 transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center"
+                            >
+                                {isAdding ? <span className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" /> : <Plus size={20} />}
+                            </button>
+                        )}
                     </div>
                     {error && (
                         <p className="text-xs text-danger animate-fade-in">{error}</p>

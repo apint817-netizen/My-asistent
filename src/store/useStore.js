@@ -1,4 +1,4 @@
-﻿import { create } from 'zustand';
+import { create } from 'zustand';
 import { persist, createJSONStorage } from 'zustand/middleware';
 
 // Dynamic storage key based on user ID
@@ -278,6 +278,9 @@ export const useStore = create(
 
       addReward: (reward) => set((state) => ({
         rewards: [...state.rewards, { ...reward, id: Date.now().toString() }]
+      })),
+      updateReward: (rewardId, updates) => set((state) => ({
+        rewards: state.rewards.map(r => r.id === rewardId ? { ...r, ...updates } : r)
       })),
       deleteRewardWithReason: (rewardId, reason) => set((state) => {
         const reward = state.rewards.find(r => r.id === rewardId);

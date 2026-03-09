@@ -21,63 +21,120 @@ import { restrictToVerticalAxis } from '@dnd-kit/modifiers';
 
 function TaskItem({ task, index, handleToggle, setDeletingTask, setEditingTaskCategory, isDragOverlay, attributes, listeners, style, setNodeRef }) {
     const categoryObj = task.category ? TASK_CATEGORIES.find(c => c.id === task.category) : null;
+    const [swipeX, setSwipeX] = useState(0);
+    const [isSwiping, setIsSwiping] = useState(false);
+    const touchStartRef = { current: null };
+
+    const handleTouchStart = (e) => {
+        touchStartRef.current = { x: e.touches[0].clientX, y: e.touches[0].clientY };
+        setIsSwiping(false);
+    };
+    const handleTouchMove = (e) => {
+        if (!touchStartRef.current) return;
+        const dx = e.touches[0].clientX - touchStartRef.current.x;
+        const dy = e.touches[0].clientY - touchStartRef.current.y;
+        // Only swipe horizontally if horizontal movement > vertical
+        if (Math.abs(dx) > Math.abs(dy) && dx < 0) {
+            setIsSwiping(true);
+            setSwipeX(Math.max(dx, -100));
+        }
+    };
+    const handleTouchEnd = () => {
+        if (swipeX < -60) {
+            setSwipeX(-80); // Lock to show delete button
+        } else {
+            setSwipeX(0);
+        }
+        touchStartRef.current = null;
+        setIsSwiping(false);
+    };
+    const resetSwipe = () => setSwipeX(0);
 
     return (
-        <div
-            ref={setNodeRef}
-            style={style}
-            className={`glass-card p-4 flex items-center justify-between group origin-center ${task.completed ? 'opacity-50' : ''} ${isDragOverlay ? 'shadow-2xl border-accent/80 ring-2 ring-accent/60 bg-[#13131A] z-[100] backdrop-blur-3xl opacity-100' : ''}`}
-        >
-            <div className="flex items-center gap-3 flex-1">
-                <div {...attributes} {...listeners} className={`text-text-secondary hover:text-white p-1.5 hover:bg-white/5 rounded-md transition-colors mt-0.5 outline-none touch-none group/drag relative ${isDragOverlay ? 'cursor-grabbing' : 'cursor-grab active:cursor-grabbing'}`}>
-                    <ChevronsUpDown size={16} />
-                    {!isDragOverlay && (
-                        <div className="absolute -top-8 left-1/2 -translate-x-1/2 bg-[#1b1b22] text-white text-[11px] font-medium py-1 px-2 rounded-md opacity-0 pointer-events-none group-hover/drag:opacity-100 transition-opacity whitespace-nowrap shadow-lg border border-white/10 z-50">Перетащить</div>
-                    )}
-                </div>
-                <div className="w-5 text-center text-xs font-bold text-text-secondary">
-                    {index + 1}
-                </div>
-                <div className={`w-6 h-6 rounded-full border-2 flex items-center justify-center transition-colors cursor-pointer ${task.completed ? 'bg-success border-success' : 'border-text-secondary'}`} onClick={() => handleToggle(task)}>
-                    {task.completed && <Check size={14} className="text-bg-primary font-bold" />}
-                </div>
-                <span className={`font-medium cursor-pointer ${task.completed ? 'line-through text-text-secondary' : 'text-text-primary'}`} onClick={() => handleToggle(task)}>
-                    {task.title}
-                </span>
-                <div
-                    className="flex items-center gap-1 cursor-pointer group/cat relative"
-                    onClick={(e) => { e.stopPropagation(); if (setEditingTaskCategory) setEditingTaskCategory(task.id); }}
-                >
-                    {!isDragOverlay && (
-                        <div className="absolute -top-8 left-1/2 -translate-x-1/2 bg-[#1b1b22] text-white text-[11px] font-medium py-1 px-2 rounded-md opacity-0 pointer-events-none group-hover/cat:opacity-100 transition-opacity whitespace-nowrap shadow-lg border border-white/10 z-50">Изменить категорию</div>
-                    )}
-                    {categoryObj ? (
-                        <span className={`text-[10px] px-1.5 py-0.5 rounded-full font-medium ${categoryObj.bg} ${categoryObj.color} border border-current/20 hidden sm:inline-block hover:opacity-80 transition-opacity`}>
-                            {categoryObj.name}
-                        </span>
-                    ) : (
-                        <span className="text-[10px] px-1.5 py-0.5 rounded-full font-medium bg-white/5 text-text-secondary border border-white/10 hidden sm:inline-block opacity-0 group-hover:opacity-100 transition-opacity hover:bg-white/10">
-                            + Категория
-                        </span>
-                    )}
-                </div>
-            </div>
-            <div className="flex items-center gap-3">
-                <div className="flex items-center gap-1 text-warning font-bold">
-                    <Zap size={16} />
-                    +{task.value}
-                </div>
-                {!task.completed && setDeletingTask && (
+        <div className="relative overflow-hidden rounded-xl" onClick={() => { if (swipeX !== 0) resetSwipe(); }}>
+            {/* Swipe-to-delete background (mobile only) */}
+            {!task.completed && swipeX < 0 && (
+                <div className="md:hidden absolute inset-y-0 right-0 w-20 bg-danger flex items-center justify-center z-0">
                     <button
-                        onClick={(e) => { e.stopPropagation(); setDeletingTask(task); }}
-                        className="p-1.5 text-text-secondary hover:text-danger hover:bg-danger/10 rounded-md transition-colors opacity-0 group-hover:opacity-100 group/del relative"
+                        onClick={(e) => { e.stopPropagation(); setDeletingTask(task); resetSwipe(); }}
+                        className="flex flex-col items-center gap-1 text-white"
                     >
-                        <Trash2 size={16} />
-                        {!isDragOverlay && (
-                            <div className="absolute -top-8 left-1/2 -translate-x-1/2 bg-danger/90 text-white text-[11px] font-medium py-1 px-2 rounded-md opacity-0 pointer-events-none group-hover/del:opacity-100 transition-opacity whitespace-nowrap shadow-lg border border-danger/50 z-50">Удалить</div>
-                        )}
+                        <Trash2 size={18} />
+                        <span className="text-[10px] font-semibold">Удалить</span>
                     </button>
-                )}
+                </div>
+            )}
+
+            <div
+                ref={setNodeRef}
+                style={{ ...style, transform: `${style?.transform || ''} translateX(${swipeX}px)`.trim(), transition: isSwiping ? 'none' : (style?.transition || 'transform 0.2s ease-out') }}
+                className={`glass-card p-3 sm:p-4 flex items-center justify-between group origin-center relative z-10 bg-bg-secondary ${task.completed ? 'opacity-50' : ''} ${isDragOverlay ? 'shadow-2xl border-accent/80 ring-2 ring-accent/60 bg-[#13131A] z-[100] backdrop-blur-3xl opacity-100' : ''}`}
+                onTouchStart={!task.completed ? handleTouchStart : undefined}
+                onTouchMove={!task.completed ? handleTouchMove : undefined}
+                onTouchEnd={!task.completed ? handleTouchEnd : undefined}
+            >
+                <div className="flex items-center gap-2 sm:gap-3 flex-1 min-w-0">
+                    {/* Drag handle — desktop only */}
+                    <div {...attributes} {...listeners} className={`hidden md:flex text-text-secondary hover:text-white p-1.5 hover:bg-white/5 rounded-md transition-colors mt-0.5 outline-none touch-none group/drag relative ${isDragOverlay ? 'cursor-grabbing' : 'cursor-grab active:cursor-grabbing'}`}>
+                        <ChevronsUpDown size={16} />
+                        {!isDragOverlay && (
+                            <div className="absolute -top-8 left-1/2 -translate-x-1/2 bg-[#1b1b22] text-white text-[11px] font-medium py-1 px-2 rounded-md opacity-0 pointer-events-none group-hover/drag:opacity-100 transition-opacity whitespace-nowrap shadow-lg border border-white/10 z-50">Перетащить</div>
+                        )}
+                    </div>
+                    {/* Category dot — ALWAYS visible on mobile */}
+                    {categoryObj && (
+                        <div
+                            className={`w-2 h-2 rounded-full shrink-0 md:hidden ${categoryObj.bg}`}
+                            onClick={(e) => { e.stopPropagation(); if (setEditingTaskCategory) setEditingTaskCategory(task.id); }}
+                        />
+                    )}
+                    {/* Checkbox — 44x44 touch target */}
+                    <div className="w-11 h-11 flex items-center justify-center shrink-0 cursor-pointer" onClick={() => handleToggle(task)}>
+                        <div className={`w-5 h-5 sm:w-6 sm:h-6 rounded-full border-2 flex items-center justify-center transition-colors shrink-0 ${task.completed ? 'bg-success border-success' : 'border-text-secondary'}`}>
+                            {task.completed && <Check size={14} className="text-bg-primary font-bold w-3 h-3 sm:w-4 sm:h-4" />}
+                        </div>
+                    </div>
+                    {/* Task title */}
+                    <span className={`font-medium cursor-pointer text-sm leading-tight break-words line-clamp-2 flex-1 min-w-0 ${task.completed ? 'line-through text-text-secondary' : 'text-text-primary'}`} onClick={() => handleToggle(task)}>
+                        {task.title}
+                    </span>
+                    {/* Category label — desktop only */}
+                    <div
+                        className="hidden md:flex items-center gap-1 cursor-pointer group/cat relative"
+                        onClick={(e) => { e.stopPropagation(); if (setEditingTaskCategory) setEditingTaskCategory(task.id); }}
+                    >
+                        {!isDragOverlay && (
+                            <div className="absolute -top-8 left-1/2 -translate-x-1/2 bg-[#1b1b22] text-white text-[11px] font-medium py-1 px-2 rounded-md opacity-0 pointer-events-none group-hover/cat:opacity-100 transition-opacity whitespace-nowrap shadow-lg border border-white/10 z-50">Изменить категорию</div>
+                        )}
+                        {categoryObj ? (
+                            <span className={`text-[10px] px-1.5 py-0.5 rounded-full font-medium ${categoryObj.bg} ${categoryObj.color} border border-current/20 hover:opacity-80 transition-opacity`}>
+                                {categoryObj.name}
+                            </span>
+                        ) : (
+                            <span className="text-[10px] px-1.5 py-0.5 rounded-full font-medium bg-white/5 text-text-secondary border border-white/10 opacity-0 group-hover:opacity-100 transition-opacity hover:bg-white/10">
+                                + Категория
+                            </span>
+                        )}
+                    </div>
+                </div>
+                <div className="flex items-center gap-1.5 sm:gap-3 shrink-0 ml-2">
+                    <div className="flex items-center gap-1 text-warning font-bold text-[13px] sm:text-base bg-warning/10 px-1.5 sm:px-2 py-1 rounded-lg shrink-0">
+                        <Zap size={12} className="sm:w-4 sm:h-4" />
+                        +{task.value}
+                    </div>
+                    {/* Delete button — desktop only (mobile uses swipe) */}
+                    {!task.completed && setDeletingTask && (
+                        <button
+                            onClick={(e) => { e.stopPropagation(); setDeletingTask(task); }}
+                            className="hidden md:flex p-1.5 text-text-secondary hover:text-danger hover:bg-danger/10 rounded-md transition-colors opacity-0 group-hover:opacity-100 group/del relative"
+                        >
+                            <Trash2 size={15} />
+                            {!isDragOverlay && (
+                                <div className="absolute -top-8 left-1/2 -translate-x-1/2 bg-danger/90 text-white text-[11px] font-medium py-1 px-2 rounded-md opacity-0 pointer-events-none group-hover/del:opacity-100 transition-opacity whitespace-nowrap shadow-lg border border-danger/50 z-50">Удалить</div>
+                            )}
+                        </button>
+                    )}
+                </div>
             </div>
         </div>
     );
@@ -256,7 +313,7 @@ export default function TaskManager() {
     return (
         <div className="flex flex-col h-full relative">
             {usedCategories.length > 0 && (
-                <div className="flex flex-wrap gap-2 mb-4 px-1 pb-2 border-b border-white/5">
+                <div className="flex gap-2 mb-4 px-1 pb-2 border-b border-white/5 overflow-x-auto no-scrollbar">
                     <button
                         onClick={() => setActiveFilter('all')}
                         className={`text-xs px-2.5 py-1 rounded-full font-medium transition-colors ${activeFilter === 'all' ? 'bg-white/20 text-white' : 'bg-white/5 text-text-secondary hover:bg-white/10'}`}
@@ -319,37 +376,50 @@ export default function TaskManager() {
             </div>
 
             {showCategoryMenu && (
-                <div className="absolute bottom-[52px] left-0 right-0 z-50 bg-[#13131A] backdrop-blur-xl border border-white/10 rounded-xl p-3 shadow-[0_10px_40px_rgba(0,0,0,0.8)] flex flex-wrap gap-2 animate-fade-in">
-                    <button
-                        type="button"
-                        onClick={() => { setSelectedCategory(null); setShowCategoryMenu(false); }}
-                        className={`text-xs px-3 py-1.5 rounded-full font-medium transition-colors ${!selectedCategory ? 'bg-white/20 text-white' : 'bg-white/5 text-text-secondary hover:bg-white/10'}`}
-                    >
-                        Без категории
-                    </button>
-                    {TASK_CATEGORIES.map(cat => (
-                        <button
-                            key={cat.id}
-                            type="button"
-                            onClick={() => { setSelectedCategory(cat.id); setShowCategoryMenu(false); }}
-                            className={`text-xs px-3 py-1.5 rounded-full font-medium transition-colors border border-current/20 flex items-center gap-1.5 ${selectedCategory === cat.id ? `${cat.bg} ${cat.color} ring-1 ring-current` : `bg-white/5 ${cat.color} opacity-70 hover:opacity-100`}`}
-                        >
-                            {cat.name}
-                        </button>
-                    ))}
-                </div>
+                <>
+                    <div className="fixed inset-0 z-40 bg-black/40 md:bg-transparent backdrop-blur-sm md:backdrop-blur-none animate-fade-in" onClick={() => setShowCategoryMenu(false)} />
+                    <div className="fixed md:absolute bottom-0 md:bottom-[52px] left-0 right-0 z-50 bg-[#13131A] md:bg-[#13131A] backdrop-blur-3xl md:backdrop-blur-xl border-t md:border border-white/10 rounded-t-3xl md:rounded-xl p-4 md:p-3 pb-safe md:pb-3 shadow-[0_-10px_40px_rgba(0,0,0,0.8)] md:shadow-[0_10px_40px_rgba(0,0,0,0.8)] flex flex-wrap gap-2 animate-slide-up md:animate-fade-in">
+                        {/* Mobile Drag Indicator */}
+                        <div className="w-full flex justify-center pb-3 md:hidden shrink-0 pointer-events-none absolute top-2 left-0 right-0">
+                            <div className="w-12 h-1.5 bg-white/20 rounded-full"></div>
+                        </div>
+                        <div className="w-full pt-4 md:pt-0 flex flex-wrap gap-2">
+                            <button
+                                type="button"
+                                onClick={() => { setSelectedCategory(null); setShowCategoryMenu(false); }}
+                                className={`text-sm md:text-xs px-4 py-2 md:py-1.5 rounded-full font-medium transition-colors ${!selectedCategory ? 'bg-white/20 text-white' : 'bg-white/5 text-text-secondary hover:bg-white/10'}`}
+                            >
+                                Без категории
+                            </button>
+                            {TASK_CATEGORIES.map(cat => (
+                                <button
+                                    key={cat.id}
+                                    type="button"
+                                    onClick={() => { setSelectedCategory(cat.id); setShowCategoryMenu(false); }}
+                                    className={`text-sm md:text-xs px-4 py-2 md:py-1.5 rounded-full font-medium transition-colors border border-current/20 flex items-center gap-1.5 ${selectedCategory === cat.id ? `${cat.bg} ${cat.color} ring-1 ring-current` : `bg-white/5 ${cat.color} opacity-70 hover:opacity-100`}`}
+                                >
+                                    {cat.name}
+                                </button>
+                            ))}
+                        </div>
+                    </div>
+                </>
             )}
 
             {editingTaskCategory && (
                 <>
-                    <div className="fixed inset-0 z-40" onClick={() => setEditingTaskCategory(null)} />
-                    <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 z-50 bg-[#13131A] backdrop-blur-xl border border-white/10 rounded-xl p-4 shadow-[0_20px_60px_rgba(0,0,0,0.9)] w-[90%] max-w-[300px] flex flex-col gap-3 animate-fade-in">
-                        <h4 className="text-sm font-bold text-white mb-1">Изменить категорию</h4>
+                    <div className="fixed inset-0 z-40 bg-black/60 md:bg-transparent backdrop-blur-md md:backdrop-blur-none" onClick={() => setEditingTaskCategory(null)} />
+                    <div className="fixed bottom-0 md:absolute md:top-1/2 left-0 right-0 md:left-1/2 md:-translate-x-1/2 md:-translate-y-1/2 z-50 bg-[#13131A] backdrop-blur-3xl md:backdrop-blur-xl border-t md:border border-white/10 rounded-t-3xl md:rounded-xl p-6 md:p-4 shadow-[0_-20px_60px_rgba(0,0,0,0.9)] md:w-[90%] md:max-w-[300px] flex flex-col gap-4 md:gap-3 animate-slide-up md:animate-fade-in pb-safe md:pb-4">
+                        {/* Mobile Drag Indicator */}
+                        <div className="w-full flex justify-center pb-2 md:hidden min-h-0 pointer-events-none absolute top-3 left-0 right-0">
+                            <div className="w-12 h-1.5 bg-white/20 rounded-full"></div>
+                        </div>
+                        <h4 className="text-lg md:text-sm font-bold text-white mb-2 md:mb-1 pt-4 md:pt-0">Изменить категорию</h4>
                         <div className="flex flex-wrap gap-2">
                             <button
                                 type="button"
                                 onClick={() => { if (editTaskCategory) editTaskCategory(editingTaskCategory, null); setEditingTaskCategory(null); }}
-                                className="text-xs px-3 py-1.5 rounded-full font-medium transition-colors bg-white/5 text-text-secondary hover:bg-white/20 hover:text-white"
+                                className="text-sm md:text-xs px-4 md:px-3 py-2 md:py-1.5 rounded-full font-medium transition-colors bg-white/5 text-text-secondary hover:bg-white/20 hover:text-white"
                             >
                                 Без категории
                             </button>
@@ -358,7 +428,7 @@ export default function TaskManager() {
                                     key={cat.id}
                                     type="button"
                                     onClick={() => { if (editTaskCategory) editTaskCategory(editingTaskCategory, cat.id); setEditingTaskCategory(null); }}
-                                    className={`text-xs px-3 py-1.5 rounded-full font-medium transition-colors border border-current/20 flex items-center gap-1.5 bg-white/5 ${cat.color} opacity-80 hover:opacity-100 hover:ring-1 hover:ring-current`}
+                                    className={`text-sm md:text-xs px-4 md:px-3 py-2 md:py-1.5 rounded-full font-medium transition-colors border border-current/20 flex items-center gap-1.5 bg-white/5 ${cat.color} opacity-80 hover:opacity-100 hover:ring-1 hover:ring-current`}
                                 >
                                     {cat.name}
                                 </button>
@@ -417,33 +487,37 @@ export default function TaskManager() {
 
             {/* Delete Task Modal */}
             {deletingTask && (
-                <div className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm rounded-lg animate-fade-in">
-                    <div className="bg-bg-secondary border border-border p-6 rounded-xl w-full max-w-sm shadow-xl">
-                        <h3 className="font-bold text-lg text-white mb-2">Удаление задачи</h3>
-                        <p className="text-sm text-text-secondary mb-4">
+                <div className="fixed inset-0 z-[60] flex items-end md:items-center justify-center p-0 md:p-4 bg-black/60 backdrop-blur-md rounded-none md:rounded-lg animate-fade-in">
+                    <div className="bg-bg-secondary border-t md:border border-border p-6 rounded-t-3xl md:rounded-xl w-full max-w-sm shadow-xl animate-slide-up md:animate-scale-in relative pb-safe md:pb-6">
+                        {/* Mobile Drag Indicator */}
+                        <div className="w-full flex justify-center pb-4 md:hidden shrink-0 pointer-events-none absolute top-3 left-0 right-0 z-50">
+                            <div className="w-12 h-1.5 bg-white/20 rounded-full"></div>
+                        </div>
+                        <h3 className="font-bold text-xl md:text-lg text-white mb-2 pt-4 md:pt-0">Удаление задачи</h3>
+                        <p className="text-sm md:text-sm text-text-secondary mb-4">
                             Почему вы решили отменить задачу <span className="text-white font-medium">"{deletingTask.title}"</span>? Эта информация поможет Nova скорректировать ваш план.
                         </p>
 
                         <form onSubmit={confirmDelete}>
                             <textarea
-                                className="w-full bg-black/40 border border-border rounded-lg p-3 text-sm text-white focus:border-danger focus:ring-1 focus:ring-danger outline-none mb-4 resize-none h-24"
+                                className="w-full bg-black/40 border border-border rounded-lg p-3 text-sm md:text-sm text-white focus:border-danger focus:ring-1 focus:ring-danger outline-none mb-6 md:mb-4 resize-none h-24"
                                 placeholder="Например: Понял, что это сейчас не в приоритете..."
                                 value={deleteReason}
                                 onChange={(e) => setDeleteReason(e.target.value)}
                                 autoFocus
                             />
 
-                            <div className="flex gap-2">
+                            <div className="flex gap-3 md:gap-2">
                                 <button
                                     type="button"
                                     onClick={() => { setDeletingTask(null); setDeleteReason(''); }}
-                                    className="flex-1 px-4 py-2 rounded-lg border border-border text-text-secondary hover:text-white hover:bg-white/5 transition-colors text-sm font-medium"
+                                    className="flex-1 px-4 py-3 md:py-2 rounded-xl md:rounded-lg border border-border text-text-secondary hover:text-white hover:bg-white/5 transition-colors text-sm font-semibold md:font-medium"
                                 >
                                     Отмена
                                 </button>
                                 <button
                                     type="submit"
-                                    className="flex-1 px-4 py-2 rounded-lg bg-danger text-white hover:bg-danger/80 transition-colors text-sm font-medium shadow-[0_0_15px_rgba(239,68,68,0.3)]"
+                                    className="flex-1 px-4 py-3 md:py-2 rounded-xl md:rounded-lg bg-danger text-white hover:bg-danger/80 transition-colors text-sm font-bold md:font-medium shadow-[0_0_15px_rgba(239,68,68,0.3)]"
                                 >
                                     Удалить
                                 </button>

@@ -132,28 +132,31 @@ const CalendarView = () => {
                             </button>
 
                             {showMonthPicker && (
-                                <div className="absolute top-full mt-2 bg-bg-secondary border border-border rounded-xl shadow-2xl p-3 min-w-[200px] animate-fade-in right-0 sm:right-auto z-50">
-                                    <div className="flex justify-between items-center mb-3 pb-2 border-b border-border">
-                                        <button onClick={() => setCurrentDate(new Date(currentDate.getFullYear() - 1, currentDate.getMonth(), 1))} className="p-1 hover:text-accent"><ChevronLeft size={16} /></button>
-                                        <span className="font-bold">{currentDate.getFullYear()}</span>
-                                        <button onClick={() => setCurrentDate(new Date(currentDate.getFullYear() + 1, currentDate.getMonth(), 1))} className="p-1 hover:text-accent"><ChevronRight size={16} /></button>
+                                <>
+                                    <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[100] sm:hidden" onClick={() => setShowMonthPicker(false)} />
+                                    <div className="absolute top-full sm:mt-2 bg-bg-secondary border border-border rounded-2xl shadow-2xl p-4 min-w-[280px] sm:min-w-[200px] animate-fade-in fixed left-1/2 -translate-x-1/2 bottom-1/2 translate-y-1/2 sm:static sm:translate-x-0 sm:translate-y-0 z-[110] sm:right-auto">
+                                        <div className="flex justify-between items-center mb-4 pb-2 border-b border-border">
+                                            <button onClick={() => setCurrentDate(new Date(currentDate.getFullYear() - 1, currentDate.getMonth(), 1))} className="p-2 hover:text-accent bg-white/5 rounded-lg"><ChevronLeft size={18} /></button>
+                                            <span className="font-bold text-lg">{currentDate.getFullYear()}</span>
+                                            <button onClick={() => setCurrentDate(new Date(currentDate.getFullYear() + 1, currentDate.getMonth(), 1))} className="p-2 hover:text-accent bg-white/5 rounded-lg"><ChevronRight size={18} /></button>
+                                        </div>
+                                        <div className="grid grid-cols-3 gap-3">
+                                            {monthNames.map((m, index) => (
+                                                <button
+                                                    key={m}
+                                                    onClick={() => {
+                                                        setCurrentDate(new Date(currentDate.getFullYear(), index, 1));
+                                                        setSelectedDate(null);
+                                                        setShowMonthPicker(false);
+                                                    }}
+                                                    className={`text-sm py-3 rounded-xl transition-all ${currentDate.getMonth() === index ? 'bg-accent text-white font-bold shadow-lg shadow-accent/20' : 'hover:bg-white/10 active:scale-95'}`}
+                                                >
+                                                    {m.substring(0, 3)}
+                                                </button>
+                                            ))}
+                                        </div>
                                     </div>
-                                    <div className="grid grid-cols-3 gap-2">
-                                        {monthNames.map((m, index) => (
-                                            <button
-                                                key={m}
-                                                onClick={() => {
-                                                    setCurrentDate(new Date(currentDate.getFullYear(), index, 1));
-                                                    setSelectedDate(null);
-                                                    setShowMonthPicker(false);
-                                                }}
-                                                className={`text-xs py-1.5 rounded-lg transition-colors ${currentDate.getMonth() === index ? 'bg-accent text-white font-bold' : 'hover:bg-white/10'}`}
-                                            >
-                                                {m.substring(0, 3)}
-                                            </button>
-                                        ))}
-                                    </div>
-                                </div>
+                                </>
                             )}
                         </div>
                         <button onClick={nextMonth} className="hover:text-accent transition-colors">

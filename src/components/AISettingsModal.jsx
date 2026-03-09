@@ -208,7 +208,7 @@ export default function AISettingsModal({ isOpen, onClose }) {
     };
 
     return (
-        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[60] flex items-center justify-center p-4 animate-fade-in" onClick={onClose}>
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[60] flex items-end md:items-center justify-center p-0 md:p-4 animate-fade-in" onClick={onClose}>
             {/* Cropper Modal Overlay */}
             {showCropper && imageSrc && (
                 <div
@@ -274,11 +274,16 @@ export default function AISettingsModal({ isOpen, onClose }) {
 
             <div
                 id="tour-settings-modal-override"
-                className="glass-panel w-full max-w-2xl max-h-[85vh] overflow-y-auto p-0 relative animate-fade-in custom-scrollbar"
+                className="w-full md:max-w-2xl max-h-[95vh] md:max-h-[85vh] bg-bg-primary/95 md:bg-[#0a0a0c]/95 backdrop-blur-3xl md:border md:border-border rounded-t-3xl md:rounded-3xl shadow-2xl flex flex-col relative animate-slide-up md:animate-scale-in overflow-hidden"
                 onClick={e => e.stopPropagation()}
             >
+                {/* Mobile Drag Indicator */}
+                <div className="w-full flex justify-center pt-3 pb-1 md:hidden shrink-0 pointer-events-none absolute top-0 left-0 right-0 z-50">
+                    <div className="w-12 h-1.5 bg-white/20 rounded-full"></div>
+                </div>
+
                 {/* Header */}
-                <div className="sticky top-0 bg-bg-secondary/95 backdrop-blur-xl border-b border-border p-6 pb-4 z-10">
+                <div className="sticky top-0 bg-bg-primary/95 md:bg-bg-secondary/95 backdrop-blur-xl border-b border-white/5 p-4 md:p-6 pb-4 pt-6 md:pt-6 z-10 shrink-0">
                     <button
                         onClick={onClose}
                         className="absolute top-4 right-4 p-2 rounded-full text-text-secondary hover:text-white hover:bg-white/10 transition-all"
@@ -325,7 +330,7 @@ export default function AISettingsModal({ isOpen, onClose }) {
                     </div>
                 </div>
 
-                <div className="p-6">
+                <div className="p-4 md:p-6 pb-20 md:pb-6 overflow-y-auto custom-scrollbar flex-1">
                     {/* ===== AI Settings Section ===== */}
                     {activeSection === 'ai' && (
                         <div className="space-y-5 animate-fade-in">

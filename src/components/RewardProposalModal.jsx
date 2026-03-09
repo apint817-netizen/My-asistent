@@ -12,8 +12,12 @@ export default function RewardProposalModal() {
     const current = proposals[0];
 
     return (
-        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-fade-in">
-            <div className="bg-bg-secondary border border-border p-6 rounded-xl w-full max-w-sm shadow-xl relative overflow-hidden">
+        <div className="fixed inset-0 z-[100] flex items-end md:items-center justify-center p-0 md:p-4 bg-black/60 backdrop-blur-sm animate-fade-in">
+            <div className="bg-bg-secondary border-t border-white/5 md:border md:border-border p-6 pb-safe rounded-t-3xl md:rounded-xl w-full max-w-sm shadow-xl relative overflow-hidden animate-slide-up md:animate-scale-in">
+                {/* Mobile Drag Indicator */}
+                <div className="w-full flex justify-center pb-4 md:hidden shrink-0 pointer-events-none absolute top-3 left-0 right-0 z-50">
+                    <div className="w-12 h-1.5 bg-white/20 rounded-full"></div>
+                </div>
                 <div className="absolute top-0 right-0 w-32 h-32 bg-warning/20 rounded-full blur-2xl pointer-events-none -translate-y-1/2 translate-x-1/2"></div>
 
                 <div className="flex items-center gap-3 mb-4 relative z-10">

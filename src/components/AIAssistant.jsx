@@ -657,20 +657,22 @@ ${calendarStr}
                             <Search size={18} />
                         </button>
                     )}
-                    <button
-                        onClick={() => setShowConfirmLogs(true)}
-                        className="p-2 rounded-full transition-all text-text-secondary hover:text-warning hover:bg-warning/10 hover:scale-110"
-                        title="Очистить системные логи"
-                    >
-                        <Trash2 size={18} />
-                    </button>
-                    <button
-                        onClick={() => setShowConfirmChat(true)}
-                        className="p-2 rounded-full transition-all text-text-secondary hover:text-danger hover:bg-danger/10 hover:rotate-12 hover:scale-110"
-                        title="Очистить весь чат"
-                    >
-                        <Eraser size={18} />
-                    </button>
+                        <button
+                            onClick={() => setShowConfirmLogs(true)}
+                            className="flex items-center gap-1.5 px-2 py-1.5 rounded-lg transition-all text-text-secondary hover:text-warning bg-white/5 border border-white/5 hover:border-warning/30"
+                            title="Очистить системные логи"
+                        >
+                            <Trash2 size={16} />
+                            <span className="text-[10px] font-bold uppercase tracking-wider hidden xs:inline">Логи</span>
+                        </button>
+                        <button
+                            onClick={() => setShowConfirmChat(true)}
+                            className="flex items-center gap-1.5 px-2 py-1.5 rounded-lg transition-all text-text-secondary hover:text-danger bg-white/5 border border-white/5 hover:border-danger/30"
+                            title="Очистить весь чат"
+                        >
+                            <Eraser size={16} />
+                            <span className="text-[10px] font-bold uppercase tracking-wider hidden xs:inline">Чат</span>
+                        </button>
                 </div>
             </div>
 
@@ -810,7 +812,7 @@ ${calendarStr}
             </div>
 
             {/* Input Area */}
-            <div className="p-4 border-t border-border bg-[#0d0d12] relative z-10">
+            <div className="p-2 md:p-4 border-t border-border bg-[#0d0d12] relative z-10 shrink-0 shadow-[0_-5px_20px_rgba(0,0,0,0.5)] md:pb-4 pb-safe">
 
                 {/* Отдельная панель превью файлов над инпутом */}
                 {attachments.length > 0 && (
@@ -841,7 +843,7 @@ ${calendarStr}
                     </div>
                 )}
 
-                <form onSubmit={handleSend} className="relative flex items-end bg-[#13131a] border border-border/70 rounded-2xl pl-2 pr-14 py-1 focus-within:border-accent/50 focus-within:ring-1 focus-within:ring-accent/30 transition-all shadow-inner">
+                <form onSubmit={handleSend} className="relative flex items-end bg-[#13131a] border border-border/70 rounded-2xl pl-1 pr-[50px] md:pl-2 md:pr-14 md:py-1 focus-within:border-accent/50 focus-within:ring-1 focus-within:ring-accent/30 transition-all shadow-inner">
 
                     {/* Кнопка скрепки */}
                     <input
@@ -855,15 +857,15 @@ ${calendarStr}
                     <button
                         type="button"
                         onClick={() => fileInputRef.current?.click()}
-                        className="p-2.5 mb-0.5 text-text-secondary hover:text-white transition-colors rounded-full shrink-0"
+                        className="p-3 md:p-2.5 mb-0.5 text-text-secondary hover:text-white transition-colors rounded-full shrink-0"
                         title="Прикрепить файл или фото"
                     >
                         <Paperclip size={20} />
                     </button>
 
                     <textarea
-                        placeholder={attachments.length > 0 ? "Добавить описание..." : "Написать Nova... (или перетащите сюда картинку)"}
-                        className="w-full bg-transparent border-none pl-2 pr-2 py-3 text-sm outline-none text-white placeholder:text-text-secondary resize-none custom-scrollbar"
+                        placeholder={attachments.length > 0 ? "Добавить описание..." : "Написать Nova..."}
+                        className="w-full bg-transparent border-none pl-1 pr-1 py-3.5 md:py-3 text-[15px] md:text-sm outline-none text-white placeholder:text-text-secondary resize-none custom-scrollbar leading-snug"
                         value={useStore(state => state.tourDemoAIText) || input}
                         onChange={(e) => setInput(e.target.value)}
                         readOnly={!!useStore(state => state.tourDemoAIText)}
@@ -875,15 +877,15 @@ ${calendarStr}
                             }
                         }}
                         rows={1}
-                        style={{ maxHeight: '120px', minHeight: '44px', height: 'auto', overflowY: input.split('\n').length > 3 ? 'auto' : 'hidden' }}
+                        style={{ maxHeight: '120px', minHeight: '48px', height: 'auto', overflowY: input.split('\n').length > 3 ? 'auto' : 'hidden' }}
                         ref={(el) => { if (el) { el.style.height = 'auto'; el.style.height = Math.min(el.scrollHeight, 120) + 'px'; } }}
                     />
                     <button
                         type="submit"
                         disabled={(!input.trim() && attachments.length === 0) || isTyping}
-                        className="absolute right-2 bottom-2 p-2 rounded-xl bg-accent text-white hover:bg-accent-hover transition-colors disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer flex justify-center items-center h-9 w-9"
+                        className="absolute right-1.5 md:right-2 bottom-1.5 md:bottom-2 p-2 rounded-xl border border-white/5 bg-accent text-white hover:bg-accent-hover transition-colors disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer flex justify-center items-center h-10 w-10 md:h-9 md:w-9 shadow-[0_5px_15px_rgba(109,40,217,0.3)] disabled:shadow-none"
                     >
-                        <Send size={16} className="-ml-0.5" />
+                        <Send size={18} className="-ml-0.5" />
                     </button>
                 </form>
             </div>

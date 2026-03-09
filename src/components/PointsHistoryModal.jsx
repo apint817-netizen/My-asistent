@@ -13,9 +13,14 @@ export default function PointsHistoryModal({ isOpen, onClose }) {
     if (!isOpen) return null;
 
     return (
-        <div className="fixed inset-0 z-[60] flex items-center justify-center p-4 sm:p-6 animate-fade-in bg-black/60 backdrop-blur-md">
-            <div id="tour-points-modal-override" className="bg-bg-secondary border border-border rounded-2xl w-full max-w-lg shadow-2xl flex flex-col relative overflow-hidden max-h-[90vh]">
-                <div className="p-6 border-b border-border flex items-center justify-between relative z-10 bg-bg-secondary/80 backdrop-blur-sm">
+        <div className="fixed inset-0 z-[60] flex items-end md:items-center justify-center p-0 md:p-6 animate-fade-in bg-black/60 backdrop-blur-md">
+            <div id="tour-points-modal-override" className="bg-bg-primary/95 md:bg-bg-secondary w-full md:max-w-lg shadow-2xl flex flex-col relative overflow-hidden max-h-[90vh] md:max-h-[85vh] rounded-t-3xl md:rounded-2xl animate-slide-up md:animate-scale-in border-t border-white/5 md:border md:border-border">
+                {/* Mobile Drag Indicator */}
+                <div className="w-full flex justify-center pt-3 pb-1 md:hidden shrink-0 pointer-events-none absolute top-0 left-0 right-0 z-50">
+                    <div className="w-12 h-1.5 bg-white/20 rounded-full"></div>
+                </div>
+
+                <div className="p-4 md:p-6 pb-4 pt-8 md:pt-6 border-b border-border flex items-center justify-between relative z-10 bg-transparent md:bg-bg-secondary/80 backdrop-blur-sm shrink-0">
                     <div className="flex items-center gap-3">
                         <div className="w-10 h-10 rounded-full bg-warning/20 flex items-center justify-center text-warning shadow-[0_0_15px_rgba(245,158,11,0.2)]">
                             <Trophy size={20} />
