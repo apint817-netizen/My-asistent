@@ -67,40 +67,54 @@ function App() {
       // Set dynamic storage key for this user
       setStorageKey(userId);
 
-      // Try to load from localStorage first (fast)
+      // FAST: Load from localStorage first — show UI immediately
       const localKey = `nova-storage-${userId}`;
       const localData = localStorage.getItem(localKey);
+      let hasLocalData = false;
 
       if (localData) {
         try {
           const parsed = JSON.parse(localData);
           if (parsed?.state) {
             useStore.setState(parsed.state);
+            hasLocalData = true;
           }
         } catch (e) {
           console.warn('[App] Failed to parse local data:', e);
         }
       }
 
-      // Then load from Supabase with a timeout (15s max)
-      try {
-        const timeoutPromise = new Promise((_, reject) =>
-          setTimeout(() => reject(new Error('Supabase load timeout')), 15000)
-        );
-        const remoteData = await Promise.race([
-          loadUserData(userId),
-          timeoutPromise
-        ]);
-        if (remoteData) {
-          useStore.getState().applyRemoteData(remoteData);
-          console.log('[App] Applied remote data from Supabase');
-        } else if (!localData) {
-          useStore.getState().resetStoreForNewUser();
-          console.log('[App] New user — clean state');
-        }
-      } catch (timeoutErr) {
-        console.warn('[App] Supabase load timed out, using local data:', timeoutErr.message);
-        if (!localData) {
+      // If we have local data, stop blocking UI — sync Supabase in background
+      if (hasLocalData) {
+        setDataLoading(false);
+        // Background sync from Supabase (non-blocking)
+        loadUserData(userId).then(remoteData => {
+          if (remoteData) {
+            useStore.getState().applyRemoteData(remoteData);
+            console.log('[App] Background sync: applied remote data');
+          }
+        }).catch(err => {
+          console.warn('[App] Background sync failed:', err.message);
+        });
+      } else {
+        // No local data — must wait for Supabase (with 5s timeout)
+        try {
+          const timeoutPromise = new Promise((_, reject) =>
+            setTimeout(() => reject(new Error('Supabase load timeout')), 5000)
+          );
+          const remoteData = await Promise.race([
+            loadUserData(userId),
+            timeoutPromise
+          ]);
+          if (remoteData) {
+            useStore.getState().applyRemoteData(remoteData);
+            console.log('[App] Applied remote data from Supabase');
+          } else {
+            useStore.getState().resetStoreForNewUser();
+            console.log('[App] New user — clean state');
+          }
+        } catch (timeoutErr) {
+          console.warn('[App] Supabase load timed out:', timeoutErr.message);
           useStore.getState().resetStoreForNewUser();
         }
       }
@@ -128,11 +142,11 @@ function App() {
       return;
     }
 
-    // Auth check with timeout (15s max)
+    // Auth check with timeout (5s max — fast fail)
     const authTimeout = setTimeout(() => {
       console.warn('[App] Auth check timed out, proceeding without auth');
       setAuthLoading(false);
-    }, 15000);
+    }, 5000);
 
     supabase.auth.getSession().then(async ({ data: { session } }) => {
       clearTimeout(authTimeout);
