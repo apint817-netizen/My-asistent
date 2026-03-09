@@ -1,6 +1,8 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { supabase } from '../lib/supabase';
 import { useStore } from '../store/useStore';
+import { getProfilesByIds, getProfileById } from '../lib/profileCache';
+import { format } from 'date-fns';
 import { ArrowLeft, Send, Users, Shield, UserPlus, Settings, LogOut, CheckCheck, Check, Search, Trash2, X, ListTodo, Plus, Circle, CheckCircle, Sparkles, Bot, Edit2, MessageSquare, Calendar, ChevronLeft, ChevronRight } from 'lucide-react';
 import AIGroupAssistant from './AIGroupAssistant';
 import ConfirmModal from './ConfirmModal';
@@ -130,7 +132,7 @@ export default function GroupChatView({ group, user, onBack, onGroupUpdate, init
 
         const handleProfileUpdate = async () => {
             if (!user?.id) return;
-            const { data } = await supabase.from('profiles').select('id, display_name, avatar_url, user_tag').eq('id', user.id).single();
+            const data = await getProfileById(user.id);
             if (data) {
                 setProfiles(prev => ({ ...prev, [user.id]: data }));
             }
@@ -245,12 +247,8 @@ export default function GroupChatView({ group, user, onBack, onGroupUpdate, init
         if (missingIds.length === 0) return;
 
         try {
-            const { data, error } = await supabase
-                .from('profiles')
-                .select('id, display_name, avatar_url, user_tag')
-                .in('id', missingIds);
-
-            if (error) throw error;
+            const data = await getProfilesByIds(missingIds);
+            if (!data) throw new Error('Could not fetch profiles');
 
             setProfiles(prev => {
                 const newProfiles = { ...prev };
@@ -299,12 +297,7 @@ export default function GroupChatView({ group, user, onBack, onGroupUpdate, init
             const uniqueFriendIds = [...new Set(friendIds)];
 
             // STEP 2: Fetch profiles for those friends
-            const { data: profiles, error: profError } = await supabase
-                .from('profiles')
-                .select('id, display_name, avatar_url, user_tag')
-                .in('id', uniqueFriendIds);
-
-            if (profError) throw profError;
+            const profiles = await getProfilesByIds(uniqueFriendIds);
 
             setFriends(profiles || []);
         } catch (err) {

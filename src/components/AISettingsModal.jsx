@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { useStore } from '../store/useStore';
-import { Settings, Bot, X, Link as LinkIcon, Zap, HelpCircle, ChevronDown, Sparkles, Heart, Code, Trash2, User, LogOut, Upload, Loader, Save, Edit2, Crop } from 'lucide-react';
+import { getProfileById } from '../lib/profileCache';
+import { Settings, Bot, X, Link as LinkIcon, Zap, HelpCircle, ChevronDown, Sparkles, Heart, Code, Trash2, User, LogOut, Upload, Loader, Save, Edit2, Crop, Mic, Shield, Database, Cpu, Play, CircleDot, Brain, StopCircle, RefreshCw, Key } from 'lucide-react';
 import { PROXY_MODELS } from '../utils/geminiApi';
 import { isSupabaseConfigured, supabase } from '../lib/supabase';
 import Cropper from 'react-easy-crop';
@@ -107,13 +108,7 @@ export default function AISettingsModal({ isOpen, onClose }) {
             const { data: { user } } = await supabase.auth.getUser();
             if (!user) return;
 
-            const { data, error } = await supabase
-                .from('profiles')
-                .select('*')
-                .eq('id', user.id)
-                .single();
-
-            if (error && error.code !== 'PGRST116') throw error;
+            const data = await getProfileById(user.id);
 
             if (data) {
                 setDisplayName(data.display_name || '');

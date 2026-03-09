@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { supabase } from '../lib/supabase';
 import { Users, Search, UserPlus, Check, X, MessageCircle, Clock, Copy } from 'lucide-react';
 import { useStore } from '../store/useStore';
+import { getProfilesByIds, searchProfilesByTag } from '../lib/profileCache';
 import ChatView from './ChatView';
 
 export default function FriendsView() {
@@ -148,13 +149,8 @@ export default function FriendsView() {
             const friendIds = rels.map(rel => rel.user_id === user.id ? rel.friend_id : rel.user_id);
             const uniqueFriendIds = [...new Set(friendIds)];
 
-            // STEP 2: Fetch the profiles for those IDs (Blazing fast, simple IN query)
-            const { data: profiles, error: profError } = await supabase
-                .from('profiles')
-                .select('id, display_name, avatar_url, level, is_online')
-                .in('id', uniqueFriendIds);
-
-            if (profError) throw profError;
+            // STEP 2: Fetch the profiles for those IDs (Blazing fast via Cache/RPC)
+            const profiles = await getProfilesByIds(uniqueFriendIds);
 
             // Combine the data manually to match the expected format
             const formattedFriends = rels.map(rel => {
@@ -200,13 +196,8 @@ export default function FriendsView() {
             const senderIds = rels.map(rel => rel.user_id);
             const uniqueSenderIds = [...new Set(senderIds)];
 
-            // STEP 2: Fetch the profiles for those senders
-            const { data: profiles, error: profError } = await supabase
-                .from('profiles')
-                .select('id, display_name, avatar_url, level')
-                .in('id', uniqueSenderIds);
-
-            if (profError) throw profError;
+            // STEP 2: Fetch the profiles for those senders (Fast via Cache/RPC)
+            const profiles = await getProfilesByIds(uniqueSenderIds);
 
             // Combine the data
             const formattedRequests = rels.map(rel => {
@@ -235,36 +226,9 @@ export default function FriendsView() {
 
         setLoadingSearch(true);
         try {
-            let queryBuilder = supabase
-                .from('profiles')
-                .select('id, display_name, avatar_url, level, user_tag')
-                .neq('id', user.id)
-                .limit(20);
+            const data = await searchProfilesByTag(query, user.id);
 
-            if (query.includes('@')) {
-                // Search by email
-                queryBuilder = queryBuilder.eq('email', query);
-            } else if (query.includes('#')) {
-                // Search by Name#Tag
-                const parts = query.split('#');
-                if (parts.length === 2 && parts[0] && parts[1]) {
-                    queryBuilder = queryBuilder.ilike('display_name', `%${parts[0]}%`).eq('user_tag', parts[1]);
-                } else if (parts[1]) {
-                    queryBuilder = queryBuilder.eq('user_tag', parts[1]);
-                }
-            } else {
-                // General search (name)
-                // If it's exactly 4 digits, try finding by tag too
-                if (/^\d{4}$/.test(query)) {
-                    queryBuilder = queryBuilder.or(`display_name.ilike.%${query}%,user_tag.eq.${query}`);
-                } else {
-                    queryBuilder = queryBuilder.ilike('display_name', `%${query}%`);
-                }
-            }
-
-            const { data, error } = await queryBuilder;
-
-            if (error) throw error;
+            if (!data) throw new Error('No search results or error occurred.');
 
             // Check existing relationship status for each result
             const { data: rels } = await supabase

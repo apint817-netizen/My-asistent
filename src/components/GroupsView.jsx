@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { supabase } from '../lib/supabase';
 import { Shield, Plus, Search, User, ArrowRight, Settings, Trash2 } from 'lucide-react';
 import { useStore } from '../store/useStore';
+import { getProfilesByIds } from '../lib/profileCache';
 import GroupChatView from './GroupChatView';
 
 export default function GroupsView() {
@@ -73,13 +74,8 @@ export default function GroupsView() {
             const friendIds = rels.map(rel => rel.user_id === userId ? rel.friend_id : rel.user_id);
             const uniqueFriendIds = [...new Set(friendIds)];
 
-            // STEP 2: Fetch profiles for those friends
-            const { data: profiles, error: profError } = await supabase
-                .from('profiles')
-                .select('id, display_name, avatar_url, user_tag')
-                .in('id', uniqueFriendIds);
-
-            if (profError) throw profError;
+            // STEP 2: Fetch profiles for those friends (Fast via cache/RPC)
+            const profiles = await getProfilesByIds(uniqueFriendIds);
             setFriends(profiles || []);
         } catch (err) {
             console.error('Error loading friends in groups:', err);
