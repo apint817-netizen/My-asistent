@@ -7,7 +7,10 @@ export default function MobileHeader({ onShowSettings, onShowPointsHistory }) {
     const streak = useStore(state => state.streak);
 
     return (
-        <header className="flex items-center justify-between h-14 px-4 shrink-0">
+        <header 
+            className="flex items-center justify-between px-4 shrink-0 bg-bg-primary border-b border-white/5 z-50 pt-[max(env(safe-area-inset-top),12px)] pb-3"
+            style={{ minHeight: 'calc(56px + env(safe-area-inset-top, 0px))' }}
+        >
             {/* Left: Logo + Streak */}
             <div className="flex items-center gap-3 min-w-0">
                 <h1 className="text-lg font-bold text-gradient tracking-tight whitespace-nowrap">Nova</h1>

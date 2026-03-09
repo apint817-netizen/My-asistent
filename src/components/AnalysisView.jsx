@@ -57,6 +57,8 @@ const parseAnalysisCommands = (text, currentDraft, updateDraftPlan) => {
 };
 
 export default function AnalysisView() {
+    const [mobileTab, setMobileTab] = useState('chat'); // 'chat' | 'draft'
+    
     const messages = useStore(state => state.analysisMessages);
     const addAnalysisMessage = useStore(state => state.addAnalysisMessage);
     const clearAnalysisMessages = useStore(state => state.clearAnalysisMessages);
@@ -373,9 +375,26 @@ ${isProfileEmpty ? '\n⚠️ ПРОФИЛЬ ПУСТ! Перед планиро�
     const hasDraftItems = draftPlan.today.length > 0 || draftPlan.future.length > 0 || draftPlan.regular.length > 0 || (draftPlan.rewards || []).length > 0;
 
     return (
-        <div className="flex flex-col lg:grid lg:grid-cols-2 gap-6 flex-1 h-full lg:min-h-[500px]">
+        <div className="flex flex-col lg:grid lg:grid-cols-2 lg:gap-6 flex-1 h-full lg:min-h-[500px]">
+            {/* Mobile Tabs */}
+            <div className="flex lg:hidden bg-black/20 rounded-xl p-1 shrink-0 mb-4 z-10 w-full relative">
+                <button
+                    onClick={() => setMobileTab('chat')}
+                    className={`flex-1 py-2 text-sm font-bold rounded-lg transition-colors flex justify-center items-center gap-2 ${mobileTab === 'chat' ? 'bg-bg-primary text-accent shadow-md' : 'text-text-secondary hover:text-white'}`}
+                >
+                    Чат 💬
+                </button>
+                <button
+                    onClick={() => setMobileTab('draft')}
+                    className={`flex-1 flex justify-center items-center gap-2 py-2 text-sm font-bold rounded-lg transition-colors ${mobileTab === 'draft' ? 'bg-bg-primary text-success shadow-md' : 'text-text-secondary hover:text-white'}`}
+                >
+                    Черновик 📋
+                    {hasDraftItems && mobileTab !== 'draft' && <span className="w-2 h-2 bg-success rounded-full animate-pulse shadow-[0_0_8px_rgba(74,222,128,0.8)]"></span>}
+                </button>
+            </div>
+
             {/* Левая колонка - Чат */}
-            <div className="glass-panel p-0 flex flex-col h-[70vh] min-h-[500px] lg:h-full lg:min-h-0 overflow-hidden border-accent/20 shrink-0">
+            <div className={`glass-panel p-0 flex-col h-[65vh] min-h-[400px] lg:h-full lg:min-h-0 overflow-hidden border-accent/20 shrink-0 ${mobileTab === 'chat' ? 'flex' : 'hidden lg:flex'}`}>
                 <div className="p-4 border-b border-border bg-black/20 flex items-center justify-between">
                     <div className="flex items-center gap-3">
                         <div className="w-10 h-10 rounded-full bg-gradient-to-br from-indigo-500 to-purple-600 flex items-center justify-center">
@@ -582,7 +601,7 @@ ${isProfileEmpty ? '\n⚠️ ПРОФИЛЬ ПУСТ! Перед планиро�
             </div>
 
             {/* Правая колонка - Черновик */}
-            <div className="glass-panel p-6 flex flex-col h-[60vh] min-h-[400px] lg:h-full lg:min-h-0 overflow-hidden border-success/20 relative shrink-0">
+            <div className={`glass-panel p-6 flex-col h-[65vh] min-h-[400px] lg:h-full lg:min-h-0 overflow-hidden border-success/20 relative shrink-0 ${mobileTab === 'draft' ? 'flex' : 'hidden lg:flex'}`}>
                 <div className="flex items-center justify-between mb-6 pb-4 border-b border-border">
                     <h2 className="text-xl font-bold text-white flex items-center gap-2">
                         <Save size={20} className="text-success" />

@@ -114,13 +114,14 @@ const CalendarView = () => {
     return (
         <section className="glass-panel p-6 flex flex-col gap-6 animate-fade-in relative overflow-hidden">
             <div className="flex-1">
-                <div className="flex justify-between items-center mb-6">
+                <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 sm:gap-0 mb-6">
                     <h2 className="text-xl font-bold flex items-center gap-2">
-                        <CalendarIcon size={20} className="text-accent" />
-                        Ближайшие планы
+                        <CalendarIcon size={20} className="text-accent shrink-0" />
+                        <span className="sm:hidden">Планы</span>
+                        <span className="hidden sm:inline">Ближайшие планы</span>
                     </h2>
-                    <div className="flex items-center gap-4 bg-bg-secondary px-3 py-1.5 rounded-xl border border-border">
-                        <button onClick={prevMonth} className="hover:text-accent transition-colors">
+                    <div className="flex items-center justify-between sm:justify-start gap-2 sm:gap-4 bg-bg-secondary px-2 sm:px-3 py-1.5 rounded-xl border border-border w-full sm:w-auto">
+                        <button onClick={prevMonth} className="hover:text-accent transition-colors p-2 sm:p-0">
                             <ChevronLeft size={20} />
                         </button>
                         <div className="relative flex items-center justify-center min-w-32 z-10">

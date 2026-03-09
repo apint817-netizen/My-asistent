@@ -327,7 +327,7 @@ function App() {
         )}
 
         {/* Mobile main content area */}
-        <div className="flex-1 overflow-y-auto px-4 pb-4">
+        <div className="flex-1 overflow-y-auto px-4 pb-32">
           {isMobileOnlyTab ? (
             renderMobileContent()
           ) : activeTab === 'calendar' ? (
@@ -337,15 +337,15 @@ function App() {
             <div className="flex flex-col gap-6">
               {/* Tasks section */}
               <section className="glass-panel p-4 flex-1 flex flex-col">
-                <div className="flex justify-between items-center mb-4">
+                <div className="flex flex-wrap justify-between items-center gap-3 mb-4">
                   <h2 className="text-lg font-bold flex items-center gap-2">
-                    <CheckCircle size={18} className="text-accent" />
-                    Цели и Привычки
+                    <CheckCircle size={18} className="text-accent shrink-0" />
+                    <span className="truncate">Цели и Привычки</span>
                   </h2>
                   <button
                     id="tour-analysis-btn"
                     onClick={() => setShowAnalysisModal(true)}
-                    className="flex items-center gap-1.5 text-xs font-bold bg-gradient-to-r from-indigo-500 to-purple-600 text-white px-3 py-1.5 rounded-lg transition-all active:scale-95"
+                    className="flex items-center gap-1.5 text-xs font-bold bg-gradient-to-r from-indigo-500 to-purple-600 text-white px-3 py-1.5 rounded-lg transition-all active:scale-95 shrink-0"
                   >
                     🧠 Анализ
                   </button>

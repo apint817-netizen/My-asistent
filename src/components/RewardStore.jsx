@@ -160,18 +160,18 @@ export default function RewardStore() {
                         {/* Horizontal scroll on mobile, vertical grid on desktop */}
                         <div className="flex md:grid md:grid-cols-2 lg:grid-cols-3 gap-3 overflow-x-auto md:overflow-x-visible no-scrollbar snap-x snap-mandatory pb-2">
                             {rewards.map((reward) => (
-                                <div key={reward.id} className="relative group shrink-0 md:shrink snap-center w-[100px] min-w-[100px] md:w-auto md:min-w-0">
-                                    <div>
+                                <div key={reward.id} className="relative group shrink-0 md:shrink snap-center w-[110px] min-w-[110px] md:w-auto md:min-w-0">
+                                    <div className="h-full">
                                         <button
                                             onClick={() => handleBuy(reward)}
                                             disabled={tokens < reward.cost}
-                                            className="w-full bg-black/20 border border-border p-2 md:p-4 rounded-xl flex flex-col items-center justify-center gap-1 md:gap-2 hover:border-warning/50 hover:bg-warning/5 transition-all disabled:opacity-50 disabled:cursor-not-allowed h-[100px] md:h-auto"
+                                            className="w-full bg-black/20 border border-border p-2 md:p-4 rounded-xl flex flex-col items-center justify-between gap-1 md:gap-2 hover:border-warning/50 hover:bg-warning/5 transition-all disabled:opacity-50 disabled:cursor-not-allowed h-[140px] md:h-auto shadow-sm"
                                         >
                                             <div className="w-8 h-8 md:w-10 md:h-10 rounded-full bg-warning/10 text-warning flex items-center justify-center">
                                                 <Gift size={16} className="md:w-5 md:h-5" />
                                             </div>
-                                            <span className="font-semibold text-center leading-tight text-xs md:text-sm line-clamp-2">{reward.title}</span>
-                                            <span className="text-warning text-[11px] md:text-sm font-bold bg-warning/10 px-2 py-0.5 md:px-3 md:py-1 rounded-full whitespace-nowrap">
+                                            <span className="font-semibold text-center leading-tight text-xs md:text-sm line-clamp-3 w-full flex-1 flex items-center justify-center">{reward.title}</span>
+                                            <span className="text-warning text-[11px] md:text-sm font-bold bg-warning/10 px-2 py-0.5 md:px-3 md:py-1 rounded-full whitespace-nowrap mt-auto shrink-0">
                                                 {reward.cost} ⚡
                                             </span>
                                         </button>

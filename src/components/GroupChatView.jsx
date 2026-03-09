@@ -633,61 +633,61 @@ export default function GroupChatView({ group, user, onBack, onGroupUpdate, init
     return (
         <div className="flex flex-col bg-[#0a0a0c]/80 backdrop-blur-3xl border border-white/5 rounded-3xl overflow-hidden shadow-2xl animate-fade-in relative z-10 w-full max-w-5xl mx-auto" style={{ minHeight: '75vh', maxHeight: '85vh' }}>
             {/* Header */}
-            <header className="p-4 border-b border-white/5 bg-white/[0.02] flex items-center justify-between gap-4 shrink-0">
-                <div className="flex items-center gap-4">
-                    <button onClick={onBack} className="w-10 h-10 rounded-full flex items-center justify-center bg-white/5 text-text-secondary hover:text-white hover:bg-white/10 transition-all">
+            <header className="p-3 sm:p-4 border-b border-white/5 bg-white/[0.02] flex flex-col xl:flex-row xl:items-center justify-between gap-4 shrink-0">
+                <div className="flex items-center gap-3 sm:gap-4">
+                    <button onClick={onBack} className="w-10 h-10 rounded-full flex items-center justify-center bg-white/5 text-text-secondary hover:text-white hover:bg-white/10 transition-all shrink-0">
                         <ArrowLeft size={18} />
                     </button>
-                    <div className="flex items-center gap-3">
-                        <div className="w-11 h-11 rounded-2xl bg-gradient-to-br from-indigo-500/80 to-purple-500/80 flex items-center justify-center text-white font-bold text-lg shadow-inner">
+                    <div className="flex items-center gap-3 w-full min-w-0">
+                        <div className="w-11 h-11 rounded-2xl bg-gradient-to-br from-indigo-500/80 to-purple-500/80 flex items-center justify-center text-white font-bold text-lg shadow-inner shrink-0">
                             {group.name.substring(0, 2).toUpperCase()}
                         </div>
-                        <div>
-                            <h3 className="font-bold text-white text-base leading-tight">{group.name}</h3>
-                            <p className="text-xs text-text-secondary mt-0.5">{members.length} участников · Роль: {myRole}</p>
+                        <div className="flex flex-col min-w-0">
+                            <h3 className="font-bold text-white text-base leading-tight truncate">{group.name}</h3>
+                            <p className="text-xs text-text-secondary mt-0.5 truncate">{members.length} участников · Роль: {myRole}</p>
                         </div>
                     </div>
                 </div>
 
-                <div className="flex bg-black/40 rounded-xl p-1 shrink-0 overflow-x-auto scrollbar-hide">
+                <div className="flex flex-wrap xl:flex-nowrap bg-black/40 rounded-xl p-1 shrink-0 gap-1 w-full xl:w-auto">
                     <button
                         onClick={() => setActiveGroupTab('tasks')}
-                        className={`px-4 sm:px-6 py-2 text-sm font-semibold rounded-lg transition-all whitespace-nowrap flex items-center gap-2 ${activeGroupTab === 'tasks' ? 'bg-white/10 text-white shadow-md' : 'text-text-secondary hover:text-white'}`}
+                        className={`flex-1 xl:flex-none px-2 sm:px-6 py-2 text-[13px] sm:text-sm font-semibold rounded-lg transition-all whitespace-nowrap flex justify-center items-center gap-1.5 sm:gap-2 ${activeGroupTab === 'tasks' ? 'bg-white/10 text-white shadow-md' : 'text-text-secondary hover:text-white'}`}
                     >
                         <ListTodo size={16} /> Задачи
                     </button>
                     <button
                         onClick={() => setActiveGroupTab('calendar')}
-                        className={`px-4 sm:px-6 py-2 text-sm font-semibold rounded-lg transition-all whitespace-nowrap flex items-center gap-2 ${activeGroupTab === 'calendar' ? 'bg-white/10 text-white shadow-md' : 'text-text-secondary hover:text-white'}`}
+                        className={`flex-1 xl:flex-none px-2 sm:px-6 py-2 text-[13px] sm:text-sm font-semibold rounded-lg transition-all whitespace-nowrap flex justify-center items-center gap-1.5 sm:gap-2 ${activeGroupTab === 'calendar' ? 'bg-white/10 text-white shadow-md' : 'text-text-secondary hover:text-white'}`}
                     >
                         <Calendar size={16} /> Календарь
                     </button>
 
-                    <div className="w-px h-6 bg-white/10 mx-2 self-center shrink-0"></div>
+                    <div className="hidden xl:block w-px h-6 bg-white/10 mx-2 self-center shrink-0"></div>
 
                     <button
                         onClick={() => setShowChat(true)}
-                        className={`px-4 sm:px-6 py-2 text-sm font-semibold rounded-lg transition-all whitespace-nowrap text-text-secondary hover:text-white flex items-center gap-2 relative`}
+                        className={`flex-1 xl:flex-none px-2 sm:px-6 py-2 text-[13px] sm:text-sm font-semibold rounded-lg transition-all whitespace-nowrap text-text-secondary hover:text-white flex justify-center items-center gap-1.5 sm:gap-2 relative`}
                     >
                         <MessageSquare size={16} /> Чат
                         {unreadCount > 0 && (
-                            <span className="absolute -top-1 -right-1 w-5 h-5 bg-danger text-white text-[10px] font-bold flex items-center justify-center rounded-full animate-pulse shadow-lg shadow-danger/50">
+                            <span className="absolute top-1 right-2 w-4 h-4 bg-danger text-white text-[9px] font-bold flex items-center justify-center rounded-full shadow-lg shadow-danger/50 mt-[-4px]">
                                 {unreadCount > 99 ? '99+' : unreadCount}
                             </span>
                         )}
                     </button>
                     <button
                         onClick={() => setShowMembers(true)}
-                        className={`px-4 sm:px-6 py-2 text-sm font-semibold rounded-lg transition-all whitespace-nowrap text-text-secondary hover:text-white flex items-center gap-2`}
+                        className={`flex-1 xl:flex-none px-2 sm:px-6 py-2 text-[13px] sm:text-sm font-semibold rounded-lg transition-all whitespace-nowrap text-text-secondary hover:text-white flex justify-center items-center gap-1.5 sm:gap-2`}
                     >
-                        <Users size={16} /> Участники <span className="text-xs opacity-50 ml-1">({members.length})</span>
+                        <Users size={16} /> <span className="hidden sm:inline">Участники</span><span className="sm:hidden">Уч.</span> <span className="text-xs opacity-50 ml-0.5">({members.length})</span>
                     </button>
                     {canManage && (
                         <button
                             onClick={() => setShowSettings(true)}
-                            className={`px-4 sm:px-6 py-2 text-sm font-semibold rounded-lg transition-all whitespace-nowrap text-text-secondary hover:text-white flex items-center gap-2`}
+                            className={`flex-1 xl:flex-none px-2 sm:px-6 py-2 text-[13px] sm:text-sm font-semibold rounded-lg transition-all whitespace-nowrap text-text-secondary hover:text-white flex justify-center items-center gap-1.5 sm:gap-2`}
                         >
-                            <Settings size={16} /> Настройки
+                            <Settings size={16} /> Настр.
                         </button>
                     )}
                 </div>
