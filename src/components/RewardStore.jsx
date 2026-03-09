@@ -160,13 +160,12 @@ export default function RewardStore() {
                         {/* Horizontal scroll on mobile, vertical grid on desktop */}
                         <div className="flex md:grid md:grid-cols-2 lg:grid-cols-3 gap-3 overflow-x-auto md:overflow-x-visible no-scrollbar snap-x snap-mandatory pb-2">
                             {rewards.map((reward) => (
-                                <div key={reward.id} className="relative group shrink-0 snap-center" style={{ width: '100px', minWidth: '100px' }}>
-                                    <div className="md:w-auto md:min-w-0">
+                                <div key={reward.id} className="relative group shrink-0 md:shrink snap-center w-[100px] min-w-[100px] md:w-auto md:min-w-0">
+                                    <div>
                                         <button
                                             onClick={() => handleBuy(reward)}
                                             disabled={tokens < reward.cost}
-                                            className="w-full bg-black/20 border border-border p-2 md:p-4 rounded-xl flex flex-col items-center justify-center gap-1 md:gap-2 hover:border-warning/50 hover:bg-warning/5 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
-                                            style={{ height: '100px' }}
+                                            className="w-full bg-black/20 border border-border p-2 md:p-4 rounded-xl flex flex-col items-center justify-center gap-1 md:gap-2 hover:border-warning/50 hover:bg-warning/5 transition-all disabled:opacity-50 disabled:cursor-not-allowed h-[100px] md:h-auto"
                                         >
                                             <div className="w-8 h-8 md:w-10 md:h-10 rounded-full bg-warning/10 text-warning flex items-center justify-center">
                                                 <Gift size={16} className="md:w-5 md:h-5" />
