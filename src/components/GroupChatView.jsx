@@ -696,7 +696,7 @@ export default function GroupChatView({ group, user, onBack, onGroupUpdate, init
             {/* Chat Sidebar/Modal */}
             {showChat && (
                 <div className="absolute inset-0 z-[60] bg-black/60 backdrop-blur-md flex justify-end animate-fade-in" onClick={() => setShowChat(false)}>
-                    <div className="w-full sm:w-[450px] h-full bg-bg-primary border-l border-white/20 shadow-[-20px_0_50px_rgba(0,0,0,0.6)] flex flex-col animate-slide-left relative shadow-inner-light" onClick={e => e.stopPropagation()}>
+                    <div className="w-full sm:w-[380px] lg:max-w-[420px] h-full bg-bg-primary border-l border-white/20 shadow-[-20px_0_50px_rgba(0,0,0,0.6)] flex flex-col animate-slide-left relative" onClick={e => e.stopPropagation()}>
                         <div className="p-4 border-b border-white/10 flex items-center justify-between bg-white/[0.03]">
                             <h3 className="font-bold text-white flex items-center gap-2"><MessageSquare size={18} className="text-accent" /> Чат команды</h3>
                             <button onClick={() => setShowChat(false)} className="w-8 h-8 flex items-center justify-center rounded-xl bg-white/5 hover:bg-white/10 text-white transition-colors"><X size={18} /></button>
@@ -812,7 +812,7 @@ export default function GroupChatView({ group, user, onBack, onGroupUpdate, init
             {/* Members Sidebar/Modal */}
             {showMembers && (
                 <div className="absolute inset-0 z-[60] bg-black/60 backdrop-blur-md flex justify-end animate-fade-in" onClick={() => setShowMembers(false)}>
-                    <div className="w-full sm:w-[450px] h-full bg-bg-primary border-l border-white/20 shadow-[-20px_0_50px_rgba(0,0,0,0.6)] flex flex-col animate-slide-left relative shadow-inner-light" onClick={e => e.stopPropagation()}>
+                    <div className="w-full sm:w-[380px] lg:max-w-[420px] h-full bg-bg-primary border-l border-white/20 shadow-[-20px_0_50px_rgba(0,0,0,0.6)] flex flex-col animate-slide-left relative" onClick={e => e.stopPropagation()}>
                         <div className="p-4 border-b border-white/10 flex items-center justify-between bg-white/[0.03]">
                             <h3 className="font-bold text-white flex items-center gap-2"><Users size={18} className="text-accent" /> Участники команды</h3>
                             <button onClick={() => setShowMembers(false)} className="w-8 h-8 flex items-center justify-center rounded-xl bg-white/5 hover:bg-white/10 text-white transition-colors"><X size={18} /></button>

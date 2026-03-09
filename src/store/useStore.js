@@ -576,9 +576,19 @@ export const useStore = create(
             fromCalendar: true
           }));
 
+          // Calculate if lastActiveDate was exactly yesterday
+          let newStreak = 1;
+          if (state.lastActiveDate) {
+            const lastDate = new Date(state.lastActiveDate);
+            const todayDate = new Date(today);
+            const diffMs = todayDate.getTime() - lastDate.getTime();
+            const diffDays = Math.round(diffMs / (1000 * 60 * 60 * 24));
+            newStreak = diffDays === 1 ? state.streak + 1 : 1;
+          }
+
           return {
             lastActiveDate: today,
-            streak: state.lastActiveDate ? state.streak + 1 : 1,
+            streak: newStreak,
             tasks: [...plannedToday],
             chatMessages: [
               ...state.chatMessages,

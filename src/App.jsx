@@ -110,12 +110,40 @@ function App() {
             useStore.getState().applyRemoteData(remoteData);
             console.log('[App] Applied remote data from Supabase');
           } else {
-            useStore.getState().resetStoreForNewUser();
-            console.log('[App] New user — clean state');
+            // Double-check: maybe localStorage has data under old key
+            const fallbackKey = `nova-storage-${userId}`;
+            const fallbackData = localStorage.getItem(fallbackKey);
+            if (fallbackData) {
+              try {
+                const parsed = JSON.parse(fallbackData);
+                if (parsed?.state && (parsed.state.tasks?.length > 0 || parsed.state.chatMessages?.length > 0)) {
+                  useStore.setState(parsed.state);
+                  console.log('[App] Recovered data from localStorage fallback');
+                } else {
+                  useStore.getState().resetStoreForNewUser();
+                  console.log('[App] New user — clean state');
+                }
+              } catch { useStore.getState().resetStoreForNewUser(); }
+            } else {
+              useStore.getState().resetStoreForNewUser();
+              console.log('[App] New user — clean state');
+            }
           }
         } catch (timeoutErr) {
           console.warn('[App] Supabase load timed out:', timeoutErr.message);
-          useStore.getState().resetStoreForNewUser();
+          // DON'T reset if we have local data — CORS/network error should NOT wipe user progress
+          const fallbackKey = `nova-storage-${userId}`;
+          const fallbackData = localStorage.getItem(fallbackKey);
+          if (fallbackData) {
+            try {
+              const parsed = JSON.parse(fallbackData);
+              if (parsed?.state) {
+                useStore.setState(parsed.state);
+                console.log('[App] Network error — using cached local data');
+              }
+            } catch { /* keep current state */ }
+          }
+          // If truly no data anywhere, remain on initial state (not reset)
         }
       }
     } catch (err) {

@@ -1,12 +1,40 @@
 /**
  * Profile cache — avoids repeated Supabase queries to profiles table.
  * Uses RPC functions (SECURITY DEFINER) to bypass RLS.
+ * Now with localStorage persistence for instant loading.
  */
 import { supabase } from './supabase';
 
 // In-memory cache: id -> { display_name, avatar_url, user_tag, ... }
 const cache = new Map();
 const CACHE_TTL = 5 * 60 * 1000; // 5 minutes
+const LOCAL_CACHE_KEY = 'nova-profile-cache';
+
+// Load from localStorage on startup
+try {
+    const stored = localStorage.getItem(LOCAL_CACHE_KEY);
+    if (stored) {
+        const parsed = JSON.parse(stored);
+        const now = Date.now();
+        for (const [id, profile] of Object.entries(parsed)) {
+            // Allow localStorage cache up to 30 min
+            if (now - (profile._ts || 0) < 30 * 60 * 1000) {
+                cache.set(id, profile);
+            }
+        }
+    }
+} catch { /* ignore */ }
+
+// Persist to localStorage
+function persistToLocalStorage() {
+    try {
+        const obj = {};
+        for (const [id, profile] of cache.entries()) {
+            obj[id] = profile;
+        }
+        localStorage.setItem(LOCAL_CACHE_KEY, JSON.stringify(obj));
+    } catch { /* quota exceeded, etc */ }
+}
 
 /**
  * Get multiple profiles by IDs. Uses RPC to bypass RLS.
@@ -51,6 +79,7 @@ export async function getProfilesByIds(ids) {
                         cache.set(profile.id, profile);
                         result.push(profile);
                     }
+                    persistToLocalStorage();
                 }
             } else if (data) {
                 for (const profile of data) {
@@ -58,9 +87,15 @@ export async function getProfilesByIds(ids) {
                     cache.set(profile.id, profile);
                     result.push(profile);
                 }
+                persistToLocalStorage();
             }
         } catch (err) {
             console.error('[ProfileCache] Failed to fetch profiles:', err);
+            // Return stale cache data if available (even expired)
+            for (const id of missingIds) {
+                const stale = cache.get(id);
+                if (stale) result.push(stale);
+            }
         }
     }
 
@@ -112,6 +147,7 @@ export async function searchProfilesByTag(tag, currentUserId) {
  */
 export function invalidateProfile(id) {
     cache.delete(id);
+    persistToLocalStorage();
 }
 
 /**
@@ -119,4 +155,5 @@ export function invalidateProfile(id) {
  */
 export function clearProfileCache() {
     cache.clear();
+    localStorage.removeItem(LOCAL_CACHE_KEY);
 }
