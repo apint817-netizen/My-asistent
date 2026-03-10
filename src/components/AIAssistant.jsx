@@ -1,6 +1,6 @@
 import { useState, useRef, useEffect, useMemo } from 'react';
 import { useStore, TASK_CATEGORIES } from '../store/useStore';
-import { Send, Bot, User, MessageSquare, Eraser, Settings, Zap, Link as LinkIcon, HelpCircle, ChevronDown, Check, Copy, Edit2, X, Search, Paperclip, FileText, Image as ImageIcon, Trash2 } from 'lucide-react';
+import { Send, Bot, User, MessageSquare, Eraser, Settings, Zap, Link as LinkIcon, HelpCircle, ChevronDown, Check, Copy, Edit2, X, Search, Paperclip, FileText, Image as ImageIcon, Trash2, History } from 'lucide-react';
 import { callAI, GOOGLE_OPENAI_BASE } from '../utils/geminiApi';
 import ReactMarkdown from 'react-markdown';
 import ConfirmModal from './ConfirmModal';
@@ -9,6 +9,9 @@ export default function AIAssistant() {
     const messages = useStore(state => state.chatMessages);
     const addMessage = useStore(state => state.addChatMessage);
     const clearMessages = useStore(state => state.clearChatMessages);
+    const chatHistory = useStore(state => state.chatHistory);
+    const addToChatHistory = useStore(state => state.addToChatHistory);
+    const [showHistory, setShowHistory] = useState(false);
     const hasCompletedOnboarding = useStore(state => state.hasCompletedOnboarding);
     const hasSeenTour = useStore(state => state.hasSeenTour);
     const tokens = useStore(state => state.tokens);
@@ -51,6 +54,12 @@ export default function AIAssistant() {
     useEffect(() => {
         setChatDraft(input);
     }, [input, setChatDraft]);
+
+    useEffect(() => {
+        if (messages.length > 0) {
+            addToChatHistory(messages);
+        }
+    }, [messages, addToChatHistory]);
 
     const chatMsgs = useMemo(() => {
         let msgs = messages.filter(m => m.role !== 'system').map((msg, idx) => ({ msg, globalIndex: idx }));
@@ -666,6 +675,13 @@ ${calendarStr}
                             <Search size={18} />
                         </button>
                     )}
+                    <button
+                        onClick={() => setShowHistory(true)}
+                        className="p-2 rounded-full transition-all text-text-secondary hover:text-accent hover:bg-accent/10"
+                        title="История чатов (30 дней)"
+                    >
+                        <History size={18} />
+                    </button>
                         <button
                             onClick={() => setShowConfirmLogs(true)}
                             className="flex items-center gap-1.5 px-2 py-1.5 rounded-lg transition-all text-text-secondary hover:text-warning bg-white/5 border border-white/5 hover:border-warning/30"
@@ -920,6 +936,37 @@ ${calendarStr}
                 title="Очистить чат с Nova?"
                 description="Вся история переписки будет безвозвратно удалена. Будет начат новый диалог."
             />
+
+            {showHistory && (
+                <div className="fixed inset-0 z-[100] flex items-end md:items-center justify-center p-0 md:p-4 bg-black/60 backdrop-blur-md animate-fade-in">
+                    <div className="bg-bg-secondary border-t md:border border-border p-6 rounded-t-3xl md:rounded-xl w-full max-w-lg md:h-[80vh] h-[90vh] flex flex-col shadow-xl animate-slide-up md:animate-scale-in relative pb-safe md:pb-6">
+                        <div className="flex justify-between items-center mb-4">
+                            <h3 className="font-bold text-xl text-white flex items-center gap-2"><History className="text-accent" /> История чатов</h3>
+                            <button onClick={() => setShowHistory(false)} className="p-2 text-text-secondary hover:text-white bg-white/5 rounded-lg"><X size={20}/></button>
+                        </div>
+                        <div className="flex-1 overflow-y-auto pr-2 custom-scrollbar flex flex-col gap-4">
+                            {(!chatHistory || chatHistory.length === 0) ? (
+                                <div className="text-center text-text-secondary mt-10">История пока пуста.</div>
+                            ) : (
+                                chatHistory.map((day, idx) => (
+                                    <div key={idx} className="bg-white/5 rounded-xl p-4">
+                                        <h4 className="text-accent font-medium mb-3 border-b border-white/10 pb-2">{new Date(day.date).toLocaleDateString('ru-RU', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}</h4>
+                                        <div className="flex flex-col gap-3">
+                                            {day.messages.filter(m => m.role !== 'system').slice(-4).map((m, mIdx) => (
+                                                <div key={mIdx} className={`text-sm ${m.role === 'assistant' ? 'text-text-secondary' : 'text-white'}`}>
+                                                    <span className="font-bold">{m.role === 'assistant' ? 'Nova: ' : 'Вы: '}</span>
+                                                    <span className="line-clamp-2">{Array.isArray(m.content) ? m.content.map(c => c.text || '').join(' ') : m.content}</span>
+                                                </div>
+                                            ))}
+                                            {day.messages.length > 4 && <div className="text-xs text-text-secondary italic">+ еще сообщения...</div>}
+                                        </div>
+                                    </div>
+                                ))
+                            )}
+                        </div>
+                    </div>
+                </div>
+            )}
         </div>
     );
 }

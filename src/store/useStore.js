@@ -29,6 +29,7 @@ const getInitialState = () => ({
   rewards: [],
   pointsHistory: [],
   purchaseHistory: [],
+  chatHistory: [],
   chatMessages: [],
   analysisMessages: [],
   chatDraft: '',
@@ -108,6 +109,22 @@ export const useStore = create(
       setShowPointsHistory: (show) => set({ showPointsHistory: show }),
       setTourDemoTaskText: (text) => set({ tourDemoTaskText: text }),
       setTourDemoAIText: (text) => set({ tourDemoAIText: text }),
+
+      addToChatHistory: (messages) => set(state => {
+        const todayStr = new Date().toISOString().split('T')[0];
+        const existingIndex = state.chatHistory.findIndex(h => h.date === todayStr);
+
+        let newHistory = [...state.chatHistory];
+        if (existingIndex !== -1) {
+            newHistory[existingIndex] = { ...newHistory[existingIndex], messages: [...messages] };
+        } else {
+            newHistory.unshift({ date: todayStr, messages: [...messages] });
+        }
+        
+        if (newHistory.length > 30) newHistory = newHistory.slice(0, 30);
+        
+        return { chatHistory: newHistory };
+      }),
 
       addAiTokensUsed: (amount) => set((state) => ({ aiTokensUsed: (state.aiTokensUsed || 0) + amount })),
       addTokens: (amount, title = 'Выполнение задачи') => set((state) => ({
