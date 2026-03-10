@@ -18,7 +18,7 @@ import DashboardTour from './components/DashboardTour';
 
 // Floating background blobs component
 const FloatingBlobs = () => (
-  <div className="fixed inset-0 pointer-events-none overflow-hidden" style={{ zIndex: 0 }}>
+  <div className="fixed inset-0 pointer-events-none" style={{ zIndex: 0 }}>
     <div className="floating-blob" style={{ width: '350px', height: '350px', background: 'rgba(124, 58, 237, 0.22)', top: '8%', left: '5%', animation: 'floatBlob1 25s ease-in-out infinite' }} />
     <div className="floating-blob" style={{ width: '300px', height: '300px', background: 'rgba(59, 130, 246, 0.18)', top: '55%', right: '5%', animation: 'floatBlob2 30s ease-in-out infinite' }} />
     <div className="floating-blob" style={{ width: '250px', height: '250px', background: 'rgba(168, 85, 247, 0.15)', bottom: '10%', left: '35%', animation: 'floatBlob3 35s ease-in-out infinite' }} />
@@ -322,12 +322,12 @@ function App() {
   return (
     <>
       <FloatingBlobs />
+      <ToastContainer />
+      <TaskProposalModal />
+      <RewardProposalModal />
 
       <div className="container mx-auto max-w-7xl min-h-screen flex flex-col relative overflow-hidden" style={{ zIndex: 1 }}>
 
-        <ToastContainer />
-        <TaskProposalModal />
-        <RewardProposalModal />
         <DashboardTour />
         <HelpView isOpen={showHelp} onClose={() => setShowHelp(false)} />
         <AISettingsModal isOpen={showAISettings} onClose={() => setShowAISettings(false)} />

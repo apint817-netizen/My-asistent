@@ -335,7 +335,7 @@ ${calendarStr}
                 const pts = parseInt(match[2], 10);
                 const dateStr = match[3] ? match[3].trim() : '';
                 const category = match[4] ? match[4].trim() : null;
-                useStore.getState().addCalendarTask(dateStr, title, pts, category);
+                useStore.getState().addCalendarProposal(title, pts, dateStr, category);
             }
 
             // ADD_REGULAR_TASK
