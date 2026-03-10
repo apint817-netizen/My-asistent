@@ -8,6 +8,7 @@ import {
     PointerSensor,
     useSensor,
     useSensors,
+    DragOverlay,
 } from '@dnd-kit/core';
 import {
     arrayMove,
@@ -51,7 +52,7 @@ function TaskItem({ task, index, handleToggle, setDeletingTask, setEditingTaskCa
     const resetSwipe = () => setSwipeX(0);
 
     return (
-        <div className="relative overflow-hidden rounded-xl" onClick={() => { if (swipeX !== 0) resetSwipe(); }}>
+        <div className="relative overflow-hidden md:overflow-visible rounded-xl" onClick={() => { if (swipeX !== 0) resetSwipe(); }}>
             {/* Swipe-to-delete background (mobile only) */}
             {!task.completed && swipeX < 0 && (
                 <div className="md:hidden absolute inset-y-0 right-0 w-20 bg-danger flex items-center justify-center z-0">
@@ -226,6 +227,7 @@ export default function TaskManager() {
     const [deleteReason, setDeleteReason] = useState('');
     const [error, setError] = useState('');
     const [isAdding, setIsAdding] = useState(false);
+    const [activeId, setActiveId] = useState(null);
 
     const [showCategoryMenu, setShowCategoryMenu] = useState(false);
     const [editingTaskCategory, setEditingTaskCategory] = useState(null);
@@ -294,7 +296,12 @@ export default function TaskManager() {
         })
     );
 
+    const handleDragStart = (event) => {
+        setActiveId(event.active.id);
+    };
+
     const handleDragEnd = (event) => {
+        setActiveId(null);
         const { active, over } = event;
         if (over && active.id !== over.id) {
             const oldIndex = tasks.findIndex((t) => t.id === active.id);
@@ -302,6 +309,12 @@ export default function TaskManager() {
             reorderTasks(oldIndex, newIndex);
         }
     };
+
+    const handleDragCancel = () => {
+        setActiveId(null);
+    };
+
+    const activeTask = activeId ? filteredTasks.find(t => t.id === activeId) : null;
 
     const filteredTasks = activeFilter === 'all'
         ? tasks
@@ -349,7 +362,9 @@ export default function TaskManager() {
                     sensors={sensors}
                     collisionDetection={closestCenter}
                     modifiers={[restrictToVerticalAxis]}
+                    onDragStart={handleDragStart}
                     onDragEnd={handleDragEnd}
+                    onDragCancel={handleDragCancel}
                 >
                     <SortableContext
                         items={filteredTasks.map(t => t.id)}
@@ -366,6 +381,20 @@ export default function TaskManager() {
                             />
                         ))}
                     </SortableContext>
+                    <DragOverlay dropAnimation={{ duration: 200, easing: 'ease' }}>
+                        {activeTask ? (
+                            <TaskItem
+                                task={activeTask}
+                                index={0}
+                                handleToggle={() => { }}
+                                isDragOverlay={true}
+                                attributes={{}}
+                                listeners={{}}
+                                style={{}}
+                                setNodeRef={() => { }}
+                            />
+                        ) : null}
+                    </DragOverlay>
                 </DndContext>
                 {filteredTasks.length === 0 && (
                     <div className="text-center text-text-secondary py-8 flex items-center justify-center flex-col gap-2">

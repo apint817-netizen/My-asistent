@@ -1,6 +1,6 @@
 import { useState, useRef, useEffect, useMemo } from 'react';
 import { useStore, TASK_CATEGORIES } from '../store/useStore';
-import { Send, Bot, User, MessageSquare, Eraser, Settings, Zap, Link as LinkIcon, HelpCircle, ChevronDown, Check, Copy, Edit2, X, Search, Paperclip, FileText, Image as ImageIcon, Trash2, History } from 'lucide-react';
+import { Send, Bot, User, MessageSquare, Eraser, Settings, Zap, Link as LinkIcon, HelpCircle, ChevronDown, Check, Copy, Edit2, X, Search, Paperclip, FileText, Image as ImageIcon, Trash2 } from 'lucide-react';
 import { callAI, GOOGLE_OPENAI_BASE } from '../utils/geminiApi';
 import ReactMarkdown from 'react-markdown';
 import ConfirmModal from './ConfirmModal';
@@ -9,9 +9,6 @@ export default function AIAssistant() {
     const messages = useStore(state => state.chatMessages);
     const addMessage = useStore(state => state.addChatMessage);
     const clearMessages = useStore(state => state.clearChatMessages);
-    const chatHistory = useStore(state => state.chatHistory);
-    const addToChatHistory = useStore(state => state.addToChatHistory);
-    const [showHistory, setShowHistory] = useState(false);
     const hasCompletedOnboarding = useStore(state => state.hasCompletedOnboarding);
     const hasSeenTour = useStore(state => state.hasSeenTour);
     const tokens = useStore(state => state.tokens);
@@ -54,12 +51,6 @@ export default function AIAssistant() {
     useEffect(() => {
         setChatDraft(input);
     }, [input, setChatDraft]);
-
-    useEffect(() => {
-        if (messages.length > 0) {
-            addToChatHistory(messages);
-        }
-    }, [messages, addToChatHistory]);
 
     const chatMsgs = useMemo(() => {
         let msgs = messages.filter(m => m.role !== 'system').map((msg, idx) => ({ msg, globalIndex: idx }));
@@ -187,29 +178,49 @@ export default function AIAssistant() {
 - Если много невыполненных — помоги приоритизировать: "Вижу ${pendingTasksList.length} задач. Давай определим, какая самая важная?"
 - Если выполнены задачи — похвали конкретно: "Ты сегодня уже справился с ${completedTasksList.length} задач! Отлично!"
 
-🏷️ ТЕГИ УПРАВЛЕНИЯ (ТОЛЬКО ПО ЗАПРОСУ ПОЛЬЗОВАТЕЛЯ):
-Задачи (ОПЦИОНАЛЬНО можно указать ID категории 3-им/4-ым параметром, например "urgent", "work"):
-- Отметить выполненной: [COMPLETE_TASK: "id или #номер или название"]
-- Изменить очки: [EDIT_TASK_POINTS: "id" | новые_очки]
-- Добавить задачу: [ADD_TASK: "Название" | Очки | "category_id"]
-- Добавить на дату: [ADD_CALENDAR_TASK: "Название" | Очки | "YYYY-MM-DD" | "category_id"]
+🏷️ ТЕГИ УПРАВЛЕНИЯ — КРИТИЧЕСКИ ВАЖНО!
+Когда пользователь просит добавить, создать, записать задачу, награду и т.д. — ты ОБЯЗАНА вставить соответствующий тег в своё сообщение. Без тега НИЧЕГО НЕ ПРОИЗОЙДЁТ в системе!
+
+📌 ЗАДАЧИ:
+- Добавить задачу на сегодня: [ADD_TASK: "Название" | Очки | "category_id"]
+- Добавить на конкретную дату: [ADD_CALENDAR_TASK: "Название" | Очки | "YYYY-MM-DD" | "category_id"]
 - Регулярная рутина: [ADD_REGULAR_TASK: "Название" | Очки | "ПЕРИОД" | "category_id"]
   (ПЕРИОД: "EVERY_DAY", "WORK_DAYS", "WEEKENDS" или "1,3,5")
+- Отметить выполненной: [COMPLETE_TASK: "id или #номер или название"]
+- Изменить очки: [EDIT_TASK_POINTS: "id" | новые_очки]
 - Удалить: [DELETE_TASK: "id"]
 
-📋 Доступные категории:
+📋 Доступные категории (3-й параметр, ОПЦИОНАЛЬНО):
 ${categoriesStr}
 
-Награды:
+🎁 НАГРАДЫ:
 - Добавить: [ADD_REWARD: "Название" | Стоимость]
 - Удалить: [DELETE_REWARD: "id"]
 - Купить: [BUY_REWARD: "id"]
 - Использовать: [USE_PURCHASE: "id_покупки"]
 
-⚠️ ПРАВИЛА ТЕГОВ:
-- Ищи задачу по номеру (#2), названию или ID — любой способ
-- ПРИ УДАЛЕНИИ ВСЕГДА прикрепляй тег [DELETE_TASK: "ID"] в конце ответа, иначе задача НЕ удалится!
-- Для дат: завтра/послезавтра → вычисляй YYYY-MM-DD. На несколько дней → несколько тегов
+🚨 КРИТИЧЕСКИЕ ПРАВИЛА ТЕГОВ:
+1. При ЛЮБОМ запросе на добавление задачи/награды — ВСЕГДА вставляй тег! Без тега задача НЕ создастся!
+2. [ADD_TASK] создаёт ПРЕДЛОЖЕНИЕ — пользователь увидит модальное окно и должен подтвердить. Поэтому НИКОГДА не пиши "добавила" или "готово" — пиши "Предложила задачу! Подтверди в появившемся окне 👆"
+3. [ADD_CALENDAR_TASK] — то же самое, задача на будущую дату появляется в календаре после подтверждения
+4. [ADD_REGULAR_TASK] — создаёт регулярную задачу на 30 дней вперёд
+5. Для дат: завтра/послезавтра → вычисляй YYYY-MM-DD. На несколько дней → несколько тегов
+6. Ищи задачу по номеру (#2), названию или ID — любой способ
+7. ПРИ УДАЛЕНИИ ВСЕГДА прикрепляй тег [DELETE_TASK: "ID"]!
+
+✅ ПРИМЕРЫ ПРАВИЛЬНОГО ПОВЕДЕНИЯ:
+Пользователь: "Добавь задачу почитать книгу"
+Ты: "Предложила задачу! Подтверди в появившемся окне 👆 [ADD_TASK: "Почитать книгу" | 30]"
+
+Пользователь: "Запиши на завтра созвон с клиентом"
+Ты: "Добавляю на завтра! Подтверди в окне 👆 [ADD_CALENDAR_TASK: "Созвон с клиентом" | 40 | "${new Date(Date.now() + 86400000).toISOString().split('T')[0]}" | "work"]"
+
+Пользователь: "Хочу каждый день пить воду"
+Ты: "Отличная привычка! Создаю регулярную задачу 💧 [ADD_REGULAR_TASK: "Выпить стакан воды" | 10 | "EVERY_DAY" | "health"]"
+
+❌ ПРИМЕРЫ НЕПРАВИЛЬНОГО ПОВЕДЕНИЯ:
+- "Отлично, задача добавлена!" (без тега — задача НЕ создастся!)
+- "Записала созвон на завтра!" (без тега [ADD_CALENDAR_TASK] — ничего не произойдёт!)
 
 📅 Сегодня: ${todayDate} (${todayDayOfWeek})
 
@@ -618,8 +629,8 @@ ${calendarStr}
 
     return (
         <div
-            className="flex flex-col h-full bg-black/20 rounded-inherit overflow-hidden relative"
-            style={{ maxHeight: '100%' }}
+            className="flex flex-col h-full glass-panel overflow-hidden relative"
+            style={{ maxHeight: '100%', boxShadow: '0 0 40px rgba(124, 58, 237, 0.08), inset 0 1px 0 rgba(255,255,255,0.04)' }}
             onDragOver={handleDragOver}
             onDragLeave={handleDragLeave}
             onDrop={handleDrop}
@@ -676,28 +687,21 @@ ${calendarStr}
                         </button>
                     )}
                     <button
-                        onClick={() => setShowHistory(true)}
-                        className="p-2 rounded-full transition-all text-text-secondary hover:text-accent hover:bg-accent/10"
-                        title="История чатов (30 дней)"
+                        onClick={() => setShowConfirmLogs(true)}
+                        className="flex items-center gap-1.5 px-2 py-1.5 rounded-lg transition-all text-text-secondary hover:text-warning bg-white/5 border border-white/5 hover:border-warning/30"
+                        title="Очистить системные логи"
                     >
-                        <History size={18} />
+                        <Trash2 size={16} />
+                        <span className="text-[10px] font-bold uppercase tracking-wider hidden xs:inline">Логи</span>
                     </button>
-                        <button
-                            onClick={() => setShowConfirmLogs(true)}
-                            className="flex items-center gap-1.5 px-2 py-1.5 rounded-lg transition-all text-text-secondary hover:text-warning bg-white/5 border border-white/5 hover:border-warning/30"
-                            title="Очистить системные логи"
-                        >
-                            <Trash2 size={16} />
-                            <span className="text-[10px] font-bold uppercase tracking-wider hidden xs:inline">Логи</span>
-                        </button>
-                        <button
-                            onClick={() => setShowConfirmChat(true)}
-                            className="flex items-center gap-1.5 px-2 py-1.5 rounded-lg transition-all text-text-secondary hover:text-danger bg-white/5 border border-white/5 hover:border-danger/30"
-                            title="Очистить весь чат"
-                        >
-                            <Eraser size={16} />
-                            <span className="text-[10px] font-bold uppercase tracking-wider hidden xs:inline">Чат</span>
-                        </button>
+                    <button
+                        onClick={() => setShowConfirmChat(true)}
+                        className="flex items-center gap-1.5 px-2 py-1.5 rounded-lg transition-all text-text-secondary hover:text-danger bg-white/5 border border-white/5 hover:border-danger/30"
+                        title="Очистить весь чат"
+                    >
+                        <Eraser size={16} />
+                        <span className="text-[10px] font-bold uppercase tracking-wider hidden xs:inline">Чат</span>
+                    </button>
                 </div>
             </div>
 
@@ -936,37 +940,6 @@ ${calendarStr}
                 title="Очистить чат с Nova?"
                 description="Вся история переписки будет безвозвратно удалена. Будет начат новый диалог."
             />
-
-            {showHistory && (
-                <div className="fixed inset-0 z-[100] flex items-end md:items-center justify-center p-0 md:p-4 bg-black/60 backdrop-blur-md animate-fade-in">
-                    <div className="bg-bg-secondary border-t md:border border-border p-6 rounded-t-3xl md:rounded-xl w-full max-w-lg md:h-[80vh] h-[90vh] flex flex-col shadow-xl animate-slide-up md:animate-scale-in relative pb-safe md:pb-6">
-                        <div className="flex justify-between items-center mb-4">
-                            <h3 className="font-bold text-xl text-white flex items-center gap-2"><History className="text-accent" /> История чатов</h3>
-                            <button onClick={() => setShowHistory(false)} className="p-2 text-text-secondary hover:text-white bg-white/5 rounded-lg"><X size={20}/></button>
-                        </div>
-                        <div className="flex-1 overflow-y-auto pr-2 custom-scrollbar flex flex-col gap-4">
-                            {(!chatHistory || chatHistory.length === 0) ? (
-                                <div className="text-center text-text-secondary mt-10">История пока пуста.</div>
-                            ) : (
-                                chatHistory.map((day, idx) => (
-                                    <div key={idx} className="bg-white/5 rounded-xl p-4">
-                                        <h4 className="text-accent font-medium mb-3 border-b border-white/10 pb-2">{new Date(day.date).toLocaleDateString('ru-RU', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}</h4>
-                                        <div className="flex flex-col gap-3">
-                                            {day.messages.filter(m => m.role !== 'system').slice(-4).map((m, mIdx) => (
-                                                <div key={mIdx} className={`text-sm ${m.role === 'assistant' ? 'text-text-secondary' : 'text-white'}`}>
-                                                    <span className="font-bold">{m.role === 'assistant' ? 'Nova: ' : 'Вы: '}</span>
-                                                    <span className="line-clamp-2">{Array.isArray(m.content) ? m.content.map(c => c.text || '').join(' ') : m.content}</span>
-                                                </div>
-                                            ))}
-                                            {day.messages.length > 4 && <div className="text-xs text-text-secondary italic">+ еще сообщения...</div>}
-                                        </div>
-                                    </div>
-                                ))
-                            )}
-                        </div>
-                    </div>
-                </div>
-            )}
         </div>
     );
 }

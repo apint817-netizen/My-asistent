@@ -29,7 +29,6 @@ const getInitialState = () => ({
   rewards: [],
   pointsHistory: [],
   purchaseHistory: [],
-  chatHistory: [],
   chatMessages: [],
   analysisMessages: [],
   chatDraft: '',
@@ -109,22 +108,6 @@ export const useStore = create(
       setShowPointsHistory: (show) => set({ showPointsHistory: show }),
       setTourDemoTaskText: (text) => set({ tourDemoTaskText: text }),
       setTourDemoAIText: (text) => set({ tourDemoAIText: text }),
-
-      addToChatHistory: (messages) => set(state => {
-        const todayStr = new Date().toISOString().split('T')[0];
-        const existingIndex = state.chatHistory.findIndex(h => h.date === todayStr);
-
-        let newHistory = [...state.chatHistory];
-        if (existingIndex !== -1) {
-            newHistory[existingIndex] = { ...newHistory[existingIndex], messages: [...messages] };
-        } else {
-            newHistory.unshift({ date: todayStr, messages: [...messages] });
-        }
-        
-        if (newHistory.length > 30) newHistory = newHistory.slice(0, 30);
-        
-        return { chatHistory: newHistory };
-      }),
 
       addAiTokensUsed: (amount) => set((state) => ({ aiTokensUsed: (state.aiTokensUsed || 0) + amount })),
       addTokens: (amount, title = 'Выполнение задачи') => set((state) => ({
@@ -593,23 +576,40 @@ export const useStore = create(
             fromCalendar: true
           }));
 
-          // Calculate if lastActiveDate was exactly yesterday
+          // Preserve uncompleted tasks from previous day, remove completed ones
+          const carriedTasks = state.tasks.filter(t => !t.completed);
+
+          // Calculate streak using local date parsing to avoid timezone bugs
           let newStreak = 1;
           if (state.lastActiveDate) {
-            const lastDate = new Date(state.lastActiveDate);
-            const todayDate = new Date(today);
-            const diffMs = todayDate.getTime() - lastDate.getTime();
-            const diffDays = Math.round(diffMs / (1000 * 60 * 60 * 24));
+            const [ly, lm, ld] = state.lastActiveDate.split('-').map(Number);
+            const [ty, tm, td] = today.split('-').map(Number);
+            const lastDate = new Date(ly, lm - 1, ld);
+            const todayDate = new Date(ty, tm - 1, td);
+            const diffDays = Math.round((todayDate.getTime() - lastDate.getTime()) / 86400000);
             newStreak = diffDays === 1 ? state.streak + 1 : 1;
+          }
+
+          const carriedCount = carriedTasks.length;
+          const plannedCount = plannedToday.length;
+          let dayMessage = 'Доброе утро! Наступил новый день. ';
+          if (carriedCount > 0 && plannedCount > 0) {
+            dayMessage += `У тебя осталось ${carriedCount} незавершённых задач с прошлого дня, и ещё ${plannedCount} запланированных на сегодня из календаря. Давай разберёмся с ними! 💪`;
+          } else if (carriedCount > 0) {
+            dayMessage += `У тебя осталось ${carriedCount} незавершённых задач с прошлого дня. Продолжим? 🎯`;
+          } else if (plannedCount > 0) {
+            dayMessage += `Всё выполнено вчера — молодец! На сегодня из календаря запланировано ${plannedCount} задач.`;
+          } else {
+            dayMessage += 'Список чист! Какие цели на сегодня? Расскажи, и я помогу сформировать план.';
           }
 
           return {
             lastActiveDate: today,
             streak: newStreak,
-            tasks: [...plannedToday],
+            tasks: [...carriedTasks, ...plannedToday],
             chatMessages: [
               ...state.chatMessages,
-              { role: 'assistant', content: `Доброе утро! Наступил новый день, список задач сброшен. ${plannedToday.length > 0 ? `В календаре у нас было запланировано ${plannedToday.length} задач на сегодня - они перенесены в активный список.` : 'На сегодня ничего не было запланировано.'} Какие ещё у нас цели на сегодня? Расскажи, и я помогу тебе их сформировать.` }
+              { role: 'assistant', content: dayMessage, timestamp: new Date().toISOString() }
             ]
           };
         }

@@ -200,7 +200,7 @@ function App() {
             import('@capacitor/browser').then(({ Browser }) => {
               Browser.close().catch(console.error);
             });
-            
+
             if (event.url.includes('#')) {
               const hashParams = new URL(event.url).hash.substring(1);
               const params = new URLSearchParams(hashParams);
@@ -311,6 +311,12 @@ function App() {
 
   return (
     <div className="container mx-auto max-w-7xl min-h-screen flex flex-col relative overflow-hidden">
+      {/* Floating background blobs */}
+      <div className="floating-blob" style={{ width: '300px', height: '300px', background: 'rgba(124, 58, 237, 0.12)', top: '10%', left: '5%', animation: 'floatBlob1 25s ease-in-out infinite' }} />
+      <div className="floating-blob" style={{ width: '250px', height: '250px', background: 'rgba(59, 130, 246, 0.10)', top: '60%', right: '8%', animation: 'floatBlob2 30s ease-in-out infinite' }} />
+      <div className="floating-blob" style={{ width: '200px', height: '200px', background: 'rgba(168, 85, 247, 0.08)', bottom: '15%', left: '40%', animation: 'floatBlob3 35s ease-in-out infinite' }} />
+      <div className="floating-blob" style={{ width: '180px', height: '180px', background: 'rgba(236, 72, 153, 0.06)', top: '30%', right: '25%', animation: 'floatBlob4 28s ease-in-out infinite' }} />
+
       <ToastContainer />
       <TaskProposalModal />
       <RewardProposalModal />
@@ -457,7 +463,7 @@ function App() {
                 <HelpCircle size={18} />
               </button>
             </div>
-            
+
             <button
               id="tour-points"
               onClick={() => setShowPointsHistory(true)}
