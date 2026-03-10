@@ -15,6 +15,16 @@ import PointsHistoryModal from './components/PointsHistoryModal';
 import AuthView from './components/AuthView';
 import OnboardingView from './components/OnboardingView';
 import DashboardTour from './components/DashboardTour';
+
+// Floating background blobs component
+const FloatingBlobs = () => (
+  <div className="fixed inset-0 pointer-events-none overflow-hidden" style={{ zIndex: 0 }}>
+    <div className="floating-blob" style={{ width: '350px', height: '350px', background: 'rgba(124, 58, 237, 0.22)', top: '8%', left: '5%', animation: 'floatBlob1 25s ease-in-out infinite' }} />
+    <div className="floating-blob" style={{ width: '300px', height: '300px', background: 'rgba(59, 130, 246, 0.18)', top: '55%', right: '5%', animation: 'floatBlob2 30s ease-in-out infinite' }} />
+    <div className="floating-blob" style={{ width: '250px', height: '250px', background: 'rgba(168, 85, 247, 0.15)', bottom: '10%', left: '35%', animation: 'floatBlob3 35s ease-in-out infinite' }} />
+    <div className="floating-blob" style={{ width: '200px', height: '200px', background: 'rgba(236, 72, 153, 0.12)', top: '25%', right: '20%', animation: 'floatBlob4 28s ease-in-out infinite' }} />
+  </div>
+);
 import Tooltip from './components/Tooltip';
 import FriendsView from './components/FriendsView';
 import GroupsView from './components/GroupsView';
@@ -264,12 +274,12 @@ function App() {
 
   // Show auth screen if Supabase is configured and user is not logged in
   if (isSupabaseConfigured() && !user && !authLoading) {
-    return <AuthView />;
+    return <><FloatingBlobs /><AuthView /></>;
   }
 
   // Show onboarding if logged in but hasn't completed it
   if (isSupabaseConfigured() && user && !hasCompletedOnboarding && !dataLoading) {
-    return <OnboardingView />;
+    return <><FloatingBlobs /><OnboardingView /></>;
   }
 
   // Loading
@@ -311,13 +321,7 @@ function App() {
 
   return (
     <>
-      {/* Floating background blobs — outside container to avoid overflow clipping */}
-      <div className="fixed inset-0 pointer-events-none overflow-hidden" style={{ zIndex: 0 }}>
-        <div className="floating-blob" style={{ width: '300px', height: '300px', background: 'rgba(124, 58, 237, 0.12)', top: '10%', left: '5%', animation: 'floatBlob1 25s ease-in-out infinite' }} />
-        <div className="floating-blob" style={{ width: '250px', height: '250px', background: 'rgba(59, 130, 246, 0.10)', top: '60%', right: '8%', animation: 'floatBlob2 30s ease-in-out infinite' }} />
-        <div className="floating-blob" style={{ width: '200px', height: '200px', background: 'rgba(168, 85, 247, 0.08)', bottom: '15%', left: '40%', animation: 'floatBlob3 35s ease-in-out infinite' }} />
-        <div className="floating-blob" style={{ width: '180px', height: '180px', background: 'rgba(236, 72, 153, 0.06)', top: '30%', right: '25%', animation: 'floatBlob4 28s ease-in-out infinite' }} />
-      </div>
+      <FloatingBlobs />
 
       <div className="container mx-auto max-w-7xl min-h-screen flex flex-col relative overflow-hidden" style={{ zIndex: 1 }}>
 
