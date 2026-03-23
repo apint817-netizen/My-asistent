@@ -176,6 +176,10 @@ export const useStore = create(
         tasks: [...state.tasks, { id: Date.now().toString(), title, completed: false, value, category }]
       })),
 
+      updateTask: (taskId, updates) => set((state) => ({
+        tasks: state.tasks.map(t => t.id === taskId ? { ...t, ...updates } : t)
+      })),
+
       reorderTasks: (oldIndex, newIndex) => set((state) => {
         const tasks = [...state.tasks];
         const [removed] = tasks.splice(oldIndex, 1);

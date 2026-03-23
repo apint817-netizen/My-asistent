@@ -4,6 +4,7 @@ import { Send, Bot, User, MessageSquare, Eraser, Settings, Zap, Link as LinkIcon
 import { callAI, GOOGLE_OPENAI_BASE } from '../utils/geminiApi';
 import ReactMarkdown from 'react-markdown';
 import ConfirmModal from './ConfirmModal';
+import ProfileWizardModal from './ProfileWizardModal';
 
 export default function AIAssistant() {
     const messages = useStore(state => state.chatMessages);
@@ -43,6 +44,7 @@ export default function AIAssistant() {
     const [showConfirmLogs, setShowConfirmLogs] = useState(false);
     const [showConfirmChat, setShowConfirmChat] = useState(false);
     const [profileEditModal, setProfileEditModal] = useState({ isOpen: false, field: '', newValue: '', oldValue: '' });
+    const [showProfileWizard, setShowProfileWizard] = useState(false);
 
     // Состояния для прикрепленных файлов
     const [attachments, setAttachments] = useState([]);
@@ -109,9 +111,19 @@ export default function AIAssistant() {
             // Нумерованный список задач (ИИ может ссылаться по номеру)
             const pendingTasksList = tasks.filter(t => !t.completed);
             const completedTasksList = tasks.filter(t => t.completed);
-            const pendingTasks = pendingTasksList.map((t, i) => `${i + 1}. ${t.title} (ID: ${t.id}, ${t.value} очк.)`).join('\n') || 'Нет невыполненных';
-            const completedTasks = completedTasksList.map(t => t.title).join(', ') || 'Нет выполненных';
-            const availableRewards = rewards.map((r, i) => `${i + 1}. ${r.title} (ID: ${r.id}, ${r.cost} очк.)`).join('\n') || 'Нет наград';
+            
+            // ОПТИМИЗАЦИЯ ПАМЯТИ
+            const recentPendingTasks = pendingTasksList.slice(-10);
+            const pendingTasksCount = pendingTasksList.length;
+            const completedTasksCount = completedTasksList.length;
+            
+            const pendingTasks = recentPendingTasks.length > 0 
+                ? `Всего ${pendingTasksCount} задач. Вот 10 последних:\n` + recentPendingTasks.map((t, i) => `${i + 1}. ${t.title} (ID: ${t.id}, ${t.value} очк.)`).join('\n')
+                : 'Нет невыполненных';
+                
+            const completedTasks = `Сегодня выполнено: ${completedTasksCount} задач`;
+
+            const availableRewards = rewards.slice(0, 5).map((r, i) => `${i + 1}. ${r.title} (ID: ${r.id}, ${r.cost} очк.)`).join('\n') || 'Нет наград';
 
             const recentPurchases = purchaseHistory.slice(0, 5).map(p =>
                 `"${p.title}" (ID: ${p.purchaseId}, статус: ${p.status === 'refunded' ? `Отменено [Причина: ${p.refundReason}]` : p.status === 'used' ? 'Использовано' : 'Активно — можно использовать'})`
@@ -134,7 +146,7 @@ export default function AIAssistant() {
             const isProfilePartial = (!userProfile.bio || !userProfile.goals || !userProfile.interests) && !isProfileEmpty;
 
             const profileBlock = isProfileEmpty
-                ? `\n\n🚨 ПРОФИЛЬ ПУСТОЙ! При первом же удобном моменте (но не навязчиво) мягко предложи пользователю рассказать о себе. Скажи что-то вроде: "Кстати, я заметила, что мы ещё не познакомились как следует! Если расскажешь немного о себе, своих целях и интересах — мои советы станут гораздо точнее 🎯". НЕ превращай это в допрос — спрашивай по одному пункту за раз.`
+                ? `\n\n🚨 ПРОФИЛЬ ПУСТОЙ! Выдай тег [REQUEST_PROFILE_INFO] в конце сообщения, чтобы вызвать окно заполнения профиля. Не задавай вопросы текстом, просто скажи "Я вижу, мы еще не знакомы! Заполни свой профиль, чтобы я могла лучше помогать тебе:" и добавь тег.`
                 : isProfilePartial
                     ? `\n\n💡 ПРОФИЛЬ ЗАПОЛНЕН ЧАСТИЧНО. Можешь ненавязчиво спросить о недостающем:${!userProfile.bio ? ' \n- Кто ты по жизни/профессии?' : ''}${!userProfile.goals ? ' \n- Какие у тебя главные цели?' : ''}${!userProfile.interests ? ' \n- Чем увлекаешься в свободное время?' : ''}`
                     : '';
@@ -276,6 +288,7 @@ ${calendarStr}
             const buyRewardRegex = /\[BUY_REWARD:\s*"?([^"\]]+?)"?\s*\]/g;
             const usePurchaseRegex = /\[USE_PURCHASE:\s*"?([^"\]]+?)"?\s*\]/g;
             const editProfileRegex = /\[EDIT_PROFILE:\s*"?([^"\|]+?)"?\s*\|\s*"?([^"\]]+?)"?\s*\]/g;
+            const requestProfileRegex = /\[REQUEST_PROFILE_INFO\]/g;
 
             let cleanResponse = responseText;
             let match;
@@ -396,6 +409,11 @@ ${calendarStr}
             // USE_PURCHASE
             while ((match = usePurchaseRegex.exec(responseText)) !== null) {
                 useStore.getState().usePurchase(match[1].trim());
+            }
+
+            // REQUEST_PROFILE_INFO
+            if (requestProfileRegex.test(responseText)) {
+                setShowProfileWizard(true);
             }
 
             // START_TOUR
@@ -995,6 +1013,10 @@ ${calendarStr}
                 title="Очистить чат с Nova?"
                 description="Вся история переписки будет безвозвратно удалена. Будет начат новый диалог."
             />
+
+            {showProfileWizard && (
+                <ProfileWizardModal onClose={() => setShowProfileWizard(false)} />
+            )}
         </div>
     );
 }
