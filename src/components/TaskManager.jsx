@@ -1,23 +1,20 @@
 import { useState, useEffect } from 'react';
 import { useStore, TASK_CATEGORIES } from '../store/useStore';
-import { Plus, Check, Trash2, Zap, ChevronsUpDown } from 'lucide-react';
+import { Plus, Check, ArrowDownAZ } from 'lucide-react';
 import {
     DndContext,
     closestCenter,
-    KeyboardSensor,
     PointerSensor,
     useSensor,
     useSensors,
     DragOverlay,
 } from '@dnd-kit/core';
 import {
-    arrayMove,
     SortableContext,
-    sortableKeyboardCoordinates,
     verticalListSortingStrategy,
-    useSortable
 } from '@dnd-kit/sortable';
-import { CSS } from '@dnd-kit/utilities';
+import { TaskItem, SortableTaskItem } from './TaskItem';
+import EditTaskModal from './EditTaskModal';
 
 const restrictToVerticalAxis = ({ transform }) => {
     return {
@@ -25,162 +22,6 @@ const restrictToVerticalAxis = ({ transform }) => {
         x: 0,
     };
 };
-
-function TaskItem({ task, index, handleToggle, setDeletingTask, setEditingTaskCategory, isDragOverlay, attributes, listeners, style, setNodeRef }) {
-    const categoryObj = task.category ? TASK_CATEGORIES.find(c => c.id === task.category) : null;
-    const [swipeX, setSwipeX] = useState(0);
-    const [isSwiping, setIsSwiping] = useState(false);
-    const touchStartRef = { current: null };
-
-    const handleTouchStart = (e) => {
-        touchStartRef.current = { x: e.touches[0].clientX, y: e.touches[0].clientY };
-        setIsSwiping(false);
-    };
-    const handleTouchMove = (e) => {
-        if (!touchStartRef.current) return;
-        const dx = e.touches[0].clientX - touchStartRef.current.x;
-        const dy = e.touches[0].clientY - touchStartRef.current.y;
-        // Only swipe horizontally if horizontal movement > vertical
-        if (Math.abs(dx) > Math.abs(dy) && dx < 0) {
-            setIsSwiping(true);
-            setSwipeX(Math.max(dx, -100));
-        }
-    };
-    const handleTouchEnd = () => {
-        if (swipeX < -60) {
-            setSwipeX(-80); // Lock to show delete button
-        } else {
-            setSwipeX(0);
-        }
-        touchStartRef.current = null;
-        setIsSwiping(false);
-    };
-    const resetSwipe = () => setSwipeX(0);
-
-    return (
-        <div className="relative overflow-hidden md:overflow-visible rounded-xl" onClick={() => { if (swipeX !== 0) resetSwipe(); }}>
-            {/* Swipe-to-delete background (mobile only) */}
-            {!task.completed && swipeX < 0 && (
-                <div className="md:hidden absolute inset-y-0 right-0 w-20 bg-danger flex items-center justify-center z-0">
-                    <button
-                        onClick={(e) => { e.stopPropagation(); setDeletingTask(task); resetSwipe(); }}
-                        className="flex flex-col items-center gap-1 text-white"
-                    >
-                        <Trash2 size={18} />
-                        <span className="text-[10px] font-semibold">Удалить</span>
-                    </button>
-                </div>
-            )}
-
-            <div
-                ref={setNodeRef}
-                style={{ ...style, transform: `${style?.transform || ''} translateX(${swipeX}px)`.trim(), transition: isSwiping ? 'none' : (style?.transition || 'transform 0.2s ease-out') }}
-                className={`glass-card p-3 sm:p-4 flex items-center justify-between group origin-center relative z-10 bg-bg-secondary ${task.completed ? 'opacity-50' : ''} ${isDragOverlay ? 'shadow-2xl border-accent/80 ring-2 ring-accent/60 bg-[#13131A] z-[100] backdrop-blur-3xl opacity-100' : ''}`}
-                onTouchStart={!task.completed ? handleTouchStart : undefined}
-                onTouchMove={!task.completed ? handleTouchMove : undefined}
-                onTouchEnd={!task.completed ? handleTouchEnd : undefined}
-            >
-                <div className="flex items-center gap-2 sm:gap-3 flex-1 min-w-0">
-                    {/* Drag handle — desktop only */}
-                    <div {...attributes} {...listeners} className={`hidden md:flex text-text-secondary hover:text-white p-1.5 hover:bg-white/5 rounded-md transition-colors mt-0.5 outline-none touch-none group/drag relative ${isDragOverlay ? 'cursor-grabbing' : 'cursor-grab active:cursor-grabbing'}`}>
-                        <ChevronsUpDown size={16} />
-                        {!isDragOverlay && (
-                            <div className="absolute -top-8 left-1/2 -translate-x-1/2 bg-[#1b1b22] text-white text-[11px] font-medium py-1 px-2 rounded-md opacity-0 pointer-events-none group-hover/drag:opacity-100 transition-opacity whitespace-nowrap shadow-lg border border-white/10 z-50">Перетащить</div>
-                        )}
-                    </div>
-                    {/* Category dot — ALWAYS visible on mobile */}
-                    {categoryObj && (
-                        <div
-                            className={`w-2 h-2 rounded-full shrink-0 md:hidden ${categoryObj.bg}`}
-                            onClick={(e) => { e.stopPropagation(); if (setEditingTaskCategory) setEditingTaskCategory(task.id); }}
-                        />
-                    )}
-                    {/* Checkbox — 44x44 touch target */}
-                    <div className="w-11 h-11 flex items-center justify-center shrink-0 cursor-pointer" onClick={() => handleToggle(task)}>
-                        <div className={`w-5 h-5 sm:w-6 sm:h-6 rounded-full border-2 flex items-center justify-center transition-colors shrink-0 ${task.completed ? 'bg-success border-success' : 'border-text-secondary'}`}>
-                            {task.completed && <Check size={14} className="text-bg-primary font-bold w-3 h-3 sm:w-4 sm:h-4" />}
-                        </div>
-                    </div>
-                    {/* Task title */}
-                    <span className={`font-medium cursor-pointer text-sm leading-tight break-words line-clamp-2 flex-1 min-w-0 ${task.completed ? 'line-through text-text-secondary' : 'text-text-primary'}`} onClick={() => handleToggle(task)}>
-                        {task.title}
-                    </span>
-                    {/* Category label — desktop only */}
-                    <div
-                        className="hidden md:flex items-center gap-1 cursor-pointer group/cat relative"
-                        onClick={(e) => { e.stopPropagation(); if (setEditingTaskCategory) setEditingTaskCategory(task.id); }}
-                    >
-                        {!isDragOverlay && (
-                            <div className="absolute -top-8 left-1/2 -translate-x-1/2 bg-[#1b1b22] text-white text-[11px] font-medium py-1 px-2 rounded-md opacity-0 pointer-events-none group-hover/cat:opacity-100 transition-opacity whitespace-nowrap shadow-lg border border-white/10 z-50">Изменить категорию</div>
-                        )}
-                        {categoryObj ? (
-                            <span className={`text-[10px] px-1.5 py-0.5 rounded-full font-medium ${categoryObj.bg} ${categoryObj.color} border border-current/20 hover:opacity-80 transition-opacity`}>
-                                {categoryObj.name}
-                            </span>
-                        ) : (
-                            <span className="text-[10px] px-1.5 py-0.5 rounded-full font-medium bg-white/5 text-text-secondary border border-white/10 opacity-0 group-hover:opacity-100 transition-opacity hover:bg-white/10">
-                                + Категория
-                            </span>
-                        )}
-                    </div>
-                </div>
-                <div className="flex items-center gap-1.5 sm:gap-3 shrink-0 ml-2">
-                    <div className="flex items-center gap-1 text-warning font-bold text-[13px] sm:text-base bg-warning/10 px-1.5 sm:px-2 py-1 rounded-lg shrink-0">
-                        <Zap size={12} className="sm:w-4 sm:h-4" />
-                        +{task.value}
-                    </div>
-                    {/* Delete button — desktop only (mobile uses swipe) */}
-                    {!task.completed && setDeletingTask && (
-                        <button
-                            onClick={(e) => { e.stopPropagation(); setDeletingTask(task); }}
-                            className="hidden md:flex p-1.5 text-text-secondary hover:text-danger hover:bg-danger/10 rounded-md transition-colors opacity-0 group-hover:opacity-100 group/del relative"
-                        >
-                            <Trash2 size={15} />
-                            {!isDragOverlay && (
-                                <div className="absolute -top-8 left-1/2 -translate-x-1/2 bg-danger/90 text-white text-[11px] font-medium py-1 px-2 rounded-md opacity-0 pointer-events-none group-hover/del:opacity-100 transition-opacity whitespace-nowrap shadow-lg border border-danger/50 z-50">Удалить</div>
-                            )}
-                        </button>
-                    )}
-                </div>
-            </div>
-        </div>
-    );
-}
-
-function SortableTaskItem({ task, index, handleToggle, setDeletingTask, setEditingTaskCategory }) {
-    const {
-        attributes,
-        listeners,
-        setNodeRef,
-        transform,
-        transition,
-        isDragging,
-    } = useSortable({ id: task.id });
-
-    const style = {
-        transform: CSS.Transform.toString(transform),
-        // Dragged item: no transition (instant cursor follow). Others: fast smooth reorder.
-        transition: isDragging ? 'none' : 'transform 150ms cubic-bezier(0.25, 1, 0.5, 1)',
-        zIndex: isDragging ? 50 : 1,
-        position: isDragging ? 'relative' : undefined,
-        willChange: 'transform',
-    };
-
-    return (
-        <TaskItem
-            task={task}
-            index={index}
-            handleToggle={handleToggle}
-            setDeletingTask={setDeletingTask}
-            setEditingTaskCategory={setEditingTaskCategory}
-            attributes={attributes}
-            listeners={listeners}
-            style={style}
-            setNodeRef={setNodeRef}
-            isDragOverlay={isDragging}
-        />
-    );
-}
 
 export default function TaskManager() {
     const tasks = useStore(state => state.tasks);
@@ -237,6 +78,8 @@ export default function TaskManager() {
 
     const [showCategoryMenu, setShowCategoryMenu] = useState(false);
     const [editingTaskCategory, setEditingTaskCategory] = useState(null);
+    const [editingTask, setEditingTask] = useState(null);
+    const [sortOrder, setSortOrder] = useState('manual');
 
     const editTaskCategory = useStore(state => state.editTaskCategory);
 
@@ -301,9 +144,6 @@ export default function TaskManager() {
             activationConstraint: {
                 distance: 8,
             },
-        }),
-        useSensor(KeyboardSensor, {
-            coordinateGetter: sortableKeyboardCoordinates,
         })
     );
 
@@ -327,9 +167,19 @@ export default function TaskManager() {
 
     const activeTask = activeId ? filteredTasks.find(t => t.id === activeId) : null;
 
-    const filteredTasks = activeFilter === 'all'
+    let filteredTasks = activeFilter === 'all'
         ? tasks
         : tasks.filter(t => activeFilter === 'uncategorized' ? !t.category : t.category === activeFilter);
+
+    if (sortOrder === 'points') {
+        filteredTasks = [...filteredTasks].sort((a, b) => b.value - a.value);
+    } else if (sortOrder === 'category') {
+        filteredTasks = [...filteredTasks].sort((a, b) => {
+            const cA = a.category || 'z';
+            const cB = b.category || 'z';
+            return cA.localeCompare(cB);
+        });
+    }
 
     // Только используемые категории для фильтров
     const usedCategories = [...new Set(tasks.map(t => t.category).filter(Boolean))];
@@ -337,7 +187,19 @@ export default function TaskManager() {
     return (
         <div className="flex flex-col h-full relative">
             {usedCategories.length > 0 && (
-                <div className="flex gap-2 mb-4 px-1 pb-2 border-b border-white/5 overflow-x-auto no-scrollbar">
+                <div className="flex items-center gap-2 mb-4 px-2 py-2 -mx-1 border-b border-white/5 overflow-x-auto no-scrollbar">
+                    <div className="flex items-center gap-1 bg-white/5 rounded-full px-2 py-1 mr-2">
+                        <ArrowDownAZ size={14} className="text-text-secondary" />
+                        <select 
+                            className="text-xs bg-transparent text-text-secondary outline-none appearance-none cursor-pointer font-medium"
+                            value={sortOrder}
+                            onChange={(e) => setSortOrder(e.target.value)}
+                        >
+                            <option value="manual">Мой порядок</option>
+                            <option value="points">По стоимости</option>
+                            <option value="category">По категориям</option>
+                        </select>
+                    </div>
                     <button
                         onClick={() => setActiveFilter('all')}
                         className={`text-xs px-2.5 py-1 rounded-full font-medium transition-colors ${activeFilter === 'all' ? 'bg-white/20 text-white' : 'bg-white/5 text-text-secondary hover:bg-white/10'}`}
@@ -380,6 +242,7 @@ export default function TaskManager() {
                     <SortableContext
                         items={filteredTasks.map(t => t.id)}
                         strategy={verticalListSortingStrategy}
+                        disabled={sortOrder !== 'manual'}
                     >
                         {filteredTasks.map((task, index) => (
                             <SortableTaskItem
@@ -389,6 +252,7 @@ export default function TaskManager() {
                                 handleToggle={handleToggle}
                                 setDeletingTask={setDeletingTask}
                                 setEditingTaskCategory={setEditingTaskCategory}
+                                setEditingTask={setEditingTask}
                             />
                         ))}
                     </SortableContext>
@@ -415,15 +279,20 @@ export default function TaskManager() {
                 )}
             </div>
 
+            {editingTask && <EditTaskModal task={editingTask} onClose={() => setEditingTask(null)} />}
+
             {showCategoryMenu && (
                 <>
                     <div className="fixed inset-0 z-40 bg-black/40 md:bg-transparent backdrop-blur-sm md:backdrop-blur-none animate-fade-in" onClick={() => setShowCategoryMenu(false)} />
-                    <div className="fixed md:absolute bottom-0 md:bottom-[52px] left-0 right-0 z-50 bg-[#13131A] md:bg-[#13131A] backdrop-blur-3xl md:backdrop-blur-xl border-t md:border border-white/10 rounded-t-3xl md:rounded-xl p-4 md:p-3 pb-safe md:pb-3 shadow-[0_-10px_40px_rgba(0,0,0,0.8)] md:shadow-[0_10px_40px_rgba(0,0,0,0.8)] flex flex-wrap gap-2 animate-slide-up md:animate-fade-in">
+                    <div className="fixed md:absolute bottom-0 md:bottom-[52px] left-0 right-0 z-50 bg-[#13131A] md:bg-[#13131A] backdrop-blur-3xl md:backdrop-blur-xl border-t md:border border-white/10 rounded-t-3xl md:rounded-xl p-4 md:p-4 pb-safe md:pb-4 shadow-[0_-10px_40px_rgba(0,0,0,0.8)] md:shadow-[0_10px_40px_rgba(0,0,0,0.8)] flex flex-wrap gap-2 animate-slide-up md:animate-fade-in">
                         {/* Mobile Drag Indicator */}
                         <div className="w-full flex justify-center pb-3 md:hidden shrink-0 pointer-events-none absolute top-2 left-0 right-0">
                             <div className="w-12 h-1.5 bg-white/20 rounded-full"></div>
                         </div>
-                        <div className="w-full pt-4 md:pt-0 flex flex-wrap gap-2">
+                        <button type="button" onClick={() => setShowCategoryMenu(false)} className="absolute top-3 right-3 text-text-secondary hover:text-white p-1 bg-white/5 rounded-full hidden md:block">
+                            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg>
+                        </button>
+                        <div className="w-full pt-4 md:pt-2 flex flex-wrap gap-2 pr-6">
                             <button
                                 type="button"
                                 onClick={() => { setSelectedCategory(null); setShowCategoryMenu(false); }}
