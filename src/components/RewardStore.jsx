@@ -21,6 +21,7 @@ export default function RewardStore() {
 
     const [refundModal, setRefundModal] = useState({ isOpen: false, purchaseId: null, reason: '' });
     const [deleteRewardModal, setDeleteRewardModal] = useState({ isOpen: false, reward: null, reason: '' });
+    const [confirmBuyModal, setConfirmBuyModal] = useState({ isOpen: false, reward: null });
     const [editingReward, setEditingReward] = useState(null); // id награды которую редактируем
 
     const deleteRewardWithReason = useStore(state => state.deleteRewardWithReason);
@@ -163,17 +164,25 @@ export default function RewardStore() {
                                 <div key={reward.id} className="relative group shrink-0 md:shrink snap-center w-[110px] min-w-[110px] md:w-auto md:min-w-0">
                                     <div className="h-full">
                                         <button
-                                            onClick={() => handleBuy(reward)}
+                                            onClick={() => setConfirmBuyModal({ isOpen: true, reward })}
                                             disabled={tokens < reward.cost}
-                                            className="w-full bg-black/20 border border-border p-2 md:p-4 rounded-xl flex flex-col items-center justify-between gap-1 md:gap-2 hover:border-warning/50 hover:bg-warning/5 transition-all disabled:opacity-50 disabled:cursor-not-allowed h-[140px] md:h-auto shadow-sm"
+                                            className="group/btn w-full bg-black/20 border border-border p-2 md:p-4 rounded-xl flex flex-col items-center justify-between gap-1 md:gap-2 hover:border-warning/50 transition-all disabled:opacity-50 disabled:cursor-not-allowed h-[140px] md:h-auto relative overflow-hidden shadow-sm"
                                         >
-                                            <div className="w-8 h-8 md:w-10 md:h-10 rounded-full bg-warning/10 text-warning flex items-center justify-center">
+                                            <div className="w-8 h-8 md:w-10 md:h-10 rounded-full bg-warning/10 text-warning flex items-center justify-center relative z-10 transition-transform group-hover/btn:-translate-y-1">
                                                 <Gift size={16} className="md:w-5 md:h-5" />
                                             </div>
-                                            <span className="font-semibold text-center leading-tight text-xs md:text-sm line-clamp-3 w-full flex-1 flex items-center justify-center">{reward.title}</span>
-                                            <span className="text-warning text-[11px] md:text-sm font-bold bg-warning/10 px-2 py-0.5 md:px-3 md:py-1 rounded-full whitespace-nowrap mt-auto shrink-0">
+                                            <span className="font-semibold text-center leading-tight text-xs md:text-sm line-clamp-3 w-full flex-1 flex items-center justify-center relative z-10 transition-transform group-hover/btn:-translate-y-1">{reward.title}</span>
+                                            
+                                            <span className="text-warning text-[11px] md:text-sm font-bold bg-warning/10 px-2 py-0.5 md:px-3 md:py-1 rounded-full whitespace-nowrap mt-auto shrink-0 relative z-10 transition-opacity group-hover/btn:opacity-0">
                                                 {reward.cost} ⚡
                                             </span>
+
+                                            {/* Hover "Купить" overlay */}
+                                            <div className="absolute inset-x-0 bottom-0 h-1/2 bg-gradient-to-t from-warning/20 to-transparent opacity-0 group-hover/btn:opacity-100 transition-opacity flex items-end justify-center pb-2 md:pb-3 pointer-events-none">
+                                                <span className="text-warning font-bold text-xs md:text-sm shadow-sm bg-black/60 px-3 py-1 rounded-full whitespace-nowrap translate-y-4 group-hover/btn:translate-y-0 transition-transform">
+                                                    Купить за {reward.cost} ⚡
+                                                </span>
+                                            </div>
                                         </button>
                                         {/* Edit/Delete — always visible on mobile, hover on desktop */}
                                         <div className="flex justify-center gap-1 mt-1 md:absolute md:top-2 md:right-2 md:mt-0 md:opacity-0 md:group-hover:opacity-100 transition-opacity">
@@ -390,6 +399,40 @@ export default function RewardStore() {
                                 </button>
                             </div>
                         </form>
+                    </div>
+                </div>
+            )}
+            {/* Confirm Buy Modal */}
+            {confirmBuyModal.isOpen && confirmBuyModal.reward && (
+                <div className="absolute inset-0 z-[60] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm rounded-lg animate-fade-in">
+                    <div className="bg-bg-secondary border border-border p-6 rounded-xl w-full max-w-sm shadow-xl text-center">
+                        <div className="w-12 h-12 rounded-full bg-warning/20 text-warning flex items-center justify-center mx-auto mb-4">
+                            <Gift size={24} />
+                        </div>
+                        <h3 className="font-bold text-lg text-white mb-2">Купить награду?</h3>
+                        <p className="text-sm text-text-secondary mb-6">
+                            Вы хотите потратить <strong className="text-warning">{confirmBuyModal.reward.cost} ⚡</strong> на <strong className="text-white">"{confirmBuyModal.reward.title}"</strong>?
+                        </p>
+                        
+                        <div className="flex gap-2">
+                            <button
+                                type="button"
+                                onClick={() => setConfirmBuyModal({ isOpen: false, reward: null })}
+                                className="flex-1 px-4 py-2.5 rounded-lg border border-border text-text-secondary hover:text-white hover:bg-white/5 transition-colors text-sm font-medium"
+                            >
+                                Отмена
+                            </button>
+                            <button
+                                type="button"
+                                onClick={() => {
+                                    handleBuy(confirmBuyModal.reward);
+                                    setConfirmBuyModal({ isOpen: false, reward: null });
+                                }}
+                                className="flex-1 px-4 py-2.5 rounded-lg bg-warning text-black hover:bg-yellow-500 transition-colors text-sm font-bold shadow-[0_0_15px_rgba(245,158,11,0.3)]"
+                            >
+                                Подтвердить
+                            </button>
+                        </div>
                     </div>
                 </div>
             )}

@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useStore, TASK_CATEGORIES } from '../store/useStore';
 import { Plus, Check, Trash2, Zap, ChevronsUpDown } from 'lucide-react';
 import {
@@ -18,7 +18,13 @@ import {
     useSortable
 } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
-import { restrictToVerticalAxis } from '@dnd-kit/modifiers';
+
+const restrictToVerticalAxis = ({ transform }) => {
+    return {
+        ...transform,
+        x: 0,
+    };
+};
 
 function TaskItem({ task, index, handleToggle, setDeletingTask, setEditingTaskCategory, isDragOverlay, attributes, listeners, style, setNodeRef }) {
     const categoryObj = task.category ? TASK_CATEGORIES.find(c => c.id === task.category) : null;
@@ -234,6 +240,12 @@ export default function TaskManager() {
 
     const editTaskCategory = useStore(state => state.editTaskCategory);
 
+    useEffect(() => {
+        if (activeFilter !== 'all' && activeFilter !== 'uncategorized') {
+            setSelectedCategory(activeFilter);
+        }
+    }, [activeFilter]);
+
     const handleToggle = (task) => {
         toggleTask(task.id);
     };
@@ -274,7 +286,6 @@ export default function TaskManager() {
         addTask(newTaskTitle, Number(newTaskValue), selectedCategory);
         setNewTaskTitle('');
         setNewTaskValue(10);
-        setSelectedCategory(null);
         setShowCategoryMenu(false);
     };
 
@@ -437,8 +448,8 @@ export default function TaskManager() {
 
             {editingTaskCategory && (
                 <>
-                    <div className="fixed inset-0 z-40 bg-black/60 md:bg-transparent backdrop-blur-md md:backdrop-blur-none" onClick={() => setEditingTaskCategory(null)} />
-                    <div className="fixed bottom-0 md:absolute md:top-1/2 left-0 right-0 md:left-1/2 md:-translate-x-1/2 md:-translate-y-1/2 z-50 bg-[#13131A] backdrop-blur-3xl md:backdrop-blur-xl border-t md:border border-white/10 rounded-t-3xl md:rounded-xl p-6 md:p-4 shadow-[0_-20px_60px_rgba(0,0,0,0.9)] md:w-[90%] md:max-w-[300px] flex flex-col gap-4 md:gap-3 animate-slide-up md:animate-fade-in pb-safe md:pb-4">
+                    <div className="fixed inset-0 z-[90] bg-black/60 backdrop-blur-md" onClick={() => setEditingTaskCategory(null)} />
+                    <div className="fixed bottom-0 md:fixed md:top-1/2 left-0 right-0 md:left-1/2 md:-translate-x-1/2 md:-translate-y-1/2 z-[100] bg-[#13131A] backdrop-blur-3xl md:backdrop-blur-xl border-t md:border border-white/10 rounded-t-3xl md:rounded-xl p-6 md:p-4 shadow-[0_-20px_60px_rgba(0,0,0,0.9)] md:w-[90%] md:max-w-[300px] flex flex-col gap-4 md:gap-3 animate-slide-up md:animate-fade-in pb-safe md:pb-4">
                         {/* Mobile Drag Indicator */}
                         <div className="w-full flex justify-center pb-2 md:hidden min-h-0 pointer-events-none absolute top-3 left-0 right-0">
                             <div className="w-12 h-1.5 bg-white/20 rounded-full"></div>

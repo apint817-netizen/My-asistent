@@ -140,6 +140,7 @@ export const useStore = create(
           date: new Date().toISOString()
         }, ...state.pointsHistory]
       })),
+      clearPointsHistory: () => set({ pointsHistory: [] }),
       clearSystemLogs: () => set(state => ({ chatMessages: state.chatMessages.filter(m => m.role !== 'system') })),
 
       toggleTask: (taskId) => {

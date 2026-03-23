@@ -42,6 +42,7 @@ export default function AIAssistant() {
     const [copiedIndex, setCopiedIndex] = useState(null);
     const [showConfirmLogs, setShowConfirmLogs] = useState(false);
     const [showConfirmChat, setShowConfirmChat] = useState(false);
+    const [profileEditModal, setProfileEditModal] = useState({ isOpen: false, field: '', newValue: '', oldValue: '' });
 
     // Состояния для прикрепленных файлов
     const [attachments, setAttachments] = useState([]);
@@ -193,6 +194,10 @@ export default function AIAssistant() {
 📋 Доступные категории (3-й параметр, ОПЦИОНАЛЬНО):
 ${categoriesStr}
 
+👤 ПРОФИЛЬ:
+- Обновить поле профиля: [EDIT_PROFILE: "поле" | "текст"]
+  (где "поле" это 'bio', 'goals' или 'interests')
+
 🎁 НАГРАДЫ:
 - Добавить: [ADD_REWARD: "Название" | Стоимость]
 - Удалить: [DELETE_REWARD: "id"]
@@ -270,6 +275,7 @@ ${calendarStr}
             const deleteRewardRegex = /\[DELETE_REWARD:\s*"?([^"\]]+?)"?\s*\]/g;
             const buyRewardRegex = /\[BUY_REWARD:\s*"?([^"\]]+?)"?\s*\]/g;
             const usePurchaseRegex = /\[USE_PURCHASE:\s*"?([^"\]]+?)"?\s*\]/g;
+            const editProfileRegex = /\[EDIT_PROFILE:\s*"?([^"\|]+?)"?\s*\|\s*"?([^"\]]+?)"?\s*\]/g;
 
             let cleanResponse = responseText;
             let match;
@@ -353,6 +359,20 @@ ${calendarStr}
                 if (task) useStore.getState().deleteTaskWithReason(task.id, 'Удалено по запросу через Nova');
             }
 
+            // EDIT_PROFILE
+            while ((match = editProfileRegex.exec(responseText)) !== null) {
+                const field = match[1].trim();
+                const newValue = match[2].trim();
+                if (field === 'bio' || field === 'goals' || field === 'interests') {
+                    const currentValue = useStore.getState().userProfile[field];
+                    if (currentValue && currentValue !== newValue) {
+                        setProfileEditModal({ isOpen: true, field, newValue, oldValue: currentValue });
+                    } else {
+                        useStore.getState().updateUserProfile({ [field]: newValue });
+                    }
+                }
+            }
+
             // ADD_REWARD
             while ((match = addRewardRegex.exec(responseText)) !== null) {
                 useStore.getState().addRewardProposal(match[1].trim(), parseInt(match[2], 10));
@@ -391,6 +411,7 @@ ${calendarStr}
                 .replace(deleteTaskRegex, '')
                 .replace(addRewardRegex, '').replace(deleteRewardRegex, '')
                 .replace(buyRewardRegex, '').replace(usePurchaseRegex, '')
+                .replace(editProfileRegex, '')
                 .replace(startTourRegex, '')
                 .trim();
 
@@ -918,6 +939,40 @@ ${calendarStr}
                     </button>
                 </form>
             </div>
+
+            {/* Profile Edit Modal */}
+            {profileEditModal.isOpen && (
+                <div className="absolute inset-0 z-[60] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm rounded-xl">
+                    <div className="bg-bg-secondary border border-border p-5 rounded-2xl w-full max-w-sm shadow-2xl animate-fade-in text-center">
+                        <h3 className="font-bold text-lg mb-2 text-white">Обновление профиля</h3>
+                        <p className="text-sm text-text-secondary mb-4">
+                            Nova предлагает обновить поле <strong>{profileEditModal.field}</strong>.
+                        </p>
+                        <div className="mb-4 text-left text-sm max-h-32 overflow-y-auto custom-scrollbar">
+                            <p className="text-text-secondary line-through mb-1 break-words">{profileEditModal.oldValue}</p>
+                            <p className="text-white bg-white/10 p-2 rounded-lg break-words">{profileEditModal.newValue}</p>
+                        </div>
+                        <div className="flex gap-2">
+                            <button
+                                onClick={() => setProfileEditModal({ isOpen: false, field: '', newValue: '', oldValue: '' })}
+                                className="flex-1 py-2 rounded-lg bg-black/40 hover:bg-black/60 text-text-secondary transition-colors text-sm font-medium"
+                            >
+                                Оставить старое
+                            </button>
+                            <button
+                                onClick={() => {
+                                    useStore.getState().updateUserProfile({ [profileEditModal.field]: profileEditModal.newValue });
+                                    setProfileEditModal({ isOpen: false, field: '', newValue: '', oldValue: '' });
+                                    addToast('Профиль успешно обновлен!', 'success');
+                                }}
+                                className="flex-1 py-2 rounded-lg bg-accent hover:bg-accent-hover text-white transition-colors text-sm font-bold shadow-lg shadow-accent/20"
+                            >
+                                Обновить
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
 
             <ConfirmModal
                 isOpen={showConfirmLogs}
