@@ -76,9 +76,10 @@ export async function callAI({ baseUrl, apiKey, model, systemPrompt, history, us
         headers['Authorization'] = `Bearer ${apiKey}`;
     }
 
-    let res;
+    try {
+        let res;
 
-    if (baseUrl === GOOGLE_OPENAI_BASE && isDevelopment) {
+        if (baseUrl === GOOGLE_OPENAI_BASE && isDevelopment) {
         // Локальная разработка: бьем НАПРЯМУЮ в Native REST API 구гла (так как OpenAI endpoint глючит с длинными текстами)
         // Чтобы не залипал демо-ключ, фильтруем его
         let keyToUse = apiKey;
@@ -225,7 +226,15 @@ export async function callAI({ baseUrl, apiKey, model, systemPrompt, history, us
         return data.choices[0].message.content;
     }
 
-    throw new Error('Пустой ответ от ИИ');
+        throw new Error('Пустой ответ от ИИ');
+    } catch (err) {
+        console.warn("Локальная ошибка или лимит исчерпан:", err.message);
+        if (userMessage && typeof userMessage === 'string') {
+            console.log("🚀 Активирована ОФЛАЙН ИИ-Заглушка!");
+            return fallbackToOfflineStub(userMessage);
+        }
+        throw err;
+    }
 }
 
 export const GOOGLE_MODELS = [
@@ -240,5 +249,38 @@ export const PROXY_MODELS = [
     { id: 'gemini-2.5-flash', name: 'Gemini 2.5 Flash', description: 'Через прокси' },
     { id: 'gpt-4o', name: 'GPT-4o', description: 'OpenAI' }
 ];
+
+export function fallbackToOfflineStub(userMessage) {
+    const msg = userMessage.toLowerCase();
+    
+    // Простейший алгоритм определения интента (создание задачи)
+    if (msg.includes('добавь') || msg.includes('создай') || msg.includes('напомни') || msg.includes('сделай')) {
+        let title = userMessage.replace(/(добавь|создай|сделай|напомни|задачу|привычку|цель|мне|пожалуйста)/gi, '').trim();
+        // Убираем лишние знаки препинания в начале
+        title = title.replace(/^[\s,.:;\-]+/, '');
+        if (!title) title = "Новая задача от ИИ (офлайн)";
+        
+        // Возвращаем JSON строго по контракту
+        return JSON.stringify([{
+            type: "create_task",
+            title: title + " ⚡",
+            category: "goals",
+            points: 10
+        }]);
+    }
+    
+    // Удаление наград/задач
+    if (msg.includes('купи') || msg.includes('потрать') || msg.includes('удали')) {
+        return "В офлайн-режиме (перебои с сетью или лимитом ИИ) я не могу удалять или изменять существующие данные, чтобы ничего не испортить. Вы можете сделать это вручную!";
+    }
+
+    // Дефолтные разговорные ответы
+    const stubs = [
+        "Извините, облачные серверы ИИ сейчас недоступны. Но я всё еще здесь! Напишите «Добавь задачу ...», и я сделаю это локально.",
+        "Мои нейросетевые модули отдыхают (исчерпан лимит минут или нет сети). Зато мой офлайн-алгоритм работает! Какую задачу вам создать?",
+        "Связь с облаком потеряна... Но я всё равно могу создавать для вас задачи. Просто напишите команду создания!"
+    ];
+    return stubs[Math.floor(Math.random() * stubs.length)];
+}
 
 export { GOOGLE_OPENAI_BASE };

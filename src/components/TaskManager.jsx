@@ -11,9 +11,9 @@ import {
 } from '@dnd-kit/core';
 import { SortableContext, verticalListSortingStrategy, useSortable } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
-import { restrictToParentElement } from '@dnd-kit/modifiers';
 import { TaskItem } from './TaskItem';
 import EditTaskModal from './EditTaskModal';
+import { playHoverSound, playDeleteSound } from '../utils/sound';
 
 const restrictToVerticalAxis = ({ transform }) => {
     return {
@@ -175,6 +175,7 @@ export default function TaskManager() {
 
     const confirmDelete = (e) => {
         e.preventDefault();
+        playDeleteSound();
         deleteTaskWithReason(deletingTask.id, deleteReason || 'Без причины');
         setDeletingTask(null);
         setDeleteReason('');
@@ -232,6 +233,7 @@ export default function TaskManager() {
                 {/* Sort button — no overflow clip */}
                 <div className="relative shrink-0 z-50">
                     <button 
+                        onMouseEnter={playHoverSound}
                         onClick={() => setIsSortMenuOpen(!isSortMenuOpen)}
                         className="flex items-center gap-1.5 bg-white/5 hover:bg-white/10 rounded-full px-3 py-1 transition-colors border border-white/5"
                     >
@@ -248,6 +250,7 @@ export default function TaskManager() {
                                 {SORT_OPTIONS.map(opt => (
                                     <button
                                         key={opt.id}
+                                        onMouseEnter={playHoverSound}
                                         onClick={() => { setSortOrder(opt.id); setIsSortMenuOpen(false); }}
                                         className={`w-full text-left px-4 py-2.5 text-xs font-medium transition-colors ${sortOrder === opt.id ? 'bg-accent/20 text-accent' : 'text-text-secondary hover:bg-white/5 hover:text-white'}`}
                                     >
@@ -264,6 +267,7 @@ export default function TaskManager() {
                 {usedCategories.length > 0 && (
                     <>
                     <button
+                        onMouseEnter={playHoverSound}
                         onClick={() => setActiveFilter('all')}
                         className={`text-xs px-2.5 py-1 rounded-full font-medium transition-colors ${activeFilter === 'all' ? 'bg-white/20 text-white' : 'bg-white/5 text-text-secondary hover:bg-white/10'}`}
                     >
@@ -275,6 +279,7 @@ export default function TaskManager() {
                         return (
                             <button
                                 key={catId}
+                                onMouseEnter={playHoverSound}
                                 onClick={() => setActiveFilter(catId)}
                                 className={`text-xs px-2.5 py-1 rounded-full font-medium transition-colors border border-current/20 ${activeFilter === catId ? `${cat.bg} ${cat.color} ring-1 ring-current` : `bg-white/5 ${cat.color} opacity-70 hover:opacity-100`}`}
                             >
@@ -284,6 +289,7 @@ export default function TaskManager() {
                     })}
                     {tasks.some(t => !t.category) && (
                         <button
+                            onMouseEnter={playHoverSound}
                             onClick={() => setActiveFilter('uncategorized')}
                             className={`text-xs px-2.5 py-1 rounded-full font-medium transition-colors ${activeFilter === 'uncategorized' ? 'bg-white/20 text-white' : 'bg-white/5 text-text-secondary hover:bg-white/10'}`}
                         >
@@ -299,7 +305,7 @@ export default function TaskManager() {
                 <DndContext
                     sensors={sensors}
                     collisionDetection={closestCenter}
-                    modifiers={[restrictToVerticalAxis, restrictToParentElement]}
+                    modifiers={[restrictToVerticalAxis]}
                     onDragStart={handleDragStart}
                     onDragEnd={handleDragEnd}
                     onDragCancel={handleDragCancel}
@@ -425,6 +431,7 @@ export default function TaskManager() {
                         />
                         <button
                             type="button"
+                            onMouseEnter={playHoverSound}
                             onClick={() => setShowCategoryMenu(!showCategoryMenu)}
                             className="px-2 border-l border-[rgba(255,255,255,0.1)] hover:bg-white/5 transition-colors flex flex-col justify-center gap-0.5 items-center w-12 group/catbtn relative"
                         >
@@ -450,7 +457,7 @@ export default function TaskManager() {
                         onChange={(e) => setNewTaskValue(e.target.value)}
                         min="1"
                     />
-                    <button type="submit" disabled={isAdding} className="btn-primary flex-shrink-0 flex items-center justify-center px-3 sm:px-4 rounded-md disabled:opacity-50">
+                    <button type="submit" disabled={isAdding} onMouseEnter={playHoverSound} className="btn-primary flex-shrink-0 flex items-center justify-center px-3 sm:px-4 rounded-md disabled:opacity-50">
                         {isAdding ? <span className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" /> : <Plus size={20} />}
                     </button>
                 </div>

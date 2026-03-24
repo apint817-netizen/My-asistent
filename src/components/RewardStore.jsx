@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { useStore } from '../store/useStore';
 import { Gift, Plus, ShoppingBag, RotateCcw, Check, Trash2, Edit2 } from 'lucide-react';
-import { playRewardSound } from '../utils/sound';
+import { playRewardSound, playHoverSound, playDeleteSound, playRefundSound } from '../utils/sound';
 
 export default function RewardStore() {
     const rewards = useStore(state => state.rewards);
@@ -124,6 +124,7 @@ export default function RewardStore() {
         e.preventDefault();
         const finalReason = refundModal.reason.trim() || 'Без причины';
 
+        playRefundSound();
         refundPurchase(refundModal.purchaseId, finalReason);
 
         addMessage({
@@ -142,6 +143,7 @@ export default function RewardStore() {
         <div className="flex flex-col h-full relative">
             <div className="flex bg-black/20 rounded-lg p-1 mb-6">
                 <button
+                    onMouseEnter={playHoverSound}
                     onClick={() => setActiveTab('store')}
                     className={`flex-1 flex justify-center items-center gap-2 py-2 text-sm rounded-md transition-all font-medium ${activeTab === 'store' ? 'bg-bg-primary text-warning shadow-md' : 'text-text-secondary hover:text-white'}`}
                 >
@@ -149,6 +151,7 @@ export default function RewardStore() {
                     Магазин
                 </button>
                 <button
+                    onMouseEnter={playHoverSound}
                     onClick={() => setActiveTab('history')}
                     className={`flex-1 flex justify-center items-center gap-2 py-2 text-sm rounded-md transition-all font-medium ${activeTab === 'history' ? 'bg-bg-primary text-blue-400 shadow-md' : 'text-text-secondary hover:text-white'}`}
                 >
@@ -166,6 +169,7 @@ export default function RewardStore() {
                                 <div key={reward.id} className="relative group shrink-0 md:shrink snap-center w-[110px] min-w-[110px] md:w-auto md:min-w-0">
                                     <div className="h-full">
                                         <button
+                                            onMouseEnter={playHoverSound}
                                             onClick={() => setConfirmBuyModal({ isOpen: true, reward })}
                                             disabled={tokens < reward.cost}
                                             className="group/btn w-full bg-black/20 border border-border p-2 md:p-4 rounded-xl flex flex-col items-center justify-between gap-1 md:gap-2 hover:border-warning/50 transition-all disabled:opacity-50 disabled:cursor-not-allowed h-[140px] md:h-auto relative overflow-hidden shadow-sm"
@@ -229,12 +233,14 @@ export default function RewardStore() {
 
                                             <div className="flex gap-2 mt-2">
                                                 <button
+                                                    onMouseEnter={playHoverSound}
                                                     onClick={() => usePurchase(p.purchaseId)}
                                                     className="flex-1 bg-blue-500 hover:bg-blue-600 text-white text-xs font-bold py-2 rounded transition-colors flex items-center justify-center gap-1"
                                                 >
                                                     <Check size={14} /> Использовать
                                                 </button>
                                                 <button
+                                                    onMouseEnter={playHoverSound}
                                                     onClick={() => setRefundModal({ isOpen: true, purchaseId: p.purchaseId, reason: '' })}
                                                     className="flex-1 bg-black/40 hover:bg-red-500/20 text-text-secondary hover:text-red-400 border border-transparent hover:border-red-500/30 text-xs font-bold py-2 rounded transition-colors flex items-center justify-center gap-1"
                                                 >
@@ -374,6 +380,7 @@ export default function RewardStore() {
 
                         <form onSubmit={(e) => {
                             e.preventDefault();
+                            playDeleteSound();
                             deleteRewardWithReason(deleteRewardModal.reward.id, deleteRewardModal.reason.trim() || 'Без причины');
                             setDeleteRewardModal({ isOpen: false, reward: null, reason: '' });
                             addToast(`Награда удалена из магазина`, "info");

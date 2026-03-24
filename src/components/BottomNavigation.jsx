@@ -1,6 +1,7 @@
 import React from 'react';
 import { ListTodo, Calendar as CalendarIcon, Users, User } from 'lucide-react';
 import { useStore } from '../store/useStore';
+import { playHoverSound } from '../utils/sound';
 
 export default function BottomNavigation() {
     const activeTab = useStore(state => state.activeTab);
@@ -22,6 +23,7 @@ export default function BottomNavigation() {
                     return (
                         <button
                             key={tab.id}
+                            onMouseEnter={playHoverSound}
                             onClick={() => setActiveTab(tab.id)}
                             className={`flex flex-col items-center justify-center min-w-[64px] h-12 rounded-xl transition-all ${
                                 isActive 
