@@ -40,6 +40,7 @@ const getInitialState = () => ({
     rewards: []
   },
   apiKey: '',
+  aiKeysCount: 1,
   googleModel: 'gemini-2.0-flash',
   aiProvider: 'google',
   proxyParams: {
@@ -51,6 +52,11 @@ const getInitialState = () => ({
     bio: '',
     goals: '',
     interests: ''
+  },
+  aiPersona: {
+    gender: 'female',
+    tone: 'friendly',
+    role: 'mentor'
   },
   calendarTasks: {},
   version: 2,
@@ -90,6 +96,7 @@ export const useStore = create(
       setAiProvider: (provider) => set({ aiProvider: provider }),
       setProxyParams: (params) => set((state) => ({ proxyParams: { ...state.proxyParams, ...params } })),
       updateUserProfile: (profile) => set((state) => ({ userProfile: { ...state.userProfile, ...profile } })),
+      setAiPersona: (personaUpdate) => set((state) => ({ aiPersona: { ...state.aiPersona, ...personaUpdate } })),
       setShowMobileMenu: (show) => set({ showMobileMenu: show }),
       addToast: (message, type = 'success') => {
         const id = Date.now().toString() + Math.random();
@@ -109,6 +116,7 @@ export const useStore = create(
       setTourDemoTaskText: (text) => set({ tourDemoTaskText: text }),
       setTourDemoAIText: (text) => set({ tourDemoAIText: text }),
 
+      setAiKeysCount: (count) => set({ aiKeysCount: count }),
       addAiTokensUsed: (amount) => set((state) => ({ aiTokensUsed: (state.aiTokensUsed || 0) + amount })),
       addTokens: (amount, title = 'Выполнение задачи') => set((state) => ({
         tokens: state.tokens + amount,
@@ -597,15 +605,15 @@ export const useStore = create(
 
           const carriedCount = carriedTasks.length;
           const plannedCount = plannedToday.length;
-          let dayMessage = 'Доброе утро! Наступил новый день. ';
+          let dayMessage = `[SYSTEM_NEW_DAY] Пользователь зашел в новый день. Сегодняшняя дата: ${today}. Серия дней: ${newStreak}. `;
           if (carriedCount > 0 && plannedCount > 0) {
-            dayMessage += `У тебя осталось ${carriedCount} незавершённых задач с прошлого дня, и ещё ${plannedCount} запланированных на сегодня из календаря. Давай разберёмся с ними! 💪`;
+            dayMessage += `Перенесено ${carriedCount} незавершённых задач с прошлого дня, и запланировано ${plannedCount} на сегодня. `;
           } else if (carriedCount > 0) {
-            dayMessage += `У тебя осталось ${carriedCount} незавершённых задач с прошлого дня. Продолжим? 🎯`;
+            dayMessage += `Перенесено ${carriedCount} незавершённых задач с прошлого дня. `;
           } else if (plannedCount > 0) {
-            dayMessage += `Всё выполнено вчера — молодец! На сегодня из календаря запланировано ${plannedCount} задач.`;
+            dayMessage += `На сегодня из календаря запланировано ${plannedCount} задач.`;
           } else {
-            dayMessage += 'Список чист! Какие цели на сегодня? Расскажи, и я помогу сформировать план.';
+            dayMessage += 'Список чист.';
           }
 
           return {
@@ -614,7 +622,7 @@ export const useStore = create(
             tasks: [...carriedTasks, ...plannedToday],
             chatMessages: [
               ...state.chatMessages,
-              { role: 'assistant', content: dayMessage, timestamp: new Date().toISOString() }
+              { role: 'system', content: dayMessage, timestamp: new Date().toISOString() }
             ]
           };
         }

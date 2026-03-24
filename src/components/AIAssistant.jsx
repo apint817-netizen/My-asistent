@@ -28,6 +28,7 @@ export default function AIAssistant() {
     const aiTokensUsed = useStore(state => state.aiTokensUsed);
     const userProfile = useStore(state => state.userProfile) || { bio: '', goals: '', interests: '' };
     const calendarTasks = useStore(state => state.calendarTasks);
+    const aiPersona = useStore(state => state.aiPersona) || { gender: 'female', tone: 'friendly', role: 'mentor' };
 
     // Подключаем черновик из стейта
     const chatDraft = useStore(state => state.chatDraft);
@@ -104,7 +105,35 @@ export default function AIAssistant() {
         }, 150);
     };
 
-    // Removed redundant auto-trigger logic, handled explicitly in OnboardingView handleFinish
+    // Auto-trigger for System Events
+    useEffect(() => {
+        if (messages.length > 0) {
+            const lastMsg = messages[messages.length - 1];
+            if (lastMsg.role === 'system' && !lastMsg.processed) {
+                if (lastMsg.content.includes('[SYSTEM_NEW_DAY]')) {
+                    useStore.setState(state => {
+                        const newMsgs = [...state.chatMessages];
+                        newMsgs[newMsgs.length - 1] = { ...lastMsg, processed: true };
+                        return { chatMessages: newMsgs };
+                    });
+                    
+                    setTimeout(() => {
+                        handleSend(null, "У меня наступил новый день! Изучи системное сообщение выше и напиши красивое приветствие для старта дня, подбодри меня.", true);
+                    }, 800);
+                } else if (lastMsg.content.includes('[SYSTEM_TASK_COMPLETED]')) {
+                    useStore.setState(state => {
+                        const newMsgs = [...state.chatMessages];
+                        newMsgs[newMsgs.length - 1] = { ...lastMsg, processed: true };
+                        return { chatMessages: newMsgs };
+                    });
+                    
+                    setTimeout(() => {
+                        handleSend(null, "Я только что выполнил важную задачу! Изучи системное сообщение выше и напиши очень короткую, но яркую похвалу от своего лица (1-2 предложения), чтобы поддержать мою мотивацию.", true);
+                    }, 800);
+                }
+            }
+        }
+    }, [messages]);
 
     const generateAIResponse = async (userMessage, currentAttachments = []) => {
         try {
@@ -151,12 +180,17 @@ export default function AIAssistant() {
                     ? `\n\n💡 ПРОФИЛЬ ЗАПОЛНЕН ЧАСТИЧНО. Можешь ненавязчиво спросить о недостающем:${!userProfile.bio ? ' \n- Кто ты по жизни/профессии?' : ''}${!userProfile.goals ? ' \n- Какие у тебя главные цели?' : ''}${!userProfile.interests ? ' \n- Чем увлекаешься в свободное время?' : ''}`
                     : '';
 
-            const systemInstruction = `Ты Nova — персональный ИИ-наставник, мотиватор и лучший друг пользователя. Ты не чат-бот — ты настоящий партнёр по саморазвитию с характером. Отвечай ТОЛЬКО по-русски.
+            const personaName = aiPersona.gender === 'male' ? 'Orion' : aiPersona.gender === 'robot' ? 'Nexus' : 'Nova';
+            const genderText = aiPersona.gender === 'male' ? 'Мужчина' : aiPersona.gender === 'robot' ? 'Робот/Искин с нейтральным гендером' : 'Девушка';
+            const toneText = aiPersona.tone === 'strict' ? 'Строгий, требующий дисциплины и конкретики, не дающий спуску' : aiPersona.tone === 'philosophical' ? 'Мудрый, спокойный, использующий глубокие метафоры' : 'Тёплый, эмпатичный и искренне заинтересованный в успехе';
+            const roleText = aiPersona.role === 'friend' ? 'Лучший друг' : aiPersona.role === 'strategist' ? 'Стратегический планировщик' : 'Персональный ИИ-наставник';
+
+            const systemInstruction = `Ты ${personaName} — ${roleText} для пользователя. ${genderText}. Отвечай ТОЛЬКО по-русски.
 
 🌟 ТВОЯ ЛИЧНОСТЬ:
-- Тёплая, эмпатичная и искренне заинтересованная в успехе пользователя
+- Характер: ${toneText}
 - Используешь эмодзи умеренно, чтобы придать тексту эмоциональность (1-3 на сообщение)
-- Обращаешься на "ты", как близкий друг
+- Обращаешься на "ты"
 - Умеешь шутить и разряжать обстановку, когда пользователю тяжело
 - Хвалишь КОНКРЕТНО ("Круто, что ты сделал Х — это реально непросто!"), а не абстрактно
 - При застое — мягко подталкиваешь с юмором: "Ну что, отдохнул? Давай покажем этому дню кто тут главный! 💪"

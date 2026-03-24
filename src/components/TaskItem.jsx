@@ -1,14 +1,12 @@
-import { useState } from 'react';
+import { useState, useRef } from 'react';
 import { TASK_CATEGORIES } from '../store/useStore';
 import { Check, Trash2, Zap, ChevronsUpDown } from 'lucide-react';
-import { useSortable } from '@dnd-kit/sortable';
-import { CSS } from '@dnd-kit/utilities';
 
 export function TaskItem({ task, index, handleToggle, setDeletingTask, setEditingTaskCategory, isDragOverlay, attributes, listeners, style, setNodeRef }) {
     const categoryObj = task.category ? TASK_CATEGORIES.find(c => c.id === task.category) : null;
     const [swipeX, setSwipeX] = useState(0);
     const [isSwiping, setIsSwiping] = useState(false);
-    const touchStartRef = { current: null };
+    const touchStartRef = useRef(null);
 
     const handleTouchStart = (e) => {
         touchStartRef.current = { x: e.touches[0].clientX, y: e.touches[0].clientY };
@@ -122,39 +120,5 @@ export function TaskItem({ task, index, handleToggle, setDeletingTask, setEditin
                 </div>
             </div>
         </div>
-    );
-}
-
-export function SortableTaskItem({ task, index, handleToggle, setDeletingTask, setEditingTaskCategory }) {
-    const {
-        attributes,
-        listeners,
-        setNodeRef,
-        transform,
-        transition,
-        isDragging,
-    } = useSortable({ id: task.id });
-
-    const style = {
-        transform: CSS.Transform.toString(transform),
-        transition: isDragging ? 'none' : 'transform 150ms cubic-bezier(0.25, 1, 0.5, 1)',
-        zIndex: isDragging ? 50 : 1,
-        position: isDragging ? 'relative' : undefined,
-        willChange: 'transform',
-    };
-
-    return (
-        <TaskItem
-            task={task}
-            index={index}
-            handleToggle={handleToggle}
-            setDeletingTask={setDeletingTask}
-            setEditingTaskCategory={setEditingTaskCategory}
-            attributes={attributes}
-            listeners={listeners}
-            style={style}
-            setNodeRef={setNodeRef}
-            isDragOverlay={isDragging}
-        />
     );
 }

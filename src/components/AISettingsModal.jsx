@@ -70,10 +70,15 @@ export default function AISettingsModal({ isOpen, onClose }) {
     const setProxyParams = useStore(state => state.setProxyParams);
     const userProfile = useStore(state => state.userProfile) || { bio: '', goals: '', interests: '' };
     const updateUserProfile = useStore(state => state.updateUserProfile);
+    const aiPersona = useStore(state => state.aiPersona) || { gender: 'female', tone: 'friendly', role: 'mentor' };
+    const setAiPersona = useStore(state => state.setAiPersona);
+    const aiTokensUsed = useStore(state => state.aiTokensUsed) || 0;
+    const aiKeysCount = useStore(state => state.aiKeysCount) || 1;
 
     const [tempKey, setTempKey] = useState(apiKey || '');
     const [tempProxy, setTempProxy] = useState(proxyParams);
     const [tempProfile, setTempProfile] = useState(userProfile);
+    const [tempPersona, setTempPersona] = useState(aiPersona);
     const [customProxyModel, setCustomProxyModel] = useState(false);
     const [activeSection, setActiveSection] = useState('ai'); // 'ai' | 'profile' | 'about' | 'guide'
 
@@ -98,9 +103,10 @@ export default function AISettingsModal({ isOpen, onClose }) {
             setTempKey(apiKey || '');
             setTempProxy(proxyParams);
             setTempProfile(userProfile || { bio: '', goals: '', interests: '' });
+            setTempPersona(aiPersona || { gender: 'female', tone: 'friendly', role: 'mentor' });
             loadProfile();
         }
-    }, [isOpen, apiKey, proxyParams, userProfile]);
+    }, [isOpen, apiKey, proxyParams, userProfile, aiPersona]);
 
     const loadProfile = async () => {
         setIsProfileLoading(true);
@@ -165,6 +171,7 @@ export default function AISettingsModal({ isOpen, onClose }) {
         setApiKey(tempKey.trim());
         setProxyParams(tempProxy);
         updateUserProfile(tempProfile);
+        setAiPersona(tempPersona);
 
         if (displayName.trim()) {
             setIsSavingProfile(true);
@@ -351,9 +358,30 @@ export default function AISettingsModal({ isOpen, onClose }) {
                             </div>
 
                             {/* Provider Badge */}
-                            <div className={`px-3 py-2 rounded-lg text-xs font-medium flex items-center gap-2 ${aiProvider === 'google' ? 'bg-green-500/10 text-green-400 border border-green-500/20' : 'bg-orange-500/10 text-orange-400 border border-orange-500/20'}`}>
+                            <div className={`px-3 py-2 rounded-lg text-xs font-medium flex items-center gap-2 mb-4 ${aiProvider === 'google' ? 'bg-green-500/10 text-green-400 border border-green-500/20' : 'bg-orange-500/10 text-orange-400 border border-orange-500/20'}`}>
                                 <Zap size={12} />
-                                {aiProvider === 'google' ? 'Бесплатно — лимиты Google AI Studio' : 'Расход токенов с аккаунта прокси'}
+                                {aiProvider === 'google' ? 'Vercel Edge / Google AI Studio' : 'Расход токенов с аккаунта прокси'}
+                            </div>
+
+                            {/* Token Usage Stats */}
+                            <div className="bg-black/20 border border-border/50 rounded-xl p-4 animate-fade-in relative overflow-hidden group mb-4">
+                                <div className="absolute top-0 right-0 w-24 h-24 bg-accent/5 rounded-full blur-2xl pointer-events-none group-hover:bg-accent/10 transition-colors"></div>
+                                <div className="flex justify-between items-end mb-2 relative z-10">
+                                    <div>
+                                        <div className="text-[10px] text-text-secondary font-bold uppercase tracking-wider mb-1 flex items-center gap-1.5"><Database size={12} className="text-accent" /> Лимит токенов ИИ (на день)</div>
+                                        <div className="text-2xl font-black text-white">{aiTokensUsed.toLocaleString()} <span className="text-sm text-text-secondary font-medium outline-none">/ {(aiKeysCount * 1000000).toLocaleString()}</span></div>
+                                    </div>
+                                    <div className="text-right">
+                                        <div className="text-[10px] text-accent/80 font-bold bg-accent/10 px-2 py-0.5 rounded-full mb-1 inline-block border border-accent/20">Активных ключей: {aiKeysCount}</div>
+                                        <div className="text-xs font-bold text-white/90">~{Math.max(0, 100 - (aiTokensUsed / Math.max(1, aiKeysCount * 1000000) * 100)).toFixed(1)}% осталось</div>
+                                    </div>
+                                </div>
+                                <div className="w-full bg-white/5 h-2 rounded-full overflow-hidden relative z-10">
+                                    <div 
+                                        className={`h-full rounded-full transition-all duration-1000 ease-out ${aiTokensUsed / Math.max(1, aiKeysCount * 1000000) > 0.9 ? 'bg-error shadow-[0_0_10px_rgba(239,68,68,0.5)]' : aiTokensUsed / Math.max(1, aiKeysCount * 1000000) > 0.7 ? 'bg-warning shadow-[0_0_10px_rgba(245,158,11,0.5)]' : 'bg-accent shadow-[0_0_10px_rgba(var(--color-accent),0.5)]'}`}
+                                        style={{ width: `${Math.min(100, (aiTokensUsed / Math.max(1, aiKeysCount * 1000000)) * 100)}%` }}
+                                    ></div>
+                                </div>
                             </div>
 
                             <form onSubmit={saveSettings} className="space-y-4">
@@ -448,6 +476,52 @@ export default function AISettingsModal({ isOpen, onClose }) {
                                         </div>
                                     </div>
                                 )}
+                                
+                                <div className="pt-4 mt-2 border-t border-white/5 space-y-4">
+                                    <h4 className="font-bold text-white text-sm">Характер и стиль общения ИИ</h4>
+                                    <div className="space-y-1">
+                                        <label className="text-sm text-text-secondary font-medium block">Пол (Личность)</label>
+                                        <select
+                                            className="w-full bg-black/40 border border-border rounded-md px-3 py-2.5 text-sm outline-none focus:border-accent focus:ring-1 focus:ring-accent transition-all cursor-pointer appearance-none text-white"
+                                            value={tempPersona.gender}
+                                            onChange={(e) => setTempPersona({ ...tempPersona, gender: e.target.value })}
+                                            style={{ backgroundImage: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%23888' stroke-width='2'%3E%3Cpolyline points='6 9 12 15 18 9'%3E%3C/polyline%3E%3C/svg%3E")`, backgroundRepeat: 'no-repeat', backgroundPosition: 'right 10px center' }}
+                                        >
+                                            <option value="female">Nova (Женский голос)</option>
+                                            <option value="male">Orion (Мужской голос)</option>
+                                            <option value="robot">Нейтральный Искин</option>
+                                        </select>
+                                    </div>
+                                    <div className="flex gap-3">
+                                        <div className="space-y-1 w-1/2">
+                                            <label className="text-sm text-text-secondary font-medium block">Тон</label>
+                                            <select
+                                                className="w-full bg-black/40 border border-border rounded-md px-3 py-2.5 text-sm outline-none focus:border-accent focus:ring-1 focus:ring-accent transition-all cursor-pointer appearance-none text-white"
+                                                value={tempPersona.tone}
+                                                onChange={(e) => setTempPersona({ ...tempPersona, tone: e.target.value })}
+                                                style={{ backgroundImage: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%23888' stroke-width='2'%3E%3Cpolyline points='6 9 12 15 18 9'%3E%3C/polyline%3E%3C/svg%3E")`, backgroundRepeat: 'no-repeat', backgroundPosition: 'right 10px center' }}
+                                            >
+                                                <option value="friendly">Дружелюбный 😇</option>
+                                                <option value="strict">Строгий 😈</option>
+                                                <option value="philosophical">Мудрый 🧘‍♂️</option>
+                                            </select>
+                                        </div>
+                                        <div className="space-y-1 w-1/2">
+                                            <label className="text-sm text-text-secondary font-medium block">Роль</label>
+                                            <select
+                                                className="w-full bg-black/40 border border-border rounded-md px-3 py-2.5 text-sm outline-none focus:border-accent focus:ring-1 focus:ring-accent transition-all cursor-pointer appearance-none text-white"
+                                                value={tempPersona.role}
+                                                onChange={(e) => setTempPersona({ ...tempPersona, role: e.target.value })}
+                                                style={{ backgroundImage: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%23888' stroke-width='2'%3E%3Cpolyline points='6 9 12 15 18 9'%3E%3C/polyline%3E%3C/svg%3E")`, backgroundRepeat: 'no-repeat', backgroundPosition: 'right 10px center' }}
+                                            >
+                                                <option value="mentor">Наставник 🎓</option>
+                                                <option value="friend">Лучший друг 🤝</option>
+                                                <option value="strategist">Стратег ♟️</option>
+                                            </select>
+                                        </div>
+                                    </div>
+                                </div>
+
                                 <button type="submit" className="w-full bg-accent text-white px-4 py-3 mt-4 rounded-xl text-sm hover:bg-accent-hover transition-colors font-semibold shadow-lg shadow-accent/20">
                                     Сохранить настройки
                                 </button>

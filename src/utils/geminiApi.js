@@ -216,6 +216,10 @@ export async function callAI({ baseUrl, apiKey, model, systemPrompt, history, us
     if (data.usage?.total_tokens) {
         useStore.getState().addAiTokensUsed(data.usage.total_tokens);
     }
+    
+    if (data.keys_count) {
+        useStore.getState().setAiKeysCount(data.keys_count);
+    }
 
     if (data.choices && data.choices[0]?.message?.content) {
         return data.choices[0].message.content;

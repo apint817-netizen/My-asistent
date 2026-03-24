@@ -112,9 +112,10 @@ const CalendarView = () => {
     };
 
     return (
-        <section className="glass-panel p-6 flex flex-col gap-6 animate-fade-in relative overflow-hidden">
-            <div className="flex-1">
-                <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 sm:gap-0 mb-6">
+        <section className="glass-panel p-4 sm:p-6 animate-fade-in relative overflow-hidden">
+            <div className={`flex flex-col lg:flex-row gap-6 items-start`}>
+                <div className="flex-1 w-full min-w-0">
+                    <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 sm:gap-0 mb-6">
                     <h2 className="text-xl font-bold flex items-center gap-2">
                         <CalendarIcon size={20} className="text-accent shrink-0" />
                         <span className="sm:hidden">Планы</span>
@@ -236,15 +237,15 @@ const CalendarView = () => {
             </div>
 
             {selectedDate && (
-                <div className="flex flex-col bg-bg-secondary/60 backdrop-blur-xl rounded-3xl border border-white/5 shadow-2xl p-5 md:p-6 border-t-2 border-t-accent animate-fade-in relative overflow-hidden">
+                <div className="w-full lg:w-[380px] shrink-0 flex flex-col bg-bg-secondary/60 backdrop-blur-xl rounded-3xl border border-white/5 shadow-2xl p-5 md:p-6 border-t-2 border-t-accent animate-fade-in relative overflow-hidden lg:sticky lg:top-0 lg:max-h-[calc(100vh-140px)]">
                     {/* Background glow in the panel */}
                     <div className="absolute top-0 right-0 w-32 h-32 bg-accent/10 rounded-full blur-3xl pointer-events-none -mt-10 -mr-10"></div>
 
-                    <div className="flex justify-between items-center mb-6 relative z-10">
+                    <div className="flex justify-between items-center mb-6 relative z-10 shrink-0">
                         <h3 className="font-bold text-xl md:text-2xl text-white tracking-tight">Список <span className="text-accent">{selectedDate.split('-').reverse().join('.')}</span> <span className="text-text-secondary md:text-lg text-base font-medium ml-1">({getWeekdayName(selectedDate)})</span></h3>
                     </div>
 
-                    <div className="flex-1 overflow-y-auto pr-3 custom-scrollbar space-y-3 md:space-y-4 mb-4 min-h-[200px] max-h-[400px] relative z-10">
+                    <div className="flex-1 overflow-y-auto overflow-x-hidden pr-2 custom-scrollbar space-y-3 md:space-y-4 mb-4 min-h-[200px] relative z-10 w-full">
                         {selectedDateTasks.length === 0 ? (
                             <div className="h-full flex flex-col items-center justify-center text-text-secondary opacity-60 mt-12 space-y-4">
                                 <CalendarIcon size={40} className="text-accent/40" />
@@ -362,6 +363,7 @@ const CalendarView = () => {
                     </form>
                 </div>
             )}
+            </div>
         </section>
     );
 };

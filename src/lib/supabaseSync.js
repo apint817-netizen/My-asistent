@@ -6,7 +6,7 @@ const SYNC_FIELDS = [
     'tasks', 'rewards', 'pointsHistory', 'purchaseHistory',
     'chatMessages', 'analysisMessages', 'draftPlan',
     'apiKey', 'googleModel', 'aiProvider', 'proxyParams',
-    'userProfile', 'calendarTasks',
+    'userProfile', 'calendarTasks', 'aiPersona',
     'hasCompletedOnboarding', 'hasSeenTour',
     'taskProposals', 'calendarProposals', 'rewardProposals',
     'version'

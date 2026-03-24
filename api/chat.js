@@ -164,7 +164,8 @@ export default async function handler(req) {
         return new Response(JSON.stringify({
             choices: [{ message: { role: 'assistant', content: text } }],
             usage: { total_tokens: result.data.usageMetadata?.totalTokenCount || 0 },
-            model_used: result.model
+            model_used: result.model,
+            keys_count: validKeys.length
         }), {
             status: 200,
             headers: { 'Content-Type': 'application/json' },
