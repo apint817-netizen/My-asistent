@@ -227,11 +227,12 @@ export default function TaskManager() {
     return (
         <div className="flex flex-col h-full relative">
             {/* Sort button — always visible */}
-            <div className="flex items-center gap-2 mb-3 px-2 py-2 -mx-1 border-b border-white/5 overflow-x-auto no-scrollbar">
-                <div className="relative">
+            <div className="flex items-center gap-2 mb-3 border-b border-white/5 pb-2">
+                {/* Sort button — no overflow clip */}
+                <div className="relative shrink-0 z-50">
                     <button 
                         onClick={() => setIsSortMenuOpen(!isSortMenuOpen)}
-                        className="flex items-center gap-1.5 bg-white/5 hover:bg-white/10 rounded-full px-3 py-1 mr-2 transition-colors border border-white/5"
+                        className="flex items-center gap-1.5 bg-white/5 hover:bg-white/10 rounded-full px-3 py-1 transition-colors border border-white/5"
                     >
                         <ArrowDownAZ size={14} className="text-text-secondary shrink-0" />
                         <span className="text-xs font-medium text-text-secondary whitespace-nowrap">
@@ -241,8 +242,8 @@ export default function TaskManager() {
 
                     {isSortMenuOpen && (
                         <>
-                            <div className="fixed inset-0 z-40" onClick={() => setIsSortMenuOpen(false)}></div>
-                            <div className="absolute top-full left-0 mt-2 w-40 bg-bg-secondary border border-border rounded-xl shadow-xl z-50 overflow-hidden animate-scale-in">
+                            <div className="fixed inset-0" onClick={() => setIsSortMenuOpen(false)}></div>
+                            <div className="absolute top-full left-0 mt-2 w-40 bg-bg-secondary border border-border rounded-xl shadow-xl overflow-hidden animate-scale-in">
                                 {SORT_OPTIONS.map(opt => (
                                     <button
                                         key={opt.id}
@@ -256,6 +257,9 @@ export default function TaskManager() {
                         </>
                     )}
                 </div>
+
+                {/* Filters — horizontal scrollable area */}
+                <div className="flex items-center gap-2 overflow-x-auto no-scrollbar flex-1 pl-1">
                 {usedCategories.length > 0 && (
                     <>
                     <button
@@ -287,6 +291,7 @@ export default function TaskManager() {
                     )}
                     </>
                 )}
+                </div>
             </div>
 
             <div id="tour-task-list" className="flex-1 overflow-y-auto flex flex-col gap-3 mb-6 pr-2 pb-2">

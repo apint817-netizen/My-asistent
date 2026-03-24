@@ -1,8 +1,8 @@
-import { useState, useRef } from 'react';
+import { useState, useRef, forwardRef } from 'react';
 import { TASK_CATEGORIES } from '../store/useStore';
 import { Check, Trash2, Zap, ChevronsUpDown, Edit2 } from 'lucide-react';
 
-export function TaskItem({ task, index, handleToggle, setDeletingTask, setEditingTaskCategory, setEditingTask, isDragOverlay, attributes, listeners, style, setNodeRef }) {
+export const TaskItem = forwardRef(({ task, index, handleToggle, setDeletingTask, setEditingTaskCategory, setEditingTask, isDragOverlay, attributes, listeners, style, setNodeRef }, ref) => {
     const categoryObj = task.category ? TASK_CATEGORIES.find(c => c.id === task.category) : null;
     const [swipeX, setSwipeX] = useState(0);
     const [isSwiping, setIsSwiping] = useState(false);
@@ -49,7 +49,7 @@ export function TaskItem({ task, index, handleToggle, setDeletingTask, setEditin
             )}
 
             <div
-                ref={setNodeRef}
+                ref={setNodeRef || ref}
                 style={{ ...style, transform: `${style?.transform || ''} translateX(${swipeX}px)`.trim(), transition: isSwiping ? 'none' : (style?.transition || 'transform 0.2s ease-out') }}
                 className={`glass-card p-3 sm:p-4 flex items-center justify-between group origin-center relative z-10 bg-bg-secondary ${task.completed ? 'opacity-50' : ''} ${isDragOverlay ? 'shadow-2xl border-accent/80 ring-2 ring-accent/60 bg-[#13131A] z-[100] backdrop-blur-3xl opacity-100' : ''}`}
                 onTouchStart={!task.completed ? handleTouchStart : undefined}
@@ -133,4 +133,4 @@ export function TaskItem({ task, index, handleToggle, setDeletingTask, setEditin
             </div>
         </div>
     );
-}
+});

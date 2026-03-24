@@ -64,9 +64,7 @@ function App() {
   const hasCompletedOnboarding = useStore(state => state.hasCompletedOnboarding);
   const syncUnsubRef = useRef(null);
 
-  useEffect(() => {
-    updateActivity();
-  }, [updateActivity]);
+  // Initial activity update is now handled in initUserData after state is loaded
 
   // Initialize user data from Supabase
   const initUserData = async (userId) => {
@@ -96,11 +94,12 @@ function App() {
 
       // If we have local data, stop blocking UI — sync Supabase in background
       if (hasLocalData) {
+        useStore.getState().updateActivity();
         setDataLoading(false);
-        // Background sync from Supabase (non-blocking)
         loadUserData(userId).then(remoteData => {
           if (remoteData) {
             useStore.getState().applyRemoteData(remoteData);
+            useStore.getState().updateActivity();
             console.log('[App] Background sync: applied remote data');
           }
         }).catch(err => {
@@ -118,6 +117,7 @@ function App() {
           ]);
           if (remoteData) {
             useStore.getState().applyRemoteData(remoteData);
+            useStore.getState().updateActivity();
             console.log('[App] Applied remote data from Supabase');
           } else {
             // Double-check: maybe localStorage has data under old key
@@ -128,6 +128,7 @@ function App() {
                 const parsed = JSON.parse(fallbackData);
                 if (parsed?.state && (parsed.state.tasks?.length > 0 || parsed.state.chatMessages?.length > 0)) {
                   useStore.setState(parsed.state);
+                  useStore.getState().updateActivity();
                   console.log('[App] Recovered data from localStorage fallback');
                 } else {
                   useStore.getState().resetStoreForNewUser();
@@ -149,6 +150,7 @@ function App() {
               const parsed = JSON.parse(fallbackData);
               if (parsed?.state) {
                 useStore.setState(parsed.state);
+                useStore.getState().updateActivity();
                 console.log('[App] Network error — using cached local data');
               }
             } catch { /* keep current state */ }

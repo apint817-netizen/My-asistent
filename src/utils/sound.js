@@ -1,5 +1,7 @@
 // Audio context singleton for better performance
 let audioCtx = null;
+let isUnlocked = false;
+
 function getAudioCtx() {
     if (!audioCtx) {
         const AudioContext = window.AudioContext || window.webkitAudioContext;
@@ -8,6 +10,34 @@ function getAudioCtx() {
     }
     if (audioCtx.state === 'suspended') audioCtx.resume();
     return audioCtx;
+}
+
+// Умная разблокировка AudioContext для iOS/Safari и Chrome Autoplay Policy
+function unlockAudioContext() {
+    if (isUnlocked) return;
+    const ctx = getAudioCtx();
+    if (ctx && ctx.state === 'suspended') {
+        ctx.resume().then(() => {
+            isUnlocked = true;
+            // Проигрываем пустой буфер чтобы окончательно "разморозить" контекст на iOS
+            const buffer = ctx.createBuffer(1, 1, 22050);
+            const source = ctx.createBufferSource();
+            source.buffer = buffer;
+            source.connect(ctx.destination);
+            source.start(0);
+        }).catch(console.error);
+    } else if (ctx && ctx.state === 'running') {
+        isUnlocked = true;
+    }
+}
+
+if (typeof window !== 'undefined') {
+    const events = ['click', 'touchstart', 'keydown', 'mousedown'];
+    const unlock = () => {
+        unlockAudioContext();
+        events.forEach(e => document.removeEventListener(e, unlock));
+    };
+    events.forEach(e => document.addEventListener(e, unlock, { once: true, passive: true }));
 }
 
 // Premium ding — task completion (880Hz + 1108Hz chord)

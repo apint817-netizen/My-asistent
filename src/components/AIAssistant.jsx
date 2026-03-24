@@ -477,10 +477,10 @@ ${calendarStr}
             console.error("AI Error:", error);
 
             // Если ошибка связана с квотой (429 Тоо Many Requests)
-            if (error.message.includes('429') || error.message.includes('Quota exceeded')) {
+            if (error.message.includes('429') || error.message.includes('Quota exceeded') || error.message.includes('Все аккаунты исчерпаны')) {
                 addMessage({
                     role: 'assistant',
-                    content: `Упс! ⏳ Кажется, мы исчерпали лимит запросов нейросети на эту минуту.\n\nДавайте сделаем крошечную паузу, и через минуту я снова буду с вами! (Также вы можете сменить ключ или модель в настройках)`
+                    content: `Упс! ⏳ Кажется, мы исчерпали лимит запросов нейросети на эту минуту.\n\nДавайте сделаем крошечную паузу, и через минуту я снова буду с вами! (Отладочная информация: ${error.message})`
                 });
             } else {
                 addMessage({
@@ -705,8 +705,8 @@ ${calendarStr}
 
     return (
         <div
-            className="flex flex-col glass-panel overflow-hidden relative"
-            style={{ maxHeight: 'calc(100vh - 180px)', height: '100%', boxShadow: '0 0 40px rgba(124, 58, 237, 0.08), inset 0 1px 0 rgba(255,255,255,0.04)' }}
+            className="flex flex-col glass-panel relative"
+            style={{ maxHeight: 'calc(100vh - 240px)', height: '100%', boxShadow: '0 0 40px rgba(124, 58, 237, 0.08), inset 0 1px 0 rgba(255,255,255,0.04)' }}
             onDragOver={handleDragOver}
             onDragLeave={handleDragLeave}
             onDrop={handleDrop}
@@ -733,15 +733,15 @@ ${calendarStr}
                         <p className="text-xs text-accent">Базовый ассистент</p>
                     </div>
                 </div>
-                <div className="flex items-center gap-1.5 shrink-0">
-                    <div className="flex items-center gap-1 px-2 py-1 bg-accent/10 border border-accent/20 rounded-lg shrink-0" title={`${(aiTokensUsed || 0).toLocaleString('ru-RU')} / ${((useStore.getState().aiKeysCount || 1) * 1_000_000).toLocaleString('ru-RU')}`}>
-                        <span className="text-[9px] font-medium text-accent/70 whitespace-nowrap">{(aiTokensUsed || 0).toLocaleString('ru-RU')}</span>
-                        <div className="w-12 bg-white/5 h-1.5 rounded-full overflow-hidden">
-                            <div 
-                                className={`h-full rounded-full transition-all duration-700 ${(aiTokensUsed || 0) / Math.max(1, (useStore.getState().aiKeysCount || 1) * 1_000_000) > 0.9 ? 'bg-red-500' : (aiTokensUsed || 0) / Math.max(1, (useStore.getState().aiKeysCount || 1) * 1_000_000) > 0.7 ? 'bg-yellow-500' : 'bg-accent'}`}
-                                style={{ width: `${Math.min(100, ((aiTokensUsed || 0) / Math.max(1, (useStore.getState().aiKeysCount || 1) * 1_000_000)) * 100)}%` }}
-                            ></div>
-                        </div>
+                <div className="flex items-center gap-2 shrink-0 overflow-visible">
+                    <div 
+                        className="flex items-center gap-1.5 px-2 py-1 bg-accent/10 border border-accent/20 rounded-lg shrink-0" 
+                        title={`Использовано: ${(aiTokensUsed || 0).toLocaleString('ru-RU')} из ${((useStore.getState().aiKeysCount || 1) * 1_000_000).toLocaleString('ru-RU')}`}
+                    >
+                        <Zap size={10} className="text-accent shrink-0" />
+                        <span className="text-[10px] font-bold text-accent whitespace-nowrap">
+                            {(aiTokensUsed || 0).toLocaleString('ru-RU')}
+                        </span>
                     </div>
                     {isSearching ? (
                         <div className="flex items-center bg-black/40 border border-border rounded-full px-3 py-1 flex-1 sm:flex-none w-full sm:w-48 animate-fade-in">

@@ -625,6 +625,16 @@ export const useStore = create(
 
           // Preserve uncompleted tasks from previous day, remove completed ones
           const carriedTasks = state.tasks.filter(t => !t.completed);
+          const completedTasks = state.tasks.filter(t => t.completed);
+
+          let newCalendarTasks = { ...state.calendarTasks };
+          if (state.lastActiveDate && completedTasks.length > 0) {
+            const oldCalendarTasks = newCalendarTasks[state.lastActiveDate] || [];
+            const map = new Map();
+            oldCalendarTasks.forEach(t => map.set(t.id, t));
+            completedTasks.forEach(t => map.set(t.id, t)); // Overwrite with completed status
+            newCalendarTasks[state.lastActiveDate] = Array.from(map.values());
+          }
 
           // Calculate streak using local date parsing to avoid timezone bugs
           let newStreak = 1;
@@ -654,6 +664,7 @@ export const useStore = create(
             lastActiveDate: today,
             streak: newStreak,
             tasks: [...carriedTasks, ...plannedToday],
+            calendarTasks: newCalendarTasks,
             chatMessages: [
               ...state.chatMessages,
               { role: 'system', content: dayMessage, timestamp: new Date().toISOString() }
