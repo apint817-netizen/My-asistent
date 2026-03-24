@@ -2,6 +2,7 @@ import { useState, useRef, useEffect, useMemo } from 'react';
 import { useStore, TASK_CATEGORIES } from '../store/useStore';
 import { Send, Bot, User, MessageSquare, Eraser, Settings, Zap, Link as LinkIcon, HelpCircle, ChevronDown, Check, Copy, Edit2, X, Search, Paperclip, FileText, Image as ImageIcon, Trash2 } from 'lucide-react';
 import { callAI, GOOGLE_OPENAI_BASE } from '../utils/geminiApi';
+import { playSendSound, playReceiveSound, playKeyClick } from '../utils/sound';
 import ReactMarkdown from 'react-markdown';
 import ConfirmModal from './ConfirmModal';
 import ProfileWizardModal from './ProfileWizardModal';
@@ -490,6 +491,7 @@ ${calendarStr}
         } finally {
             setIsTyping(false);
             setIsThinking(false);
+            playReceiveSound();
         }
     };
 
@@ -523,6 +525,7 @@ ${calendarStr}
 
         if (!isSilentAutoPrompt) {
             addMessage({ role: 'user', content: displayContent });
+            playSendSound();
         }
 
         setIsThinking(true);
@@ -702,8 +705,8 @@ ${calendarStr}
 
     return (
         <div
-            className="flex flex-col h-full glass-panel overflow-hidden relative"
-            style={{ maxHeight: '100%', boxShadow: '0 0 40px rgba(124, 58, 237, 0.08), inset 0 1px 0 rgba(255,255,255,0.04)' }}
+            className="flex flex-col glass-panel overflow-hidden relative"
+            style={{ maxHeight: 'calc(100vh - 180px)', height: '100%', boxShadow: '0 0 40px rgba(124, 58, 237, 0.08), inset 0 1px 0 rgba(255,255,255,0.04)' }}
             onDragOver={handleDragOver}
             onDragLeave={handleDragLeave}
             onDrop={handleDrop}
@@ -730,13 +733,10 @@ ${calendarStr}
                         <p className="text-xs text-accent">Базовый ассистент</p>
                     </div>
                 </div>
-                <div className="flex items-center gap-2">
-                    <div className="flex flex-col items-end gap-1 px-2.5 py-1 bg-accent/10 border border-accent/20 rounded-xl shrink-0">
-                        <div className="flex items-center gap-1.5 text-[10px] font-medium text-accent/80">
-                            <span>Лимит ИИ:</span>
-                            <span>{(aiTokensUsed || 0).toLocaleString('ru-RU')} / {((useStore.getState().aiKeysCount || 1) * 1_000_000).toLocaleString('ru-RU')}</span>
-                        </div>
-                        <div className="w-full bg-white/5 h-1 rounded-full overflow-hidden">
+                <div className="flex items-center gap-1.5 shrink-0">
+                    <div className="flex items-center gap-1 px-2 py-1 bg-accent/10 border border-accent/20 rounded-lg shrink-0" title={`${(aiTokensUsed || 0).toLocaleString('ru-RU')} / ${((useStore.getState().aiKeysCount || 1) * 1_000_000).toLocaleString('ru-RU')}`}>
+                        <span className="text-[9px] font-medium text-accent/70 whitespace-nowrap">{(aiTokensUsed || 0).toLocaleString('ru-RU')}</span>
+                        <div className="w-12 bg-white/5 h-1.5 rounded-full overflow-hidden">
                             <div 
                                 className={`h-full rounded-full transition-all duration-700 ${(aiTokensUsed || 0) / Math.max(1, (useStore.getState().aiKeysCount || 1) * 1_000_000) > 0.9 ? 'bg-red-500' : (aiTokensUsed || 0) / Math.max(1, (useStore.getState().aiKeysCount || 1) * 1_000_000) > 0.7 ? 'bg-yellow-500' : 'bg-accent'}`}
                                 style={{ width: `${Math.min(100, ((aiTokensUsed || 0) / Math.max(1, (useStore.getState().aiKeysCount || 1) * 1_000_000)) * 100)}%` }}
@@ -984,6 +984,8 @@ ${calendarStr}
                             if (e.key === 'Enter' && !e.shiftKey) {
                                 e.preventDefault();
                                 handleSend(e);
+                            } else if (e.key.length === 1) {
+                                playKeyClick();
                             }
                         }}
                         rows={1}

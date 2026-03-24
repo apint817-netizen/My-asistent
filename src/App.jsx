@@ -369,7 +369,7 @@ function App() {
           )}
 
           {/* Mobile main content area */}
-          <div className="flex-1 overflow-y-auto px-4 pb-32">
+          <div key={activeTab} className="flex-1 overflow-y-auto px-4 pb-32 tab-transition">
             {isMobileOnlyTab ? (
               renderMobileContent()
             ) : activeTab === 'calendar' ? (
@@ -547,6 +547,7 @@ function App() {
           </div>
 
           {/* Desktop Content */}
+          <div key={activeTab} className="tab-transition flex-1 flex flex-col">
           {
             activeTab === 'resume' ? (
               <ResumeView />
@@ -613,6 +614,7 @@ function App() {
               </main>
             )
           }
+          </div>
         </div>
 
         <BottomNavigation />

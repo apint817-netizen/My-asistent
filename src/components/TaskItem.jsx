@@ -1,8 +1,8 @@
 import { useState, useRef } from 'react';
 import { TASK_CATEGORIES } from '../store/useStore';
-import { Check, Trash2, Zap, ChevronsUpDown } from 'lucide-react';
+import { Check, Trash2, Zap, ChevronsUpDown, Edit2 } from 'lucide-react';
 
-export function TaskItem({ task, index, handleToggle, setDeletingTask, setEditingTaskCategory, isDragOverlay, attributes, listeners, style, setNodeRef }) {
+export function TaskItem({ task, index, handleToggle, setDeletingTask, setEditingTaskCategory, setEditingTask, isDragOverlay, attributes, listeners, style, setNodeRef }) {
     const categoryObj = task.category ? TASK_CATEGORIES.find(c => c.id === task.category) : null;
     const [swipeX, setSwipeX] = useState(0);
     const [isSwiping, setIsSwiping] = useState(false);
@@ -105,6 +105,18 @@ export function TaskItem({ task, index, handleToggle, setDeletingTask, setEditin
                         <Zap size={12} className="sm:w-4 sm:h-4" />
                         +{task.value}
                     </div>
+                    {/* Edit button */}
+                    {!task.completed && setEditingTask && (
+                        <button
+                            onClick={(e) => { e.stopPropagation(); setEditingTask(task); }}
+                            className="hidden md:flex p-1.5 text-text-secondary hover:text-accent hover:bg-accent/10 rounded-md transition-colors opacity-0 group-hover:opacity-100 group/edit relative"
+                        >
+                            <Edit2 size={14} />
+                            {!isDragOverlay && (
+                                <div className="absolute -top-8 left-1/2 -translate-x-1/2 bg-[#1b1b22] text-white text-[11px] font-medium py-1 px-2 rounded-md opacity-0 pointer-events-none group-hover/edit:opacity-100 transition-opacity whitespace-nowrap shadow-lg border border-white/10 z-50">Редактировать</div>
+                            )}
+                        </button>
+                    )}
                     {/* Delete button — desktop only (mobile uses swipe) */}
                     {!task.completed && setDeletingTask && (
                         <button

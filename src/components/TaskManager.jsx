@@ -21,7 +21,7 @@ const restrictToVerticalAxis = ({ transform }) => {
     };
 };
 
-function SortableTaskItem({ task, index, handleToggle, setDeletingTask, setEditingTaskCategory }) {
+function SortableTaskItem({ task, index, handleToggle, setDeletingTask, setEditingTaskCategory, setEditingTask }) {
     const {
         attributes,
         listeners,
@@ -35,7 +35,7 @@ function SortableTaskItem({ task, index, handleToggle, setDeletingTask, setEditi
         transform: CSS.Transform.toString(transform),
         transition: isDragging ? 'none' : 'transform 150ms cubic-bezier(0.25, 1, 0.5, 1)',
         zIndex: isDragging ? 50 : 1,
-        position: isDragging ? 'relative' : undefined,
+        opacity: isDragging ? 0.4 : 1,
         willChange: 'transform',
     };
 
@@ -46,11 +46,12 @@ function SortableTaskItem({ task, index, handleToggle, setDeletingTask, setEditi
             handleToggle={handleToggle}
             setDeletingTask={setDeletingTask}
             setEditingTaskCategory={setEditingTaskCategory}
+            setEditingTask={setEditingTask}
             attributes={attributes}
             listeners={listeners}
             style={style}
             setNodeRef={setNodeRef}
-            isDragOverlay={isDragging}
+            isDragOverlay={false}
         />
     );
 }
@@ -225,36 +226,38 @@ export default function TaskManager() {
 
     return (
         <div className="flex flex-col h-full relative">
-            {usedCategories.length > 0 && (
-                <div className="flex items-center gap-2 mb-4 px-2 py-2 -mx-1 border-b border-white/5 overflow-x-auto no-scrollbar">
-                    <div className="relative">
-                        <button 
-                            onClick={() => setIsSortMenuOpen(!isSortMenuOpen)}
-                            className="flex items-center gap-1.5 bg-white/5 hover:bg-white/10 rounded-full px-3 py-1 mr-2 transition-colors border border-white/5"
-                        >
-                            <ArrowDownAZ size={14} className="text-text-secondary shrink-0" />
-                            <span className="text-xs font-medium text-text-secondary whitespace-nowrap">
-                                {SORT_OPTIONS.find(o => o.id === sortOrder)?.label}
-                            </span>
-                        </button>
+            {/* Sort button — always visible */}
+            <div className="flex items-center gap-2 mb-3 px-2 py-2 -mx-1 border-b border-white/5 overflow-x-auto no-scrollbar">
+                <div className="relative">
+                    <button 
+                        onClick={() => setIsSortMenuOpen(!isSortMenuOpen)}
+                        className="flex items-center gap-1.5 bg-white/5 hover:bg-white/10 rounded-full px-3 py-1 mr-2 transition-colors border border-white/5"
+                    >
+                        <ArrowDownAZ size={14} className="text-text-secondary shrink-0" />
+                        <span className="text-xs font-medium text-text-secondary whitespace-nowrap">
+                            {SORT_OPTIONS.find(o => o.id === sortOrder)?.label}
+                        </span>
+                    </button>
 
-                        {isSortMenuOpen && (
-                            <>
-                                <div className="fixed inset-0 z-40" onClick={() => setIsSortMenuOpen(false)}></div>
-                                <div className="absolute top-full left-0 mt-2 w-40 bg-bg-secondary border border-border rounded-xl shadow-xl z-50 overflow-hidden animate-scale-in">
-                                    {SORT_OPTIONS.map(opt => (
-                                        <button
-                                            key={opt.id}
-                                            onClick={() => { setSortOrder(opt.id); setIsSortMenuOpen(false); }}
-                                            className={`w-full text-left px-4 py-2.5 text-xs font-medium transition-colors ${sortOrder === opt.id ? 'bg-accent/20 text-accent' : 'text-text-secondary hover:bg-white/5 hover:text-white'}`}
-                                        >
-                                            {opt.label}
-                                        </button>
-                                    ))}
-                                </div>
-                            </>
-                        )}
-                    </div>
+                    {isSortMenuOpen && (
+                        <>
+                            <div className="fixed inset-0 z-40" onClick={() => setIsSortMenuOpen(false)}></div>
+                            <div className="absolute top-full left-0 mt-2 w-40 bg-bg-secondary border border-border rounded-xl shadow-xl z-50 overflow-hidden animate-scale-in">
+                                {SORT_OPTIONS.map(opt => (
+                                    <button
+                                        key={opt.id}
+                                        onClick={() => { setSortOrder(opt.id); setIsSortMenuOpen(false); }}
+                                        className={`w-full text-left px-4 py-2.5 text-xs font-medium transition-colors ${sortOrder === opt.id ? 'bg-accent/20 text-accent' : 'text-text-secondary hover:bg-white/5 hover:text-white'}`}
+                                    >
+                                        {opt.label}
+                                    </button>
+                                ))}
+                            </div>
+                        </>
+                    )}
+                </div>
+                {usedCategories.length > 0 && (
+                    <>
                     <button
                         onClick={() => setActiveFilter('all')}
                         className={`text-xs px-2.5 py-1 rounded-full font-medium transition-colors ${activeFilter === 'all' ? 'bg-white/20 text-white' : 'bg-white/5 text-text-secondary hover:bg-white/10'}`}
@@ -282,8 +285,9 @@ export default function TaskManager() {
                             Без категории ({tasks.filter(t => !t.category).length})
                         </button>
                     )}
-                </div>
-            )}
+                    </>
+                )}
+            </div>
 
             <div id="tour-task-list" className="flex-1 overflow-y-auto flex flex-col gap-3 mb-6 pr-2 pb-2">
                 <DndContext

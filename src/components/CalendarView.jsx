@@ -10,7 +10,7 @@ const CalendarView = () => {
     const [selectedCategory, setSelectedCategory] = useState('');
     const [showMonthPicker, setShowMonthPicker] = useState(false);
 
-    const { calendarTasks, addCalendarTask, deleteCalendarTask, toggleCalendarTask } = useStore();
+    const { calendarTasks, addCalendarTask, deleteCalendarTask, toggleCalendarTask, moveCalendarTask } = useStore();
     const tasks = useStore(state => state.tasks);
     const todayStr = new Date().toISOString().split('T')[0];
 
@@ -38,16 +38,24 @@ const CalendarView = () => {
         return `${year}-${String(month + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
     };
 
-    // Generate calendar grid
+    // Generate calendar grid with prev/next month fillers
     const daysInMonth = getDaysInMonth(currentDate.getFullYear(), currentDate.getMonth());
     const firstDay = getFirstDayOfMonth(currentDate.getFullYear(), currentDate.getMonth());
 
+    // Previous month trailing days
+    const prevMonthDays = getDaysInMonth(currentDate.getFullYear(), currentDate.getMonth() - 1);
     const days = [];
-    for (let i = 0; i < firstDay; i++) {
-        days.push(null);
+    for (let i = firstDay - 1; i >= 0; i--) {
+        days.push({ day: prevMonthDays - i, filler: true });
     }
+    // Current month days
     for (let i = 1; i <= daysInMonth; i++) {
-        days.push(i);
+        days.push({ day: i, filler: false });
+    }
+    // Next month leading days (fill to 42 = 6 rows)
+    const remaining = 42 - days.length;
+    for (let i = 1; i <= remaining; i++) {
+        days.push({ day: i, filler: true });
     }
 
     const monthNames = [
@@ -176,9 +184,16 @@ const CalendarView = () => {
                 </div>
 
                 <div className="grid grid-cols-7 gap-2 md:gap-3">
-                    {days.map((day, index) => {
-                        if (!day) return <div key={`empty-${index}`} className="h-16 md:h-24"></div>;
+                    {days.map((item, index) => {
+                        if (item.filler) {
+                            return (
+                                <div key={`filler-${index}`} className="h-16 md:h-24 rounded-2xl flex items-start justify-center p-1.5 md:p-3 text-sm bg-bg-secondary/20 border border-transparent">
+                                    <span className="text-text-secondary/30 font-medium text-lg md:text-xl">{item.day}</span>
+                                </div>
+                            );
+                        }
 
+                        const day = item.day;
                         const dayStr = formatDateString(currentDate.getFullYear(), currentDate.getMonth(), day);
                         const isSelected = selectedDate === dayStr;
                         const isToday = dayStr === new Date().toISOString().split('T')[0];
@@ -307,13 +322,28 @@ const CalendarView = () => {
                                         </div>
                                     </div>
                                     {task.source === 'calendar' ? (
-                                        <button
-                                            onClick={() => deleteCalendarTask(selectedDate, task.id)}
-                                            className="text-text-secondary hover:text-error transition-all duration-300 p-2 opacity-0 group-hover:opacity-100 bg-white/5 hover:bg-error/20 rounded-xl ml-2 shrink-0"
-                                            title="Удалить задачу из календаря"
-                                        >
-                                            <Trash2 size={16} />
-                                        </button>
+                                        <div className="flex items-center opacity-0 group-hover:opacity-100 transition-opacity shrink-0 ml-2">
+                                            <div className="relative w-9 h-9 flex items-center justify-center bg-white/5 hover:bg-accent/20 rounded-xl transition-colors mr-1.5 cursor-pointer group/move" title="Перенести на другой день">
+                                                <CalendarIcon size={16} className="text-text-secondary group-hover/move:text-accent transition-colors" />
+                                                <input 
+                                                    type="date"
+                                                    className="absolute inset-0 opacity-0 cursor-pointer w-full h-full"
+                                                    onChange={(e) => {
+                                                        if (e.target.value) {
+                                                            moveCalendarTask(selectedDate, task.id, e.target.value);
+                                                            useStore.getState().addToast('Задача перенесена', 'success');
+                                                        }
+                                                    }}
+                                                />
+                                            </div>
+                                            <button
+                                                onClick={() => deleteCalendarTask(selectedDate, task.id)}
+                                                className="text-text-secondary hover:text-error transition-all duration-300 p-2 bg-white/5 hover:bg-error/20 rounded-xl"
+                                                title="Удалить задачу из календаря"
+                                            >
+                                                <Trash2 size={16} />
+                                            </button>
+                                        </div>
                                     ) : (
                                         <button
                                             onClick={() => {

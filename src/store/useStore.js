@@ -1,6 +1,6 @@
 import { create } from 'zustand';
 import { persist, createJSONStorage } from 'zustand/middleware';
-import { playPremiumDing } from '../utils/sound';
+import { playPremiumDing, playAddSound, playRewardSound } from '../utils/sound';
 
 // Dynamic storage key based on user ID
 let currentStorageKey = 'nova-storage-v2.1';
@@ -193,9 +193,12 @@ export const useStore = create(
         set({ tasks: newTasks });
       },
 
-      addTask: (title, value, category = null) => set((state) => ({
-        tasks: [...state.tasks, { id: Date.now().toString(), title, completed: false, value, category }]
-      })),
+      addTask: (title, value, category = null) => {
+        playAddSound();
+        set((state) => ({
+          tasks: [...state.tasks, { id: Date.now().toString(), title, completed: false, value, category }]
+        }));
+      },
 
       updateTask: (taskId, updates) => set((state) => ({
         tasks: state.tasks.map(t => t.id === taskId ? { ...t, ...updates } : t)
@@ -354,7 +357,9 @@ export const useStore = create(
         )
       })),
 
-      buyRewardById: (rewardId) => set((state) => {
+      buyRewardById: (rewardId) => {
+        playRewardSound();
+        set((state) => {
         const reward = state.rewards.find(r => r.id === rewardId);
         if (!reward || state.tokens < reward.cost) return state;
         return {
@@ -377,7 +382,8 @@ export const useStore = create(
             content: `Вы потратили ${reward.cost} очков на "${reward.title}" через Nova. Наслаждайтесь!`
           }]
         };
-      }),
+      });
+      },
 
       addCalendarTask: (dateStr, title, value, category = null) => set((state) => {
         const tasksForDate = state.calendarTasks[dateStr] || [];
@@ -411,6 +417,21 @@ export const useStore = create(
           calendarTasks: {
             ...state.calendarTasks,
             [dateStr]: tasksForDate.map(t => t.id === taskId ? { ...t, completed: !t.completed } : t)
+          }
+        };
+      }),
+      moveCalendarTask: (oldDateStr, taskId, newDateStr) => set((state) => {
+        if (oldDateStr === newDateStr) return state;
+        const oldTasks = state.calendarTasks[oldDateStr] || [];
+        const taskToMove = oldTasks.find(t => t.id === taskId);
+        if (!taskToMove) return state;
+
+        const newTasks = state.calendarTasks[newDateStr] || [];
+        return {
+          calendarTasks: {
+            ...state.calendarTasks,
+            [oldDateStr]: oldTasks.filter(t => t.id !== taskId),
+            [newDateStr]: [...newTasks, taskToMove]
           }
         };
       }),
