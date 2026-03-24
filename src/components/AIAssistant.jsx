@@ -731,9 +731,17 @@ ${calendarStr}
                     </div>
                 </div>
                 <div className="flex items-center gap-2">
-                    <div className="flex flex-col items-end sm:flex-row sm:items-center gap-1.5 px-2.5 py-1 bg-accent/10 border border-accent/20 rounded-xl sm:rounded-full text-[10px] font-medium text-accent/80 shrink-0">
-                        <span>Лимит ИИ:</span>
-                        <span>{aiTokensUsed.toLocaleString('ru-RU')} / 100 000</span>
+                    <div className="flex flex-col items-end gap-1 px-2.5 py-1 bg-accent/10 border border-accent/20 rounded-xl shrink-0">
+                        <div className="flex items-center gap-1.5 text-[10px] font-medium text-accent/80">
+                            <span>Лимит ИИ:</span>
+                            <span>{(aiTokensUsed || 0).toLocaleString('ru-RU')} / {((useStore.getState().aiKeysCount || 1) * 1_000_000).toLocaleString('ru-RU')}</span>
+                        </div>
+                        <div className="w-full bg-white/5 h-1 rounded-full overflow-hidden">
+                            <div 
+                                className={`h-full rounded-full transition-all duration-700 ${(aiTokensUsed || 0) / Math.max(1, (useStore.getState().aiKeysCount || 1) * 1_000_000) > 0.9 ? 'bg-red-500' : (aiTokensUsed || 0) / Math.max(1, (useStore.getState().aiKeysCount || 1) * 1_000_000) > 0.7 ? 'bg-yellow-500' : 'bg-accent'}`}
+                                style={{ width: `${Math.min(100, ((aiTokensUsed || 0) / Math.max(1, (useStore.getState().aiKeysCount || 1) * 1_000_000)) * 100)}%` }}
+                            ></div>
+                        </div>
                     </div>
                     {isSearching ? (
                         <div className="flex items-center bg-black/40 border border-border rounded-full px-3 py-1 flex-1 sm:flex-none w-full sm:w-48 animate-fade-in">

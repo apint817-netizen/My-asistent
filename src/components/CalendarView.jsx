@@ -1,5 +1,5 @@
 import React, { useState, useMemo } from 'react';
-import { ChevronLeft, ChevronRight, Calendar as CalendarIcon, Plus, Trash2, CheckCircle } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Calendar as CalendarIcon, Plus, Trash2, CheckCircle, X } from 'lucide-react';
 import { useStore, TASK_CATEGORIES } from '../store/useStore';
 
 const CalendarView = () => {
@@ -112,9 +112,9 @@ const CalendarView = () => {
     };
 
     return (
-        <section className="glass-panel p-4 sm:p-6 animate-fade-in relative overflow-hidden">
-            <div className={`flex flex-col lg:flex-row gap-6 items-start`}>
-                <div className="flex-1 w-full min-w-0">
+        <section className="glass-panel p-4 sm:p-6 animate-fade-in relative overflow-visible">
+            <div className="flex flex-col gap-6 items-start">
+                <div className="w-full min-w-0">
                     <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 sm:gap-0 mb-6">
                     <h2 className="text-xl font-bold flex items-center gap-2">
                         <CalendarIcon size={20} className="text-accent shrink-0" />
@@ -236,13 +236,30 @@ const CalendarView = () => {
                 </div>
             </div>
 
+            {/* Overlay Backdrop */}
             {selectedDate && (
-                <div className="w-full lg:w-[380px] shrink-0 flex flex-col bg-bg-secondary/60 backdrop-blur-xl rounded-3xl border border-white/5 shadow-2xl p-5 md:p-6 border-t-2 border-t-accent animate-fade-in relative overflow-hidden lg:sticky lg:top-0 lg:max-h-[calc(100vh-140px)]">
+                <div 
+                    className="fixed inset-0 bg-black/50 backdrop-blur-sm z-40 animate-fade-in"
+                    onClick={() => setSelectedDate(null)}
+                />
+            )}
+
+            {/* Slide-in Drawer Panel */}
+            <div className={`fixed top-0 right-0 h-full w-full sm:w-[420px] z-50 transform transition-transform duration-300 ease-out ${selectedDate ? 'translate-x-0' : 'translate-x-full'}`}>
+              {selectedDate && (
+                <div className="h-full flex flex-col bg-bg-secondary/95 backdrop-blur-xl border-l border-white/10 shadow-2xl p-5 md:p-6 relative overflow-hidden">
                     {/* Background glow in the panel */}
                     <div className="absolute top-0 right-0 w-32 h-32 bg-accent/10 rounded-full blur-3xl pointer-events-none -mt-10 -mr-10"></div>
 
                     <div className="flex justify-between items-center mb-6 relative z-10 shrink-0">
                         <h3 className="font-bold text-xl md:text-2xl text-white tracking-tight">Список <span className="text-accent">{selectedDate.split('-').reverse().join('.')}</span> <span className="text-text-secondary md:text-lg text-base font-medium ml-1">({getWeekdayName(selectedDate)})</span></h3>
+                        <button
+                            onClick={() => setSelectedDate(null)}
+                            className="p-2 rounded-xl bg-white/5 hover:bg-white/10 text-text-secondary hover:text-white transition-all"
+                            title="Закрыть"
+                        >
+                            <X size={18} />
+                        </button>
                     </div>
 
                     <div className="flex-1 overflow-y-auto overflow-x-hidden pr-2 custom-scrollbar space-y-3 md:space-y-4 mb-4 min-h-[200px] relative z-10 w-full">
@@ -362,7 +379,8 @@ const CalendarView = () => {
                         </div>
                     </form>
                 </div>
-            )}
+              )}
+            </div>
             </div>
         </section>
     );

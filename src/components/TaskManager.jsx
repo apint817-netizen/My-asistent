@@ -204,8 +204,6 @@ export default function TaskManager() {
         setActiveId(null);
     };
 
-    const activeTask = activeId ? filteredTasks.find(t => t.id === activeId) : null;
-
     let filteredTasks = activeFilter === 'all'
         ? tasks
         : tasks.filter(t => activeFilter === 'uncategorized' ? !t.category : t.category === activeFilter);
@@ -219,6 +217,8 @@ export default function TaskManager() {
             return cA.localeCompare(cB);
         });
     }
+
+    const activeTask = activeId ? filteredTasks.find(t => t.id === activeId) : null;
 
     // Только используемые категории для фильтров
     const usedCategories = [...new Set(tasks.map(t => t.category).filter(Boolean))];

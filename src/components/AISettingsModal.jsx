@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { useStore } from '../store/useStore';
 import { getProfileById } from '../lib/profileCache';
-import { Settings, Bot, X, Link as LinkIcon, Zap, HelpCircle, ChevronDown, Sparkles, Heart, Code, Trash2, User, LogOut, Upload, Loader, Save, Edit2, Crop, Mic, Shield, Database, Cpu, Play, CircleDot, Brain, StopCircle, RefreshCw, Key } from 'lucide-react';
+import { Settings, Bot, X, Link as LinkIcon, Zap, HelpCircle, ChevronDown, Sparkles, Heart, Code, Trash2, User, LogOut, Upload, Loader, Save, Edit2, Crop, Mic, Shield, Database, Cpu, Play, CircleDot, Brain, StopCircle, RefreshCw, Key, Check } from 'lucide-react';
 import { PROXY_MODELS } from '../utils/geminiApi';
 import { isSupabaseConfigured, supabase } from '../lib/supabase';
 import Cropper from 'react-easy-crop';
@@ -57,6 +57,60 @@ async function getCroppedImg(imageSrc, pixelCrop) {
             reader.readAsDataURL(blob);
         }, 'image/png')
     })
+}
+
+// Custom Persona Dropdown Component
+function PersonaSelector({ label, value, onChange, options }) {
+    const [isOpen, setIsOpen] = useState(false);
+    const ref = useRef(null);
+    const selected = options.find(o => o.value === value) || options[0];
+
+    useEffect(() => {
+        const handleClick = (e) => {
+            if (ref.current && !ref.current.contains(e.target)) setIsOpen(false);
+        };
+        document.addEventListener('mousedown', handleClick);
+        return () => document.removeEventListener('mousedown', handleClick);
+    }, []);
+
+    return (
+        <div className="space-y-1 relative" ref={ref}>
+            <label className="text-sm text-text-secondary font-medium block">{label}</label>
+            <button
+                type="button"
+                onClick={() => setIsOpen(!isOpen)}
+                className={`w-full bg-black/40 border rounded-lg px-3 py-2.5 text-sm text-left flex items-center justify-between gap-2 transition-all cursor-pointer hover:border-accent/50 ${isOpen ? 'border-accent ring-1 ring-accent/30' : 'border-border'}`}
+            >
+                <div className="flex items-center gap-2.5">
+                    <span className="text-lg">{selected.icon}</span>
+                    <div>
+                        <span className="text-white font-medium">{selected.label}</span>
+                        <span className="text-text-secondary text-xs ml-1.5">— {selected.desc}</span>
+                    </div>
+                </div>
+                <ChevronDown size={14} className={`text-text-secondary transition-transform duration-200 ${isOpen ? 'rotate-180' : ''}`} />
+            </button>
+            {isOpen && (
+                <div className="absolute left-0 right-0 top-full mt-1 bg-[#1a1a28] border border-accent/20 rounded-xl shadow-2xl shadow-black/50 z-50 overflow-hidden animate-fade-in">
+                    {options.map((opt) => (
+                        <button
+                            key={opt.value}
+                            type="button"
+                            onClick={() => { onChange(opt.value); setIsOpen(false); }}
+                            className={`w-full px-3 py-3 flex items-center gap-3 text-left text-sm transition-all ${opt.value === value ? 'bg-accent/15 border-l-2 border-accent' : 'hover:bg-white/5 border-l-2 border-transparent'}`}
+                        >
+                            <span className="text-xl w-8 text-center shrink-0">{opt.icon}</span>
+                            <div className="flex-1 min-w-0">
+                                <div className={`font-medium ${opt.value === value ? 'text-accent' : 'text-white'}`}>{opt.label}</div>
+                                <div className="text-xs text-text-secondary">{opt.desc}</div>
+                            </div>
+                            {opt.value === value && <Check size={16} className="text-accent shrink-0" />}
+                        </button>
+                    ))}
+                </div>
+            )}
+        </div>
+    );
 }
 
 export default function AISettingsModal({ isOpen, onClose }) {
@@ -479,45 +533,42 @@ export default function AISettingsModal({ isOpen, onClose }) {
                                 
                                 <div className="pt-4 mt-2 border-t border-white/5 space-y-4">
                                     <h4 className="font-bold text-white text-sm">Характер и стиль общения ИИ</h4>
-                                    <div className="space-y-1">
-                                        <label className="text-sm text-text-secondary font-medium block">Пол (Личность)</label>
-                                        <select
-                                            className="w-full bg-black/40 border border-border rounded-md px-3 py-2.5 text-sm outline-none focus:border-accent focus:ring-1 focus:ring-accent transition-all cursor-pointer appearance-none text-white"
-                                            value={tempPersona.gender}
-                                            onChange={(e) => setTempPersona({ ...tempPersona, gender: e.target.value })}
-                                            style={{ backgroundImage: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%23888' stroke-width='2'%3E%3Cpolyline points='6 9 12 15 18 9'%3E%3C/polyline%3E%3C/svg%3E")`, backgroundRepeat: 'no-repeat', backgroundPosition: 'right 10px center' }}
-                                        >
-                                            <option value="female">Nova (Женский голос)</option>
-                                            <option value="male">Orion (Мужской голос)</option>
-                                            <option value="robot">Нейтральный Искин</option>
-                                        </select>
-                                    </div>
+                                    
+                                    {/* Gender Selector */}
+                                    <PersonaSelector
+                                        label="Пол (Личность)"
+                                        value={tempPersona.gender}
+                                        onChange={(val) => setTempPersona({ ...tempPersona, gender: val })}
+                                        options={[
+                                            { value: 'female', label: 'Nova', desc: 'Женский голос', icon: '👩‍💼' },
+                                            { value: 'male', label: 'Orion', desc: 'Мужской голос', icon: '👨‍💼' },
+                                            { value: 'robot', label: 'Нейтральный', desc: 'Искин без пола', icon: '🤖' },
+                                        ]}
+                                    />
                                     <div className="flex gap-3">
-                                        <div className="space-y-1 w-1/2">
-                                            <label className="text-sm text-text-secondary font-medium block">Тон</label>
-                                            <select
-                                                className="w-full bg-black/40 border border-border rounded-md px-3 py-2.5 text-sm outline-none focus:border-accent focus:ring-1 focus:ring-accent transition-all cursor-pointer appearance-none text-white"
+                                        <div className="w-1/2">
+                                            <PersonaSelector
+                                                label="Тон"
                                                 value={tempPersona.tone}
-                                                onChange={(e) => setTempPersona({ ...tempPersona, tone: e.target.value })}
-                                                style={{ backgroundImage: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%23888' stroke-width='2'%3E%3Cpolyline points='6 9 12 15 18 9'%3E%3C/polyline%3E%3C/svg%3E")`, backgroundRepeat: 'no-repeat', backgroundPosition: 'right 10px center' }}
-                                            >
-                                                <option value="friendly">Дружелюбный 😇</option>
-                                                <option value="strict">Строгий 😈</option>
-                                                <option value="philosophical">Мудрый 🧘‍♂️</option>
-                                            </select>
+                                                onChange={(val) => setTempPersona({ ...tempPersona, tone: val })}
+                                                options={[
+                                                    { value: 'friendly', label: 'Дружелюбный', desc: 'Тёплый и мягкий', icon: '😇' },
+                                                    { value: 'strict', label: 'Строгий', desc: 'Дисциплина и фокус', icon: '😈' },
+                                                    { value: 'philosophical', label: 'Мудрый', desc: 'Глубина и покой', icon: '🧘' },
+                                                ]}
+                                            />
                                         </div>
-                                        <div className="space-y-1 w-1/2">
-                                            <label className="text-sm text-text-secondary font-medium block">Роль</label>
-                                            <select
-                                                className="w-full bg-black/40 border border-border rounded-md px-3 py-2.5 text-sm outline-none focus:border-accent focus:ring-1 focus:ring-accent transition-all cursor-pointer appearance-none text-white"
+                                        <div className="w-1/2">
+                                            <PersonaSelector
+                                                label="Роль"
                                                 value={tempPersona.role}
-                                                onChange={(e) => setTempPersona({ ...tempPersona, role: e.target.value })}
-                                                style={{ backgroundImage: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%23888' stroke-width='2'%3E%3Cpolyline points='6 9 12 15 18 9'%3E%3C/polyline%3E%3C/svg%3E")`, backgroundRepeat: 'no-repeat', backgroundPosition: 'right 10px center' }}
-                                            >
-                                                <option value="mentor">Наставник 🎓</option>
-                                                <option value="friend">Лучший друг 🤝</option>
-                                                <option value="strategist">Стратег ♟️</option>
-                                            </select>
+                                                onChange={(val) => setTempPersona({ ...tempPersona, role: val })}
+                                                options={[
+                                                    { value: 'mentor', label: 'Наставник', desc: 'Учит и направляет', icon: '🎓' },
+                                                    { value: 'friend', label: 'Лучший друг', desc: 'Поддержка и юмор', icon: '🤝' },
+                                                    { value: 'strategist', label: 'Стратег', desc: 'Планы и анализ', icon: '♟️' },
+                                                ]}
+                                            />
                                         </div>
                                     </div>
                                 </div>

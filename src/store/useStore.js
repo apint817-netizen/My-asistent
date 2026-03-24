@@ -1,5 +1,6 @@
 import { create } from 'zustand';
 import { persist, createJSONStorage } from 'zustand/middleware';
+import { playPremiumDing } from '../utils/sound';
 
 // Dynamic storage key based on user ID
 let currentStorageKey = 'nova-storage-v2.1';
@@ -162,9 +163,21 @@ export const useStore = create(
         if (willComplete) {
           // Задача выполнена -> начисляем очки
           state.addTokens(task.value, `Выполнение задачи: ${task.title}`);
+          
+          // Звуковой эффект
+          try { playPremiumDing(); } catch (e) { /* ignore audio errors */ }
+          
+          // Для важных задач (>= 30 очков) — пуш системного события для похвалы от ИИ
+          if (task.value >= 30) {
+            set((s) => ({
+              chatMessages: [...s.chatMessages, {
+                role: 'system',
+                content: `[SYSTEM_TASK_COMPLETED] Пользователь выполнил задачу "${task.title}" и заработал ${task.value} очков! Текущий баланс: ${s.tokens + task.value}. Серия дней: ${s.streak}.`
+              }]
+            }));
+          }
         } else {
           // Отмена выполнения -> списываем очки
-          // Создаем кастомную запись в истории, чтобы было понятно, что это отмена
           set((s) => ({
             tokens: Math.max(0, s.tokens - task.value),
             pointsHistory: [{
