@@ -11,6 +11,7 @@ import {
 } from '@dnd-kit/core';
 import { SortableContext, verticalListSortingStrategy, useSortable } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
+import { restrictToParentElement } from '@dnd-kit/modifiers';
 import { TaskItem } from './TaskItem';
 import EditTaskModal from './EditTaskModal';
 
@@ -298,7 +299,7 @@ export default function TaskManager() {
                 <DndContext
                     sensors={sensors}
                     collisionDetection={closestCenter}
-                    modifiers={[restrictToVerticalAxis]}
+                    modifiers={[restrictToVerticalAxis, restrictToParentElement]}
                     onDragStart={handleDragStart}
                     onDragEnd={handleDragEnd}
                     onDragCancel={handleDragCancel}

@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { useStore } from '../store/useStore';
 import { Gift, Plus, ShoppingBag, RotateCcw, Check, Trash2, Edit2 } from 'lucide-react';
+import { playRewardSound } from '../utils/sound';
 
 export default function RewardStore() {
     const rewards = useStore(state => state.rewards);
@@ -104,6 +105,7 @@ export default function RewardStore() {
 
     const handleBuy = (reward) => {
         if (tokens >= reward.cost) {
+            playRewardSound();
             spendTokens(reward.cost);
             addPurchase(reward);
             addMessage({
