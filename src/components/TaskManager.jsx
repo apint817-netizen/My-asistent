@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useStore, TASK_CATEGORIES } from '../store/useStore';
-import { Plus, Check, ArrowDownAZ, ChevronDown } from 'lucide-react';
+import { Plus, Check, ArrowDownAZ, ChevronDown, Trophy } from 'lucide-react';
 import {
     DndContext,
     closestCenter,
@@ -225,6 +225,11 @@ export default function TaskManager() {
     const pendingTasks = filteredTasks.filter(t => !t.completed);
     const completedTasks = filteredTasks.filter(t => t.completed);
 
+    // Прогресс очков
+    const totalPoints = filteredTasks.reduce((sum, t) => sum + (t.value || 0), 0);
+    const earnedPoints = completedTasks.reduce((sum, t) => sum + (t.value || 0), 0);
+    const progressPercent = totalPoints > 0 ? Math.round((earnedPoints / totalPoints) * 100) : 0;
+
     const activeTask = activeId ? pendingTasks.find(t => t.id === activeId) : null;
 
     // Только используемые категории для фильтров
@@ -304,6 +309,41 @@ export default function TaskManager() {
                 )}
                 </div>
             </div>
+
+            {/* Прогресс-бар очков */}
+            {totalPoints > 0 && (
+                <div className="mb-3 px-3 py-2.5 rounded-xl bg-white/[0.03] border border-white/[0.06]">
+                    <div className="flex items-center justify-between mb-1.5">
+                        <div className="flex items-center gap-2">
+                            <Trophy size={14} className={`${progressPercent === 100 ? 'text-yellow-400' : 'text-accent'}`} />
+                            <span className="text-xs font-medium text-text-secondary">
+                                Заработано
+                            </span>
+                        </div>
+                        <div className="flex items-center gap-1.5">
+                            <span className="text-sm font-bold text-white">{earnedPoints}</span>
+                            <span className="text-xs text-text-secondary">/ {totalPoints} очк.</span>
+                            <span className={`text-[10px] font-bold ml-1 px-1.5 py-0.5 rounded-full ${
+                                progressPercent === 100 ? 'bg-yellow-500/15 text-yellow-400 border border-yellow-500/30' :
+                                progressPercent >= 50 ? 'bg-emerald-500/15 text-emerald-400 border border-emerald-500/30' :
+                                'bg-white/5 text-text-secondary border border-white/10'
+                            }`}>
+                                {progressPercent}%
+                            </span>
+                        </div>
+                    </div>
+                    <div className="h-1.5 bg-white/[0.06] rounded-full overflow-hidden">
+                        <div
+                            className={`h-full rounded-full transition-all duration-700 ease-out ${
+                                progressPercent === 100
+                                    ? 'bg-gradient-to-r from-yellow-500 to-amber-400 shadow-[0_0_8px_rgba(234,179,8,0.4)]'
+                                    : 'bg-gradient-to-r from-accent to-emerald-400 shadow-[0_0_8px_rgba(109,40,217,0.3)]'
+                            }`}
+                            style={{ width: `${progressPercent}%` }}
+                        />
+                    </div>
+                </div>
+            )}
 
             <div id="tour-task-list" className="flex-1 overflow-y-auto flex flex-col gap-3 mb-6 pr-2 pb-2">
                 {/* Незавершённые задачи — основной список */}
