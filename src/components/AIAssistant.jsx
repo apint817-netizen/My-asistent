@@ -31,6 +31,8 @@ export default function AIAssistant() {
     const calendarTasks = useStore(state => state.calendarTasks);
     const aiPersona = useStore(state => state.aiPersona) || { gender: 'female', tone: 'friendly', role: 'mentor' };
     const lastAiProvider = useStore(state => state.lastAiProvider) || 'inactive';
+    const forcedAiProvider = useStore(state => state.forcedAiProvider) || 'auto';
+    const setForcedAiProvider = useStore(state => state.setForcedAiProvider);
 
     // Подключаем черновик из стейта
     const chatDraft = useStore(state => state.chatDraft);
@@ -733,23 +735,30 @@ ${calendarStr}
                         <h2 className="font-bold text-white text-base leading-tight">Nova</h2>
                         <div className="flex items-center gap-2">
                             <p className="text-xs text-accent">Базовый ассистент</p>
-                            <span className={`inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full text-[10px] font-semibold border ${
-                                lastAiProvider === 'google' ? 'bg-emerald-500/15 text-emerald-400 border-emerald-500/30' :
-                                lastAiProvider === 'openrouter' ? 'bg-orange-500/15 text-orange-400 border-orange-500/30' :
-                                lastAiProvider === 'offline' ? 'bg-yellow-500/15 text-yellow-400 border-yellow-500/30' :
-                                'bg-white/5 text-text-secondary border-white/10'
-                            }`}>
-                                <span className={`w-1.5 h-1.5 rounded-full ${
+                            <div className="relative inline-flex items-center">
+                                <span className={`absolute left-1.5 w-1.5 h-1.5 rounded-full pointer-events-none z-10 ${
                                     lastAiProvider === 'google' ? 'bg-emerald-400' :
                                     lastAiProvider === 'openrouter' ? 'bg-orange-400' :
                                     lastAiProvider === 'offline' ? 'bg-yellow-400' :
                                     'bg-gray-500'
                                 }`}></span>
-                                {lastAiProvider === 'google' ? 'Google' :
-                                 lastAiProvider === 'openrouter' ? 'OpenRouter' :
-                                 lastAiProvider === 'offline' ? 'Офлайн' :
-                                 'Неактивен'}
-                            </span>
+                                <select
+                                    value={forcedAiProvider}
+                                    onChange={(e) => setForcedAiProvider(e.target.value)}
+                                    className={`appearance-none pl-4 pr-4 py-0.5 rounded-full text-[10px] font-semibold border cursor-pointer outline-none bg-transparent ${
+                                        lastAiProvider === 'google' ? 'bg-emerald-500/15 text-emerald-400 border-emerald-500/30' :
+                                        lastAiProvider === 'openrouter' ? 'bg-orange-500/15 text-orange-400 border-orange-500/30' :
+                                        lastAiProvider === 'offline' ? 'bg-yellow-500/15 text-yellow-400 border-yellow-500/30' :
+                                        'bg-white/5 text-text-secondary border-white/10'
+                                    }`}
+                                    style={{ backgroundImage: 'none' }}
+                                >
+                                    <option value="auto" className="bg-gray-900 text-white">⚡ Авто</option>
+                                    <option value="google" className="bg-gray-900 text-white">🟢 Google</option>
+                                    <option value="openrouter" className="bg-gray-900 text-white">🟠 OpenRouter</option>
+                                    <option value="offline" className="bg-gray-900 text-white">🟡 Офлайн</option>
+                                </select>
+                            </div>
                         </div>
                     </div>
                 </div>

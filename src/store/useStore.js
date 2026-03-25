@@ -78,6 +78,7 @@ const getInitialState = () => ({
   calendarProposals: [],
   rewardProposals: [],
   lastAiProvider: 'inactive', // 'google' | 'openrouter' | 'offline' | 'inactive'
+  forcedAiProvider: 'auto', // 'auto' | 'google' | 'openrouter' | 'offline'
 });
 
 export const useStore = create(
@@ -118,6 +119,7 @@ export const useStore = create(
       setTourDemoTaskText: (text) => set({ tourDemoTaskText: text }),
       setTourDemoAIText: (text) => set({ tourDemoAIText: text }),
       setLastAiProvider: (provider) => set({ lastAiProvider: provider }),
+      setForcedAiProvider: (provider) => set({ forcedAiProvider: provider }),
 
       setAiKeysCount: (count) => set({ aiKeysCount: count }),
       addAiTokensUsed: (amount) => set((state) => ({ aiTokensUsed: (state.aiTokensUsed || 0) + amount })),

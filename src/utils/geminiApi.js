@@ -22,6 +22,17 @@ export async function callAI({ baseUrl, apiKey, model, systemPrompt, history, us
     model = sanitizeModel(model);
 
     const isDevelopment = import.meta.env.DEV;
+    const forcedProvider = useStore.getState().forcedAiProvider || 'auto';
+
+    // Принудительный офлайн-режим
+    if (forcedProvider === 'offline') {
+        console.log('⚡ Принудительный ОФЛАЙН режим');
+        useStore.getState().setLastAiProvider('offline');
+        if (userMessage && typeof userMessage === 'string') {
+            return fallbackToOfflineStub(userMessage);
+        }
+        return 'Офлайн-режим активен. Введите команду на русском.';
+    }
 
     // Формируем контент пользователя
     let userContent;
@@ -188,7 +199,10 @@ export async function callAI({ baseUrl, apiKey, model, systemPrompt, history, us
 
         res = await fetch(`${baseUrl}/api/chat`, {
             method: 'POST',
-            headers: serverHeaders,
+            headers: {
+                ...serverHeaders,
+                ...(forcedProvider === 'openrouter' ? { 'x-force-openrouter': 'true' } : {})
+            },
             body: JSON.stringify(body)
         });
     } else {

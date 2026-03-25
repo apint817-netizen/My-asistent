@@ -21,6 +21,9 @@ export default async function handler(req) {
             clientKey = null;
         }
 
+        // Принудительный OpenRouter режим (для тестирования)
+        const forceOpenRouter = req.headers.get('x-force-openrouter') === 'true';
+
         // Ключ пользователя должен быть ТОЛЬКО в переменных окружения (Vercel)
         // В Edge Runtime иногда process.env не существует напрямую, используется глобальный process
         const envKeyRaw = typeof process !== 'undefined' && process.env ? process.env.GOOGLE_API_KEY : null;
@@ -108,8 +111,8 @@ export default async function handler(req) {
         let result = null;
         let errors = [];
 
-        // Внешний цикл по ключам
-        for (let k = 0; k < validKeys.length; k++) {
+        // Внешний цикл по ключам (пропускаем при принудительном OpenRouter)
+        for (let k = 0; k < validKeys.length && !forceOpenRouter; k++) {
             const currentKey = validKeys[k];
             let isKeyExhausted = false;
 
