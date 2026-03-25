@@ -316,6 +316,7 @@ ${calendarStr}
 
             // --- Обработка всех тегов ---
             const completeRegex = /\[COMPLETE_TASK:\s*"?([^"\]]+?)"?\s*\]/g;
+            const uncompleteRegex = /\[UNCOMPLETE_TASK:\s*"?([^"\]]+?)"?\s*\]/g;
             const editRegex = /\[EDIT_TASK_POINTS:\s*"?([^"\|]+?)"?\s*\|\s*(\d+)\]/g;
             const addTaskRegex = /\[ADD_TASK:\s*"?([^"\|]+?)"?\s*\|\s*(\d+)(?:\s*\|\s*"?([^"\]]+?)"?)?\s*\]/g;
             const addCalendarTaskRegex = /\[ADD_CALENDAR_TASK:\s*"?([^"\|]+?)"?\s*\|\s*(\d+)\s*\|\s*"?([^"\|\]]+?)"?(?:\s*\|\s*"?([^"\]]+?)"?)?\s*\]/g;
@@ -355,22 +356,52 @@ ${calendarStr}
             // Утилита: найти награду по ID, номеру или названию
             const findReward = (ref) => {
                 const currentRewards = useStore.getState().rewards;
+                // По ID
                 let found = currentRewards.find(r => r.id === ref);
                 if (found) return found;
+                // По номеру
                 const numMatch = ref.match(/^#?(\d+)$/);
                 if (numMatch) {
                     const idx = parseInt(numMatch[1], 10) - 1;
                     if (idx >= 0 && idx < currentRewards.length) return currentRewards[idx];
                 }
                 const lower = ref.toLowerCase();
+                // Точное совпадение
+                found = currentRewards.find(r => r.title.toLowerCase() === lower);
+                if (found) return found;
+                // Частичное вхождение
                 found = currentRewards.find(r => r.title.toLowerCase().includes(lower));
-                return found || null;
+                if (found) return found;
+                // Обратное вхождение
+                found = currentRewards.find(r => lower.includes(r.title.toLowerCase()));
+                if (found) return found;
+                // Token-based — по отдельным словам
+                const words = lower.split(/\s+/).filter(w => w.length > 1);
+                if (words.length > 0) {
+                    let bestMatch = null;
+                    let bestScore = 0;
+                    for (const r of currentRewards) {
+                        const titleLower = r.title.toLowerCase();
+                        const score = words.filter(w => titleLower.includes(w)).length;
+                        if (score > bestScore) { bestScore = score; bestMatch = r; }
+                    }
+                    if (bestMatch && bestScore >= 1) return bestMatch;
+                }
+                return null;
             };
 
             // COMPLETE_TASK
             while ((match = completeRegex.exec(responseText)) !== null) {
                 const task = findTask(match[1].trim());
                 if (task && !task.completed) {
+                    useStore.getState().toggleTask(task.id);
+                }
+            }
+
+            // UNCOMPLETE_TASK (вернуть задачу в незавершённые)
+            while ((match = uncompleteRegex.exec(responseText)) !== null) {
+                const task = findTask(match[1].trim());
+                if (task && task.completed) {
                     useStore.getState().toggleTask(task.id);
                 }
             }
@@ -461,7 +492,7 @@ ${calendarStr}
             }
 
             cleanResponse = cleanResponse
-                .replace(completeRegex, '').replace(editRegex, '')
+                .replace(completeRegex, '').replace(uncompleteRegex, '').replace(editRegex, '')
                 .replace(addTaskRegex, '').replace(addCalendarTaskRegex, '')
                 .replace(addRegularTaskRegex, '')
                 .replace(deleteTaskRegex, '')

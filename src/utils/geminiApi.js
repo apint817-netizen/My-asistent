@@ -272,19 +272,21 @@ export const PROXY_MODELS = [
 
 export function fallbackToOfflineStub(userMessage) {
     const msg = userMessage.toLowerCase().trim();
-    const { tasks } = useStore.getState();
+    const { tasks, rewards } = useStore.getState();
     const pendingTasks = tasks.filter(t => !t.completed);
-    
-    // --- Утилита: извлечь «смысловую часть» из команды ---
-    // Вместо удаления ключевых слов по одному, ищем конец командной фразы
-    const extractAfter = (text, patterns) => {
-        for (const p of patterns) {
-            const re = new RegExp(p, 'i');
-            const m = text.match(re);
-            if (m) {
-                // Берём всё что после найденного паттерна
-                let result = text.slice(m.index + m[0].length).trim();
-                // Убираем начальные предлоги и пунктуацию
+    const completedTasks = tasks.filter(t => t.completed);
+
+    // ═══════════════════════════════════════════════
+    // УТИЛИТЫ
+    // ═══════════════════════════════════════════════
+
+    // String-based извлечение: ищем первую из фраз в тексте, берём всё что после
+    const extractAfterPhrase = (text, phrases) => {
+        const lower = text.toLowerCase();
+        for (const phrase of phrases) {
+            const idx = lower.indexOf(phrase.toLowerCase());
+            if (idx !== -1) {
+                let result = text.slice(idx + phrase.length).trim();
                 result = result.replace(/^[\s,.:;\-—«"]+/, '').replace(/[\s,.:;\-—»"]+$/, '');
                 if (result) return result;
             }
@@ -292,31 +294,50 @@ export function fallbackToOfflineStub(userMessage) {
         return '';
     };
 
-    // --- Утилита: слово → номер задачи ---
+    // Очистка названия от служебных слов
+    const cleanTitle = (title) => {
+        if (!title) return '';
+        let t = title;
+        // Убираем «задачу», «задача», «привычку», «цель» в начале
+        t = t.replace(/^(задачу|задача|задач|привычку|привычка|цель)\s+/i, '');
+        // Убираем «на каждый день», «каждый день», «ежедневно» (переносим в контекст, не в название)
+        t = t.replace(/\s*(?:на\s+)?(?:каждый\s+день|ежедневно)\s*/gi, ' ');
+        // Убираем «пожалуйста», «мне», «себе» в начале
+        t = t.replace(/^(?:пожалуйста|мне|себе)\s+/i, '');
+        return t.trim();
+    };
+
+    // Порядковое числительное → номер
     const wordToNum = (text) => {
-        const map = { 'первую': 1, 'первая': 1, 'первый': 1, 'первой': 1, '1': 1,
-            'вторую': 2, 'вторая': 2, 'второй': 2, '2': 2,
-            'третью': 3, 'третья': 3, 'третий': 3, 'третьей': 3, '3': 3,
-            'четвёртую': 4, 'четвертую': 4, 'четвёртый': 4, '4': 4,
-            'пятую': 5, 'пятая': 5, 'пятый': 5, '5': 5,
-            'последнюю': -1, 'последняя': -1, 'последний': -1 };
-        const lower = text.toLowerCase().trim();
+        const map = {
+            'первую': 1, 'первая': 1, 'первый': 1, 'первой': 1,
+            'вторую': 2, 'вторая': 2, 'второй': 2, 'второе': 2,
+            'третью': 3, 'третья': 3, 'третий': 3, 'третьей': 3,
+            'четвёртую': 4, 'четвертую': 4, 'четвёртый': 4, 'четвертый': 4,
+            'пятую': 5, 'пятая': 5, 'пятый': 5, 'пятое': 5,
+            'шестую': 6, 'шестая': 6, 'шестой': 6,
+            'последнюю': -1, 'последняя': -1, 'последний': -1, 'последнее': -1
+        };
+        const lower = text.toLowerCase();
         for (const [word, num] of Object.entries(map)) {
-            if (lower.includes(word)) return num;
+            // Ищем как отдельное слово
+            const re = new RegExp('(?:^|\\s)' + word + '(?:\\s|$|[,!?.])', 'i');
+            if (re.test(lower)) return num;
         }
         const hashMatch = lower.match(/#(\d+)/);
         if (hashMatch) return parseInt(hashMatch[1], 10);
         return 0;
     };
 
-    // --- Определение даты ---
+    // Дата — ТОЛЬКО отдельные слова (не внутри «позавтракать»!)
     const parseFutureDate = (text) => {
         const today = new Date();
-        if (/завтра/i.test(text)) {
+        // «на завтра» или «завтра» как отдельное слово
+        if (/(?:^|\s)(?:на\s+)?завтра(?:\s|$|[,!?.])/i.test(text)) {
             const d = new Date(today); d.setDate(d.getDate() + 1);
             return d.toISOString().split('T')[0];
         }
-        if (/послезавтра/i.test(text)) {
+        if (/(?:^|\s)(?:на\s+)?послезавтра(?:\s|$|[,!?.])/i.test(text)) {
             const d = new Date(today); d.setDate(d.getDate() + 2);
             return d.toISOString().split('T')[0];
         }
@@ -332,129 +353,294 @@ export function fallbackToOfflineStub(userMessage) {
         return null;
     };
 
-    // ==================== ДОБАВЛЕНИЕ ====================
+    // Удаление даты из названия
+    const removeDateFromTitle = (title) => {
+        if (!title) return '';
+        let t = title;
+        t = t.replace(/\s*(?:на\s+)?(?:завтра|послезавтра)(?:\s|$|[,!?.])/gi, ' ');
+        t = t.replace(/\s*(?:на\s+)?\d{1,2}[./]\d{1,2}(?:[./]\d{2,4})?\s*/g, ' ');
+        t = t.replace(/\s*\d{4}-\d{2}-\d{2}\s*/g, ' ');
+        return t.trim();
+    };
+
+    // Fuzzy-поиск задачи по тексту
+    const findTaskByText = (text, taskList) => {
+        if (!text) return null;
+        const lower = text.toLowerCase().trim();
+        // Убираем слова-маркеры
+        const cleaned = lower
+            .replace(/\b(задачу?|выполненной|выполнено|готова|сделана|сделано|обратно)\b/g, '')
+            .trim();
+        if (!cleaned) return null;
+        // Точное совпадение
+        let found = taskList.find(t => t.title.toLowerCase() === cleaned);
+        if (found) return found;
+        // Частичное вхождение
+        found = taskList.find(t => t.title.toLowerCase().includes(cleaned));
+        if (found) return found;
+        // Обратное вхождение — cleaned содержит title
+        found = taskList.find(t => cleaned.includes(t.title.toLowerCase()));
+        if (found) return found;
+        // По отдельным словам (хотя бы 2 совпадения)
+        const words = cleaned.split(/\s+/).filter(w => w.length > 2);
+        if (words.length > 0) {
+            let bestMatch = null;
+            let bestScore = 0;
+            for (const task of taskList) {
+                const titleLower = task.title.toLowerCase();
+                const score = words.filter(w => titleLower.includes(w)).length;
+                if (score > bestScore) {
+                    bestScore = score;
+                    bestMatch = task;
+                }
+            }
+            if (bestMatch && bestScore >= Math.min(1, words.length)) return bestMatch;
+        }
+        return null;
+    };
+
+    // Fuzzy-поиск награды
+    const findRewardByText = (text) => {
+        if (!text) return null;
+        const lower = text.toLowerCase().trim();
+        let found = rewards.find(r => r.title.toLowerCase() === lower);
+        if (found) return found;
+        found = rewards.find(r => r.title.toLowerCase().includes(lower));
+        if (found) return found;
+        found = rewards.find(r => lower.includes(r.title.toLowerCase()));
+        if (found) return found;
+        // По словам
+        const words = lower.split(/\s+/).filter(w => w.length > 2);
+        if (words.length > 0) {
+            let bestMatch = null;
+            let bestScore = 0;
+            for (const r of rewards) {
+                const titleLower = r.title.toLowerCase();
+                const score = words.filter(w => titleLower.includes(w)).length;
+                if (score > bestScore) { bestScore = score; bestMatch = r; }
+            }
+            if (bestMatch && bestScore >= 1) return bestMatch;
+        }
+        return null;
+    };
+
+    // ═══════════════════════════════════════════════
+    // РАЗГОВОРНЫЕ ОТВЕТЫ (Nova-стиль)
+    // ═══════════════════════════════════════════════
+    if (/^(привет|здравствуй|хай|хей|hello|hi|йо)\b/i.test(msg)) {
+        return `Привет! 💜 Я Nova, твой ассистент. Сейчас я работаю в офлайн-режиме, но всё ещё могу помочь с задачами и наградами!\n\n📋 У тебя ${pendingTasks.length} незавершённых задач.\nПопробуй: «Добавь задачу ...» или «Покажи задачи»`;
+    }
+    if (/^(спасибо|благодар|thanks)/i.test(msg)) {
+        return 'Всегда пожалуйста! 😊 Обращайся, если что-то ещё нужно.';
+    }
+    if (/как\s+(ты|дела|жизнь|сама)/i.test(msg) || /^(как\s+дела)/i.test(msg)) {
+        return `У меня всё отлично! ⚡ Работаю в офлайн-режиме, но полностью функциональна.\n\n📋 У тебя ${pendingTasks.length} задач в работе${completedTasks.length > 0 ? ` и ${completedTasks.length} уже выполненных` : ''}. Чем могу помочь?`;
+    }
+    if (/^(что ты (умеешь|можешь|делаешь)|помощь|help|команды)/i.test(msg)) {
+        return `💜 Вот что я умею в офлайн-режиме:\n\n📝 Задачи:\n• «Добавь задачу ...» — создать новую\n• «Добавь на завтра ...» — на будущую дату\n• «Отметь задачу Х» — выполнить по названию\n• «Отметь первую задачу» — по номеру\n• «Верни задачу Х» — отменить выполнение\n• «Удали задачу ...» — удалить\n• «Покажи задачи» — список\n\n🎁 Награды:\n• «Удали награду ...» — удалить\n• «Купи награду ...» — потратить очки`;
+    }
+
+    // ═══════════════════════════════════════════════
+    // ДОБАВЛЕНИЕ ЗАДАЧИ / НАГРАДЫ
+    // ═══════════════════════════════════════════════
     if (msg.includes('добавь') || msg.includes('создай') || msg.includes('напомни') || msg.includes('запиши')) {
-        // Награда
+        // --- Награда ---
         if (msg.includes('наград') || msg.includes('приз')) {
-            const title = extractAfter(userMessage, [
-                'добавь\\s+награду\\s+', 'создай\\s+награду\\s+',
-                'добавь\\s+приз\\s+', 'создай\\s+приз\\s+'
+            let title = extractAfterPhrase(userMessage, [
+                'добавь награду ', 'создай награду ',
+                'добавь приз ', 'создай приз '
             ]) || 'Новая награда';
             const costMatch = msg.match(/(\d+)\s*(очк|балл|стоимост|ок\b)/);
             const cost = costMatch ? parseInt(costMatch[1], 10) : 100;
-            return `Предложила награду! Подтверди в появившемся окне 👆\n[ADD_REWARD: "${title}" | ${cost}]`;
+            return `Конечно! Предлагаю добавить награду 🎁\n[ADD_REWARD: "${title}" | ${cost}]`;
         }
 
-        // Задача — извлекаем дату и название
+        // --- Задача ---
         const futureDate = parseFutureDate(msg);
-        
-        // Паттерны для извлечения названия задачи
-        let title = extractAfter(userMessage, [
-            'добавь\\s+задачу\\s+',
-            'создай\\s+задачу\\s+',
-            'запиши\\s+(?:на\\s+(?:завтра|послезавтра|\\d+[./]\\d+[./]?\\d*)\\s+)?',
-            'напомни\\s+(?:мне\\s+)?',
-            'добавь\\s+', 'создай\\s+'
+
+        let title = extractAfterPhrase(userMessage, [
+            'добавь задачу ', 'создай задачу ',
+            'добавь на завтра ', 'добавь на послезавтра ',
+            'запиши на завтра ', 'запиши на послезавтра ',
+            'запиши задачу ', 'напомни мне ', 'напомни ',
+            'добавь ', 'создай ', 'запиши '
         ]);
-        
-        // Убираем дату из названия если она в конце или начале
-        if (title) {
-            title = title.replace(/\s*(?:на\s+)?(?:завтра|послезавтра)\s*/gi, '').trim();
-            title = title.replace(/\s*(?:на\s+)?\d{1,2}[./]\d{1,2}(?:[./]\d{2,4})?\s*/g, '').trim();
-            title = title.replace(/\s*\d{4}-\d{2}-\d{2}\s*/g, '').trim();
+
+        // Очищаем
+        title = cleanTitle(title);
+        if (futureDate) {
+            title = removeDateFromTitle(title);
+            title = cleanTitle(title); // Повторно после удаления даты
         }
         if (!title) title = 'Новая задача';
 
         if (futureDate) {
-            return `Добавляю на ${futureDate}! Подтверди в появившемся окне 👆\n[ADD_CALENDAR_TASK: "${title}" | 15 | "${futureDate}"]`;
+            return `Записываю на ${futureDate}! 📅\n[ADD_CALENDAR_TASK: "${title}" | 15 | "${futureDate}"]`;
         }
-
-        return `Предложила задачу! Подтверди в появившемся окне 👆\n[ADD_TASK: "${title}" | 15]`;
+        return `Отличная задача! ✨\n[ADD_TASK: "${title}" | 15]`;
     }
 
-    // ==================== ВЫПОЛНЕНИЕ ====================
-    if (msg.includes('выполн') || msg.includes('сделал') || msg.includes('готово') || msg.includes('отмет')) {
-        // Пробуем найти номер задачи по словам
+    // ═══════════════════════════════════════════════
+    // ВЫПОЛНЕНИЕ ЗАДАЧИ
+    // ═══════════════════════════════════════════════
+    if (msg.includes('выполн') || msg.includes('сделал') || msg.includes('готово') || msg.includes('отмет') || msg.includes('закончил')) {
+        if (pendingTasks.length === 0) {
+            return 'У тебя нет незавершённых задач! 🎉 Все выполнены — отличная работа!';
+        }
+
+        // По номеру (первую, вторую...)
         const num = wordToNum(msg);
-        if (num === -1 && pendingTasks.length > 0) {
-            // Последняя
+        if (num === -1) {
             const task = pendingTasks[pendingTasks.length - 1];
-            return `Отмечаю выполненной! ✅\n[COMPLETE_TASK: "${task.id}"]`;
+            return `Отмечаю «${task.title}» выполненной! 🎉\n[COMPLETE_TASK: "${task.id}"]`;
         }
         if (num > 0 && num <= pendingTasks.length) {
             const task = pendingTasks[num - 1];
-            return `Отмечаю «${task.title}» выполненной! ✅\n[COMPLETE_TASK: "${task.id}"]`;
+            return `Отмечаю «${task.title}» выполненной! 🎉\n[COMPLETE_TASK: "${task.id}"]`;
         }
-        // Пробуем найти по названию
-        const ref = extractAfter(userMessage, [
-            'выполнил\\s+задачу\\s+', 'выполнила\\s+задачу\\s+',
-            'отметь\\s+(?:задачу\\s+)?', 'сделал\\s+', 'готово\\s+'
+
+        // По названию — fuzzy-поиск
+        const ref = extractAfterPhrase(userMessage, [
+            'выполнил задачу ', 'выполнила задачу ', 'выполнена задача ',
+            'отметь задачу ', 'отметь выполненной задачу ',
+            'отметь ', 'сделал задачу ', 'сделала задачу ',
+            'готово задачу ', 'закончил задачу ', 'закончила задачу '
+        ]);
+        const task = findTaskByText(ref || msg, pendingTasks);
+        if (task) {
+            return `Отмечаю «${task.title}» выполненной! 🎉\n[COMPLETE_TASK: "${task.id}"]`;
+        }
+
+        // Если не нашли — предложить список
+        if (pendingTasks.length <= 5) {
+            const list = pendingTasks.map((t, i) => `${i + 1}. ${t.title}`).join('\n');
+            return `Не совсем поняла, какую задачу отметить 🤔\n\nВот твои задачи:\n${list}\n\nСкажи, например: «Отметь первую задачу» или назови точное название.`;
+        }
+        return `Не смогла найти эту задачу 🤔 Попробуй сказать точнее или используй «Отметь первую задачу».`;
+    }
+
+    // ═══════════════════════════════════════════════
+    // ВЕРНУТЬ / ОТМЕНИТЬ ВЫПОЛНЕНИЕ
+    // ═══════════════════════════════════════════════
+    if (msg.includes('верни') || msg.includes('отмени') || (msg.includes('обратно') && msg.includes('задач'))) {
+        if (completedTasks.length === 0) {
+            return 'Нет выполненных задач, которые можно вернуть.';
+        }
+
+        const ref = extractAfterPhrase(userMessage, [
+            'верни задачу ', 'верни обратно задачу ', 'верни обратно ',
+            'отмени выполнение задачи ', 'отмени выполнение ',
+            'отмени задачу ', 'верни '
+        ]);
+        const task = findTaskByText(ref || msg, completedTasks);
+        if (task) {
+            return `Возвращаю «${task.title}» в незавершённые! ↩️\n[UNCOMPLETE_TASK: "${task.id}"]`;
+        }
+
+        // Последняя выполненная
+        const lastCompleted = completedTasks[completedTasks.length - 1];
+        return `Возвращаю последнюю завершённую «${lastCompleted.title}» обратно! ↩️\n[UNCOMPLETE_TASK: "${lastCompleted.id}"]`;
+    }
+
+    // ═══════════════════════════════════════════════
+    // УДАЛЕНИЕ
+    // ═══════════════════════════════════════════════
+    if (msg.includes('удали')) {
+        // Награда
+        if (msg.includes('наград') || msg.includes('приз')) {
+            const ref = extractAfterPhrase(userMessage, [
+                'удали награду ', 'удали приз '
+            ]);
+            if (!ref) return 'Укажи название награды для удаления.';
+            const reward = findRewardByText(ref);
+            if (reward) {
+                return `Удаляю награду «${reward.title}»! 🗑️\n[DELETE_REWARD: "${reward.title}"]`;
+            }
+            return `Не нашла награду «${ref}» 🤔 Проверь название.`;
+        }
+
+        // Задача — по номеру
+        const num = wordToNum(msg);
+        if (num > 0 && num <= pendingTasks.length) {
+            const task = pendingTasks[num - 1];
+            return `Удаляю «${task.title}»! 🗑️\n[DELETE_TASK: "${task.id}"]`;
+        }
+        if (num === -1 && pendingTasks.length > 0) {
+            const task = pendingTasks[pendingTasks.length - 1];
+            return `Удаляю «${task.title}»! 🗑️\n[DELETE_TASK: "${task.id}"]`;
+        }
+
+        // Задача — по названию
+        const ref = extractAfterPhrase(userMessage, [
+            'удали задачу ', 'удали '
         ]);
         if (ref) {
-            // Ищем задачу по частичному совпадению
-            const found = pendingTasks.find(t => t.title.toLowerCase().includes(ref.toLowerCase()));
-            if (found) {
-                return `Отмечаю «${found.title}» выполненной! ✅\n[COMPLETE_TASK: "${found.id}"]`;
+            const task = findTaskByText(ref, [...pendingTasks, ...completedTasks]);
+            if (task) {
+                return `Удаляю «${task.title}»! 🗑️\n[DELETE_TASK: "${task.id}"]`;
             }
-            return `Задачу «${ref}» не удалось найти среди незавершённых. Проверьте название или используйте «Отметь первую задачу».`;
         }
-        if (pendingTasks.length > 0) {
-            // По умолчанию — первая незавершённая
-            const task = pendingTasks[0];
-            return `Отмечаю «${task.title}» выполненной! ✅\n[COMPLETE_TASK: "${task.id}"]`;
-        }
-        return 'Нет незавершённых задач для отметки!';
+        return 'Укажи название или номер задачи для удаления.';
     }
 
-    // ==================== УДАЛЕНИЕ ====================
-    if (msg.includes('удали')) {
-        if (msg.includes('наград') || msg.includes('приз')) {
-            const ref = extractAfter(userMessage, ['удали\\s+награду\\s+', 'удали\\s+приз\\s+']);
-            if (!ref) return 'Укажите название награды для удаления.';
-            return `Удаляю награду!\n[DELETE_REWARD: "${ref}"]`;
-        }
-        const num = wordToNum(msg);
-        if (num > 0 && num <= pendingTasks.length) {
-            const task = pendingTasks[num - 1];
-            return `Удаляю «${task.title}»!\n[DELETE_TASK: "${task.id}"]`;
-        }
-        const ref = extractAfter(userMessage, ['удали\\s+задачу\\s+', 'удали\\s+']);
-        if (!ref) return 'Укажите название или номер задачи для удаления.';
-        return `Удаляю задачу!\n[DELETE_TASK: "${ref}"]`;
-    }
-
-    // ==================== ПОКУПКА ====================
+    // ═══════════════════════════════════════════════
+    // ПОКУПКА НАГРАДЫ
+    // ═══════════════════════════════════════════════
     if (msg.includes('купи') || msg.includes('потрать') || msg.includes('хочу наград')) {
-        const ref = extractAfter(userMessage, ['купи\\s+', 'потрать\\s+на\\s+', 'хочу\\s+награду\\s+']);
-        if (!ref) return 'Укажите название награды для покупки.';
-        return `Покупаю! 🎁\n[BUY_REWARD: "${ref}"]`;
+        const ref = extractAfterPhrase(userMessage, [
+            'купи награду ', 'купи ', 'потрать на ',
+            'хочу награду '
+        ]);
+        if (!ref) return 'Укажи название награды для покупки.';
+        const reward = findRewardByText(ref);
+        if (reward) {
+            return `Покупаю «${reward.title}»! 🎁\n[BUY_REWARD: "${reward.title}"]`;
+        }
+        return `Не нашла награду «${ref}» 🤔`;
     }
 
-    // ==================== ИЗМЕНЕНИЕ ОЧКОВ ====================
+    // ═══════════════════════════════════════════════
+    // ИЗМЕНЕНИЕ ОЧКОВ
+    // ═══════════════════════════════════════════════
     if (msg.includes('измени') || msg.includes('поставь') || msg.includes('стоимость')) {
         const pointsMatch = msg.match(/(\d+)\s*(очк|балл|стоимост)/);
-        const ref = extractAfter(userMessage, ['измени\\s+(?:стоимость\\s+)?(?:задачи?\\s+)?', 'поставь\\s+']);
+        const ref = extractAfterPhrase(userMessage, [
+            'измени стоимость задачи ', 'измени стоимость ',
+            'поставь '
+        ]);
         if (pointsMatch && ref) {
             return `Меняю стоимость!\n[EDIT_TASK_POINTS: "${ref}" | ${pointsMatch[1]}]`;
         }
     }
 
-    // ==================== ИНФОРМАЦИЯ ====================
-    if (msg.includes('задач') && (msg.includes('покажи') || msg.includes('список') || msg.includes('какие') || msg.includes('что'))) {
-        if (pendingTasks.length === 0) {
-            return 'У вас нет незавершённых задач! 🎉 Добавьте новую: «Добавь задачу ...»';
+    // ═══════════════════════════════════════════════
+    // ПОКАЖИ ЗАДАЧИ
+    // ═══════════════════════════════════════════════
+    if (msg.includes('задач') && (msg.includes('покажи') || msg.includes('список') || msg.includes('какие') || msg.includes('мои'))) {
+        if (pendingTasks.length === 0 && completedTasks.length === 0) {
+            return 'У тебя пока нет задач! ✨ Добавь первую: «Добавь задачу ...»';
         }
-        const list = pendingTasks.map((t, i) => `${i + 1}. ${t.title} (${t.value} очк.)`).join('\n');
-        return `📋 Ваши незавершённые задачи:\n${list}\n\nМожете сказать «Отметь первую задачу» для выполнения.`;
+        let response = '';
+        if (pendingTasks.length > 0) {
+            const list = pendingTasks.map((t, i) => `${i + 1}. ${t.title} (${t.value} очк.)`).join('\n');
+            response += `📋 Незавершённые задачи:\n${list}`;
+        }
+        if (completedTasks.length > 0) {
+            response += `${response ? '\n\n' : ''}✅ Выполнено задач: ${completedTasks.length}`;
+        }
+        response += '\n\nМожешь сказать «Отметь задачу [название]» для выполнения.';
+        return response;
     }
 
-    // ==================== ДЕФОЛТ ====================
-    const stubs = [
-        `⚡ Я работаю в офлайн-режиме, но могу помочь!\n\n📋 Ваши задачи: ${pendingTasks.length} незавершённых\n\nДоступные команды:\n• «Добавь задачу ...» — создать задачу\n• «Запиши на завтра ...» — на будущую дату\n• «Отметь первую задачу» — выполнить\n• «Удали задачу ...» — удалить\n• «Покажи задачи» — список`,
-        `🔌 Облачный ИИ недоступен, но я функционирую!\n\nПримеры команд:\n• «Добавь задачу почитать книгу»\n• «Отметь вторую задачу»\n• «Запиши на завтра тренировку»`,
-        `📡 Связь с облаком потеряна. Офлайн-режим активен!\n\nНезавершённых задач: ${pendingTasks.length}\nПопробуйте: «Добавь задачу ...» или «Отметь первую задачу»`
+    // ═══════════════════════════════════════════════
+    // ДЕФОЛТНЫЙ ОТВЕТ (Nova-стиль)
+    // ═══════════════════════════════════════════════
+    const novaStubs = [
+        `Хм, не совсем поняла тебя 🤔 Сейчас я в офлайн-режиме.\n\n📋 У тебя ${pendingTasks.length} задач, ${rewards.length} наград\n\nПопробуй:\n• «Добавь задачу ...»\n• «Отметь задачу [название]»\n• «Покажи задачи»\n• «Удали награду ...»\n• «Что ты умеешь?»`,
+        `Я тебя слышу, но не совсем поняла команду! 😊\n\nВ офлайн-режиме я могу работать с задачами и наградами. Скажи «Что ты умеешь?» для полного списка команд!`,
+        `Прости, не распознала запрос 💜 Я сейчас работаю без облака, но могу помочь с задачами!\n\nНапример: «Добавь задачу почитать книгу» или «Покажи мои задачи»`
     ];
-    return stubs[Math.floor(Math.random() * stubs.length)];
+    return novaStubs[Math.floor(Math.random() * novaStubs.length)];
 }
 
 export { GOOGLE_OPENAI_BASE };
