@@ -169,7 +169,7 @@ export default async function handler(req) {
                     },
                     // Передаем оригинальные messages в формате OpenAI
                     body: JSON.stringify({
-                        model: 'google/gemini-2.0-flash-lite-preview-02-05:free',
+                        model: 'google/gemini-2.0-flash-001:free',
                         messages: requestData.messages,
                         temperature,
                         max_tokens: max_tokens || 2048
