@@ -1,6 +1,6 @@
 import { useEffect, useState, useRef } from 'react';
 import { useStore, setStorageKey } from './store/useStore';
-import { Trophy, CheckCircle, MessageSquare, Plus, Activity, Calendar as CalendarIcon, ListTodo, ChevronUp, ChevronDown, HelpCircle, Settings, FileText, LogOut, Users, Shield, UserCircle } from 'lucide-react';
+import { Trophy, CheckCircle, MessageSquare, Plus, Activity, Calendar as CalendarIcon, ListTodo, ChevronUp, ChevronDown, HelpCircle, Settings, FileText, LogOut, Users, Shield, UserCircle, Volume2, VolumeX } from 'lucide-react';
 import TaskManager from './components/TaskManager';
 import RewardStore from './components/RewardStore';
 import AIAssistant from './components/AIAssistant';
@@ -36,6 +36,7 @@ import { supabase, isSupabaseConfigured } from './lib/supabase';
 import { loadUserData, debouncedSave, flushSave, clearLocalData } from './lib/supabaseSync';
 import ToastContainer from './components/ToastContainer';
 import BottomNavigation from './components/BottomNavigation';
+import { playSwipeSound, playExpandSound, playCollapseSound, playHoverSound, isSoundEnabled, toggleSound } from './utils/sound';
 
 function App() {
   const tokens = useStore(state => state.tokens);
@@ -56,6 +57,13 @@ function App() {
   const [showHelp, setShowHelp] = useState(false);
   // Mobile settings bottom sheet
   const [showMobileSettings, setShowMobileSettings] = useState(false);
+  // Sound toggle state
+  const [soundOn, setSoundOn] = useState(isSoundEnabled());
+
+  const handleToggleSoundDesktop = () => {
+    toggleSound();
+    setSoundOn(isSoundEnabled());
+  };
 
   // Auth state
   const [user, setUser] = useState(null);
@@ -401,7 +409,10 @@ function App() {
                 <section id="tour-rewards" className="glass-panel p-4 flex flex-col shrink-0">
                   <div
                     className="flex justify-between items-center cursor-pointer group select-none"
-                    onClick={() => setIsRewardStoreOpen(!isRewardStoreOpen)}
+                    onClick={() => {
+                      if (isRewardStoreOpen) playCollapseSound(); else playExpandSound();
+                      setIsRewardStoreOpen(!isRewardStoreOpen);
+                    }}
                   >
                     <h2 className="text-lg font-bold flex items-center gap-2 group-active:text-warning transition-colors">
                       <Trophy size={18} className="text-warning" />
@@ -448,6 +459,14 @@ function App() {
 
             <div className="flex items-center gap-3 relative z-10">
               <div className="flex items-center gap-3">
+                <button
+                  onClick={handleToggleSoundDesktop}
+                  onMouseEnter={playHoverSound}
+                  className={`w-10 h-10 rounded-full border flex items-center justify-center transition-all hover:scale-110 ${soundOn ? 'bg-accent/10 border-accent/30 text-accent hover:border-accent/60' : 'bg-white/5 border-border text-text-secondary hover:text-white hover:border-white/30'}`}
+                  title={soundOn ? 'Выключить звук' : 'Включить звук'}
+                >
+                  {soundOn ? <Volume2 size={18} /> : <VolumeX size={18} />}
+                </button>
                 <button
                   id="tour-settings"
                   onClick={() => setShowAISettings(true)}
@@ -499,7 +518,7 @@ function App() {
           <div id="tour-summary" className="flex bg-black/40 p-1.5 rounded-2xl border border-border w-full max-w-full shadow-inner z-50 relative overflow-x-auto custom-scrollbar snap-x snap-mandatory">
             <Tooltip text="Добавляйте задачи на сегодня и обменивайте очки на награды" position="bottom">
               <button
-                onClick={() => setActiveTab('dashboard')}
+                onClick={() => { if (activeTab !== 'dashboard') playSwipeSound(); setActiveTab('dashboard'); }}
                 className={`px-5 py-2.5 rounded-xl flex items-center gap-2 text-sm font-semibold transition-all whitespace-nowrap snap-center ${activeTab === 'dashboard' ? 'bg-accent/20 text-accent shadow-[0_0_15px_rgba(var(--color-accent),0.2)]' : 'text-text-secondary hover:text-white hover:bg-white/5'}`}
               >
                 <ListTodo size={18} />
@@ -509,7 +528,7 @@ function App() {
             <Tooltip text="Планируйте задачи на будущие дни и следите за нагрузкой" position="bottom">
               <button
                 id="tour-calendar-tab"
-                onClick={() => setActiveTab('calendar')}
+                onClick={() => { if (activeTab !== 'calendar') playSwipeSound(); setActiveTab('calendar'); }}
                 className={`px-5 py-2.5 rounded-xl flex items-center gap-2 text-sm font-semibold transition-all whitespace-nowrap snap-center ${activeTab === 'calendar' ? 'bg-accent/20 text-accent shadow-[0_0_15px_rgba(var(--color-accent),0.2)]' : 'text-text-secondary hover:text-white hover:bg-white/5'}`}
               >
                 <CalendarIcon size={18} />
@@ -519,7 +538,7 @@ function App() {
             <Tooltip text="Настройте свой профиль и получите персональный план от ИИ" position="bottom">
               <button
                 id="tour-resume-tab"
-                onClick={() => setActiveTab('resume')}
+                onClick={() => { if (activeTab !== 'resume') playSwipeSound(); setActiveTab('resume'); }}
                 className={`px-5 py-2.5 rounded-xl flex items-center gap-2 text-sm font-semibold transition-all whitespace-nowrap snap-center ${activeTab === 'resume' ? 'bg-accent/20 text-accent shadow-[0_0_15px_rgba(var(--color-accent),0.2)]' : 'text-text-secondary hover:text-white hover:bg-white/5'}`}
               >
                 <FileText size={18} />
@@ -529,7 +548,7 @@ function App() {
             <Tooltip text="Общайтесь с друзьями и следите за их успехами" position="bottom">
               <button
                 id="tour-friends-tab"
-                onClick={() => setActiveTab('friends')}
+                onClick={() => { if (activeTab !== 'friends') playSwipeSound(); setActiveTab('friends'); }}
                 className={`px-5 py-2.5 rounded-xl flex items-center gap-2 text-sm font-semibold transition-all whitespace-nowrap snap-center ${activeTab === 'friends' ? 'bg-accent/20 text-accent shadow-[0_0_15px_rgba(var(--color-accent),0.2)]' : 'text-text-secondary hover:text-white hover:bg-white/5'}`}
               >
                 <Users size={18} />
@@ -539,7 +558,7 @@ function App() {
             <Tooltip text="Организуйте команды и распределяйте задачи" position="bottom">
               <button
                 id="tour-teams-tab"
-                onClick={() => setActiveTab('teams')}
+                onClick={() => { if (activeTab !== 'teams') playSwipeSound(); setActiveTab('teams'); }}
                 className={`px-5 py-2.5 rounded-xl flex items-center gap-2 text-sm font-semibold transition-all whitespace-nowrap snap-center ${activeTab === 'teams' ? 'bg-accent/20 text-accent shadow-[0_0_15px_rgba(var(--color-accent),0.2)]' : 'text-text-secondary hover:text-white hover:bg-white/5'}`}
               >
                 <Shield size={18} />
@@ -584,7 +603,10 @@ function App() {
                       <section id="tour-rewards" className="glass-panel p-6 flex flex-col transition-all duration-300 shrink-0">
                         <div
                           className="flex justify-between items-center cursor-pointer group select-none mb-0"
-                          onClick={() => setIsRewardStoreOpen(!isRewardStoreOpen)}
+                          onClick={() => {
+                            if (isRewardStoreOpen) playCollapseSound(); else playExpandSound();
+                            setIsRewardStoreOpen(!isRewardStoreOpen);
+                          }}
                         >
                           <h2 className="text-xl font-bold flex items-center gap-2 group-hover:text-warning transition-colors">
                             <Trophy size={20} className="text-warning" />

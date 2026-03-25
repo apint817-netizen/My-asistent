@@ -2,6 +2,24 @@
 let audioCtx = null;
 let isUnlocked = false;
 
+// Global sound enabled flag (persisted in localStorage)
+let soundEnabled = (() => {
+    try {
+        const stored = localStorage.getItem('nova-sound-enabled');
+        return stored === null ? true : stored === 'true';
+    } catch { return true; }
+})();
+
+export function isSoundEnabled() { return soundEnabled; }
+export function setSoundEnabled(val) {
+    soundEnabled = val;
+    try { localStorage.setItem('nova-sound-enabled', String(val)); } catch {}
+}
+export function toggleSound() {
+    setSoundEnabled(!soundEnabled);
+    return soundEnabled;
+}
+
 function getAudioCtx() {
     if (!audioCtx) {
         const AudioContext = window.AudioContext || window.webkitAudioContext;
@@ -40,8 +58,14 @@ if (typeof window !== 'undefined') {
     events.forEach(e => document.addEventListener(e, unlock, { once: true, passive: true }));
 }
 
+// Helper: check mute before playing
+function canPlay() {
+    return soundEnabled;
+}
+
 // Premium ding — task completion (880Hz + 1108Hz chord)
 export function playPremiumDing() {
+    if (!canPlay()) return;
     try {
         const ctx = getAudioCtx();
         if (!ctx) return;
@@ -74,6 +98,7 @@ export function playPremiumDing() {
 
 // Pop sound — adding task (short ascending pop)
 export function playAddSound() {
+    if (!canPlay()) return;
     try {
         const ctx = getAudioCtx();
         if (!ctx) return;
@@ -94,6 +119,7 @@ export function playAddSound() {
 
 // Reward sound — purchase (melodic three-note arpeggio)
 export function playRewardSound() {
+    if (!canPlay()) return;
     try {
         const ctx = getAudioCtx();
         if (!ctx) return;
@@ -114,8 +140,32 @@ export function playRewardSound() {
     } catch (e) { /* ignore */ }
 }
 
+// Reward add/update — sparkly ascending chime
+export function playRewardAddSound() {
+    if (!canPlay()) return;
+    try {
+        const ctx = getAudioCtx();
+        if (!ctx) return;
+        const notes = [659.25, 783.99]; // E5, G5
+        notes.forEach((freq, i) => {
+            const osc = ctx.createOscillator();
+            const gain = ctx.createGain();
+            osc.connect(gain);
+            gain.connect(ctx.destination);
+            osc.type = 'sine';
+            osc.frequency.setValueAtTime(freq, ctx.currentTime + i * 0.08);
+            gain.gain.setValueAtTime(0, ctx.currentTime + i * 0.08);
+            gain.gain.linearRampToValueAtTime(0.15, ctx.currentTime + i * 0.08 + 0.015);
+            gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + i * 0.08 + 0.25);
+            osc.start(ctx.currentTime + i * 0.08);
+            osc.stop(ctx.currentTime + i * 0.08 + 0.25);
+        });
+    } catch (e) { /* ignore */ }
+}
+
 // Send message — short whoosh up
 export function playSendSound() {
+    if (!canPlay()) return;
     try {
         const ctx = getAudioCtx();
         if (!ctx) return;
@@ -136,6 +186,7 @@ export function playSendSound() {
 
 // Receive message — soft descending tone
 export function playReceiveSound() {
+    if (!canPlay()) return;
     try {
         const ctx = getAudioCtx();
         if (!ctx) return;
@@ -156,6 +207,7 @@ export function playReceiveSound() {
 
 // Key click — very quiet tick for typing
 export function playKeyClick() {
+    if (!canPlay()) return;
     try {
         const ctx = getAudioCtx();
         if (!ctx) return;
@@ -175,6 +227,7 @@ export function playKeyClick() {
 
 // Hover sound — crisp, ultra-quiet tap
 export function playHoverSound() {
+    if (!canPlay()) return;
     try {
         const ctx = getAudioCtx();
         if (!ctx) return;
@@ -194,6 +247,7 @@ export function playHoverSound() {
 
 // Delete sound — low descending thwack
 export function playDeleteSound() {
+    if (!canPlay()) return;
     try {
         const ctx = getAudioCtx();
         if (!ctx) return;
@@ -214,6 +268,7 @@ export function playDeleteSound() {
 
 // Refund sound — soft ascending reverse chime
 export function playRefundSound() {
+    if (!canPlay()) return;
     try {
         const ctx = getAudioCtx();
         if (!ctx) return;
@@ -229,5 +284,77 @@ export function playRefundSound() {
         gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.3);
         osc.start(ctx.currentTime);
         osc.stop(ctx.currentTime + 0.3);
+    } catch (e) { /* ignore */ }
+}
+
+// Swipe/skip — whoosh noise for navigating between sections
+export function playSwipeSound() {
+    if (!canPlay()) return;
+    try {
+        const ctx = getAudioCtx();
+        if (!ctx) return;
+        // White noise burst filtered through bandpass
+        const bufferSize = ctx.sampleRate * 0.08;
+        const buffer = ctx.createBuffer(1, bufferSize, ctx.sampleRate);
+        const data = buffer.getChannelData(0);
+        for (let i = 0; i < bufferSize; i++) {
+            data[i] = (Math.random() * 2 - 1) * (1 - i / bufferSize); // fade out
+        }
+        const source = ctx.createBufferSource();
+        source.buffer = buffer;
+        const filter = ctx.createBiquadFilter();
+        filter.type = 'bandpass';
+        filter.frequency.setValueAtTime(2000, ctx.currentTime);
+        filter.frequency.exponentialRampToValueAtTime(4000, ctx.currentTime + 0.04);
+        filter.Q.value = 0.5;
+        const gain = ctx.createGain();
+        gain.gain.setValueAtTime(0.06, ctx.currentTime);
+        gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.08);
+        source.connect(filter);
+        filter.connect(gain);
+        gain.connect(ctx.destination);
+        source.start(ctx.currentTime);
+    } catch (e) { /* ignore */ }
+}
+
+// Collapse sound — soft descending slide
+export function playCollapseSound() {
+    if (!canPlay()) return;
+    try {
+        const ctx = getAudioCtx();
+        if (!ctx) return;
+        const osc = ctx.createOscillator();
+        const gain = ctx.createGain();
+        osc.connect(gain);
+        gain.connect(ctx.destination);
+        osc.type = 'sine';
+        osc.frequency.setValueAtTime(600, ctx.currentTime);
+        osc.frequency.exponentialRampToValueAtTime(300, ctx.currentTime + 0.12);
+        gain.gain.setValueAtTime(0, ctx.currentTime);
+        gain.gain.linearRampToValueAtTime(0.08, ctx.currentTime + 0.01);
+        gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.15);
+        osc.start(ctx.currentTime);
+        osc.stop(ctx.currentTime + 0.15);
+    } catch (e) { /* ignore */ }
+}
+
+// Expand sound — soft ascending slide
+export function playExpandSound() {
+    if (!canPlay()) return;
+    try {
+        const ctx = getAudioCtx();
+        if (!ctx) return;
+        const osc = ctx.createOscillator();
+        const gain = ctx.createGain();
+        osc.connect(gain);
+        gain.connect(ctx.destination);
+        osc.type = 'sine';
+        osc.frequency.setValueAtTime(300, ctx.currentTime);
+        osc.frequency.exponentialRampToValueAtTime(600, ctx.currentTime + 0.12);
+        gain.gain.setValueAtTime(0, ctx.currentTime);
+        gain.gain.linearRampToValueAtTime(0.08, ctx.currentTime + 0.01);
+        gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.15);
+        osc.start(ctx.currentTime);
+        osc.stop(ctx.currentTime + 0.15);
     } catch (e) { /* ignore */ }
 }

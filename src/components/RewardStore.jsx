@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { useStore } from '../store/useStore';
 import { Gift, Plus, ShoppingBag, RotateCcw, Check, Trash2, Edit2 } from 'lucide-react';
-import { playRewardSound, playHoverSound, playDeleteSound, playRefundSound } from '../utils/sound';
+import { playRewardSound, playHoverSound, playDeleteSound, playRefundSound, playRewardAddSound, playKeyClick } from '../utils/sound';
 
 export default function RewardStore() {
     const rewards = useStore(state => state.rewards);
@@ -98,6 +98,7 @@ export default function RewardStore() {
             // При ошибке сети — пропускаем
         }
         setIsAdding(false);
+        playRewardAddSound();
         addReward({ title: newRewardTitle, cost: Number(newRewardCost) });
         setNewRewardTitle('');
         setNewRewardCost(100);
@@ -287,6 +288,7 @@ export default function RewardStore() {
                             className={`flex-[3] min-w-0 bg-black/40 border rounded-lg px-3 sm:px-4 py-2 text-sm sm:text-base outline-none focus:border-warning focus:ring-1 focus:ring-warning transition-all placeholder:text-text-secondary ${error ? 'border-danger' : 'border-border'}`}
                             value={newRewardTitle}
                             onChange={(e) => { setNewRewardTitle(e.target.value); setError(''); }}
+                            onKeyDown={playKeyClick}
                         />
                         <input
                             type="number"
@@ -294,6 +296,7 @@ export default function RewardStore() {
                             className="flex-shrink-0 w-14 sm:w-20 bg-black/40 border border-border rounded-lg px-1 sm:px-2 py-2 text-sm sm:text-base outline-none focus:border-warning focus:ring-1 focus:ring-warning transition-all"
                             value={newRewardCost}
                             onChange={(e) => setNewRewardCost(e.target.value)}
+                            onKeyDown={playKeyClick}
                         />
                         {editingReward ? (
                             <div className="flex gap-1">
@@ -306,6 +309,7 @@ export default function RewardStore() {
                                 </button>
                                 <button
                                     onClick={() => {
+                                        playRewardAddSound();
                                         updateReward(editingReward.id, { title: newRewardTitle, cost: Number(newRewardCost) });
                                         setEditingReward(null);
                                         setNewRewardTitle('');

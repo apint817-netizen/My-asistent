@@ -13,7 +13,7 @@ import { SortableContext, verticalListSortingStrategy, useSortable } from '@dnd-
 import { CSS } from '@dnd-kit/utilities';
 import { TaskItem } from './TaskItem';
 import EditTaskModal from './EditTaskModal';
-import { playHoverSound, playDeleteSound } from '../utils/sound';
+import { playHoverSound, playDeleteSound, playKeyClick } from '../utils/sound';
 
 const restrictToVerticalAxis = ({ transform }) => {
     return {
@@ -427,6 +427,7 @@ export default function TaskManager() {
                             className="w-full bg-transparent px-3 sm:px-4 text-sm sm:text-base text-text-primary outline-none"
                             value={useStore(state => state.tourDemoTaskText) || newTaskTitle}
                             onChange={(e) => { setNewTaskTitle(e.target.value); setError(''); }}
+                            onKeyDown={playKeyClick}
                             readOnly={!!useStore(state => state.tourDemoTaskText)}
                         />
                         <button

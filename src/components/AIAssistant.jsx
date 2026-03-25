@@ -1,8 +1,8 @@
 import { useState, useRef, useEffect, useMemo } from 'react';
 import { useStore, TASK_CATEGORIES } from '../store/useStore';
-import { Send, Bot, User, MessageSquare, Eraser, Settings, Zap, Link as LinkIcon, HelpCircle, ChevronDown, Check, Copy, Edit2, X, Search, Paperclip, FileText, Image as ImageIcon, Trash2 } from 'lucide-react';
+import { Send, Bot, User, MessageSquare, Eraser, Settings, Zap, Link as LinkIcon, HelpCircle, ChevronDown, Check, Copy, Edit2, X, Search, Paperclip, FileText, Image as ImageIcon, Trash2, Wifi, WifiOff } from 'lucide-react';
 import { callAI, GOOGLE_OPENAI_BASE } from '../utils/geminiApi';
-import { playSendSound, playReceiveSound, playKeyClick } from '../utils/sound';
+import { playSendSound, playReceiveSound, playKeyClick, playHoverSound } from '../utils/sound';
 import ReactMarkdown from 'react-markdown';
 import ConfirmModal from './ConfirmModal';
 import ProfileWizardModal from './ProfileWizardModal';
@@ -30,6 +30,7 @@ export default function AIAssistant() {
     const userProfile = useStore(state => state.userProfile) || { bio: '', goals: '', interests: '' };
     const calendarTasks = useStore(state => state.calendarTasks);
     const aiPersona = useStore(state => state.aiPersona) || { gender: 'female', tone: 'friendly', role: 'mentor' };
+    const lastAiProvider = useStore(state => state.lastAiProvider) || 'inactive';
 
     // Подключаем черновик из стейта
     const chatDraft = useStore(state => state.chatDraft);
@@ -730,7 +731,26 @@ ${calendarStr}
                     </div>
                     <div className="flex-1 min-w-0">
                         <h2 className="font-bold text-white text-base leading-tight">Nova</h2>
-                        <p className="text-xs text-accent">Базовый ассистент</p>
+                        <div className="flex items-center gap-2">
+                            <p className="text-xs text-accent">Базовый ассистент</p>
+                            <span className={`inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full text-[10px] font-semibold border ${
+                                lastAiProvider === 'google' ? 'bg-emerald-500/15 text-emerald-400 border-emerald-500/30' :
+                                lastAiProvider === 'openrouter' ? 'bg-orange-500/15 text-orange-400 border-orange-500/30' :
+                                lastAiProvider === 'offline' ? 'bg-yellow-500/15 text-yellow-400 border-yellow-500/30' :
+                                'bg-white/5 text-text-secondary border-white/10'
+                            }`}>
+                                <span className={`w-1.5 h-1.5 rounded-full ${
+                                    lastAiProvider === 'google' ? 'bg-emerald-400' :
+                                    lastAiProvider === 'openrouter' ? 'bg-orange-400' :
+                                    lastAiProvider === 'offline' ? 'bg-yellow-400' :
+                                    'bg-gray-500'
+                                }`}></span>
+                                {lastAiProvider === 'google' ? 'Google' :
+                                 lastAiProvider === 'openrouter' ? 'OpenRouter' :
+                                 lastAiProvider === 'offline' ? 'Офлайн' :
+                                 'Неактивен'}
+                            </span>
+                        </div>
                     </div>
                 </div>
                 <div className="flex items-center gap-2 shrink-0 overflow-visible">

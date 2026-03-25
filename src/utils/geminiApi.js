@@ -138,6 +138,7 @@ export async function callAI({ baseUrl, apiKey, model, systemPrompt, history, us
 
             const textResponse = data.candidates?.[0]?.content?.parts?.[0]?.text;
             if (!textResponse) throw new Error('Пустой ответ от ИИ');
+            useStore.getState().setLastAiProvider('google');
             return textResponse;
         } catch (err) {
             console.warn("Локальный Google API недоступен или исчерпан лимит:", err.message);
@@ -222,6 +223,10 @@ export async function callAI({ baseUrl, apiKey, model, systemPrompt, history, us
         useStore.getState().setAiKeysCount(data.keys_count);
     }
 
+    if (data.ai_provider) {
+        useStore.getState().setLastAiProvider(data.ai_provider);
+    }
+
     if (data.choices && data.choices[0]?.message?.content) {
         return data.choices[0].message.content;
     }
@@ -231,6 +236,7 @@ export async function callAI({ baseUrl, apiKey, model, systemPrompt, history, us
         console.warn("Локальная ошибка или лимит исчерпан:", err.message);
         if (userMessage && typeof userMessage === 'string') {
             console.log("🚀 Активирована ОФЛАЙН ИИ-Заглушка!");
+            useStore.getState().setLastAiProvider('offline');
             return fallbackToOfflineStub(userMessage);
         }
         throw err;
@@ -253,32 +259,94 @@ export const PROXY_MODELS = [
 export function fallbackToOfflineStub(userMessage) {
     const msg = userMessage.toLowerCase();
     
-    // Простейший алгоритм определения интента (создание задачи)
-    if (msg.includes('добавь') || msg.includes('создай') || msg.includes('напомни') || msg.includes('сделай')) {
-        let title = userMessage.replace(/(добавь|создай|сделай|напомни|задачу|привычку|цель|мне|пожалуйста)/gi, '').trim();
-        // Убираем лишние знаки препинания в начале
-        title = title.replace(/^[\s,.:;\-]+/, '');
-        if (!title) title = "Новая задача от ИИ (офлайн)";
-        
-        // Возвращаем JSON строго по контракту
-        return JSON.stringify([{
-            type: "create_task",
-            title: title + " ⚡",
-            category: "goals",
-            points: 10
-        }]);
+    // Извлечь текст после ключевых слов
+    const extractTitle = (text, keywords) => {
+        let title = text;
+        keywords.forEach(kw => { title = title.replace(new RegExp(kw, 'gi'), ''); });
+        title = title.replace(/^[\s,.:;\-]+/, '').replace(/[\s,.:;\-]+$/, '').trim();
+        return title;
+    };
+
+    // Определение даты из текста
+    const parseFutureDate = (text) => {
+        const today = new Date();
+        if (/завтра/i.test(text)) {
+            const d = new Date(today); d.setDate(d.getDate() + 1);
+            return d.toISOString().split('T')[0];
+        }
+        if (/послезавтра/i.test(text)) {
+            const d = new Date(today); d.setDate(d.getDate() + 2);
+            return d.toISOString().split('T')[0];
+        }
+        const dateMatch = text.match(/(\d{4}-\d{2}-\d{2})/);
+        if (dateMatch) return dateMatch[1];
+        return null;
+    };
+
+    // --- ДОБАВЛЕНИЕ ЗАДАЧИ ---
+    if (msg.includes('добавь') || msg.includes('создай') || msg.includes('напомни') || msg.includes('запиши')) {
+        // Проверяем — это награда?
+        if (msg.includes('наград') || msg.includes('приз')) {
+            let title = extractTitle(userMessage, ['добавь', 'создай', 'награду', 'награда', 'приз', 'пожалуйста', 'мне']);
+            if (!title) title = 'Новая награда (офлайн)';
+            const costMatch = msg.match(/(\d+)\s*(очк|балл|стоимост)/);
+            const cost = costMatch ? parseInt(costMatch[1], 10) : 100;
+            return `Предложила награду! Подтверди в окне 👆 [ADD_REWARD: "${title}" | ${cost}]`;
+        }
+
+        // Проверяем — это задача на дату?
+        const futureDate = parseFutureDate(msg);
+        let title = extractTitle(userMessage, ['добавь', 'создай', 'сделай', 'напомни', 'запиши', 'задачу', 'привычку', 'цель', 'мне', 'пожалуйста', 'завтра', 'послезавтра', 'на']);
+        if (!title) title = 'Новая задача (офлайн)';
+
+        if (futureDate) {
+            return `Добавляю на ${futureDate}! Подтверди в окне 👆 [ADD_CALENDAR_TASK: "${title}" | 15 | "${futureDate}"]`;
+        }
+
+        // Обычная задача на сегодня
+        return `Предложила задачу! Подтверди в окне 👆 [ADD_TASK: "${title}" | 15]`;
     }
-    
-    // Удаление наград/задач
-    if (msg.includes('купи') || msg.includes('потрать') || msg.includes('удали')) {
-        return "В офлайн-режиме (перебои с сетью или лимитом ИИ) я не могу удалять или изменять существующие данные, чтобы ничего не испортить. Вы можете сделать это вручную!";
+
+    // --- ВЫПОЛНЕНИЕ ЗАДАЧИ ---
+    if (msg.includes('выполн') || msg.includes('сделал') || msg.includes('готово') || msg.includes('отмет')) {
+        let ref = extractTitle(userMessage, ['выполнил', 'выполнена', 'отметь', 'сделал', 'готово', 'задачу', 'задача']);
+        if (!ref) ref = '#1';
+        return `Отмечаю выполненной! ✅ [COMPLETE_TASK: "${ref}"]`;
+    }
+
+    // --- УДАЛЕНИЕ ---
+    if (msg.includes('удали')) {
+        if (msg.includes('наград') || msg.includes('приз')) {
+            let ref = extractTitle(userMessage, ['удали', 'награду', 'награда', 'приз']);
+            if (!ref) return 'Укажите название или номер награды для удаления.';
+            return `Удаляю награду! [DELETE_REWARD: "${ref}"]`;
+        }
+        let ref = extractTitle(userMessage, ['удали', 'задачу', 'задача']);
+        if (!ref) return 'Укажите название или номер задачи для удаления.';
+        return `Удаляю задачу! [DELETE_TASK: "${ref}"]`;
+    }
+
+    // --- ПОКУПКА НАГРАДЫ ---
+    if (msg.includes('купи') || msg.includes('потрать') || msg.includes('хочу наград')) {
+        let ref = extractTitle(userMessage, ['купи', 'потрать', 'на', 'хочу', 'награду', 'наград']);
+        if (!ref) return 'Укажите название награды для покупки.';
+        return `Покупаю! 🎁 [BUY_REWARD: "${ref}"]`;
+    }
+
+    // --- ИЗМЕНЕНИЕ ОЧКОВ ---
+    if (msg.includes('измени') || msg.includes('поставь') || msg.includes('стоимость')) {
+        const pointsMatch = msg.match(/(\d+)\s*(очк|балл|стоимост)/);
+        let ref = extractTitle(userMessage, ['измени', 'поставь', 'стоимость', 'задачу', 'задача', 'количество', 'очков']);
+        if (pointsMatch && ref) {
+            return `Меняю стоимость! [EDIT_TASK_POINTS: "${ref}" | ${pointsMatch[1]}]`;
+        }
     }
 
     // Дефолтные разговорные ответы
     const stubs = [
-        "Извините, облачные серверы ИИ сейчас недоступны. Но я всё еще здесь! Напишите «Добавь задачу ...», и я сделаю это локально.",
-        "Мои нейросетевые модули отдыхают (исчерпан лимит минут или нет сети). Зато мой офлайн-алгоритм работает! Какую задачу вам создать?",
-        "Связь с облаком потеряна... Но я всё равно могу создавать для вас задачи. Просто напишите команду создания!"
+        "⚡ Сейчас я работаю в офлайн-режиме, но могу:\n• Добавить задачу — \"Добавь задачу ...\"\n• Добавить награду — \"Добавь награду ...\"\n• Удалить задачу — \"Удали задачу ...\"\n• Отметить выполненной — \"Выполнил задачу ...\"\nПросто напишите команду!",
+        "🔌 Облачные серверы ИИ сейчас недоступны, но я всё ещё функционирую! Попробуйте:\n• \"Добавь задачу почитать книгу\"\n• \"Запиши на завтра тренировку\"\n• \"Удали задачу #2\"",
+        "📡 Связь с облаком потеряна, но система продолжает работать! Доступные команды:\n• Добавить/удалить задачи и награды\n• Отметить задачу выполненной\n• Запланировать на будущую дату"
     ];
     return stubs[Math.floor(Math.random() * stubs.length)];
 }

@@ -183,6 +183,7 @@ export default async function handler(req) {
                             choices: [{ message: { role: 'assistant', content: orData.choices[0].message.content } }],
                             usage: { total_tokens: orData.usage?.total_tokens || 0 },
                             model_used: 'openrouter-free',
+                            ai_provider: 'openrouter',
                             keys_count: validKeys.length
                         }), {
                             status: 200,
@@ -208,6 +209,7 @@ export default async function handler(req) {
             choices: [{ message: { role: 'assistant', content: text } }],
             usage: { total_tokens: result.data.usageMetadata?.totalTokenCount || 0 },
             model_used: result.model,
+            ai_provider: 'google',
             keys_count: validKeys.length
         }), {
             status: 200,
