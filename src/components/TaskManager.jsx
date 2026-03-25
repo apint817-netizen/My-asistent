@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useStore, TASK_CATEGORIES } from '../store/useStore';
-import { Plus, Check, ArrowDownAZ } from 'lucide-react';
+import { Plus, Check, ArrowDownAZ, ChevronDown } from 'lucide-react';
 import {
     DndContext,
     closestCenter,
@@ -13,7 +13,7 @@ import { SortableContext, verticalListSortingStrategy, useSortable } from '@dnd-
 import { CSS } from '@dnd-kit/utilities';
 import { TaskItem } from './TaskItem';
 import EditTaskModal from './EditTaskModal';
-import { playHoverSound, playDeleteSound, playKeyClick } from '../utils/sound';
+import { playHoverSound, playDeleteSound, playKeyClick, playCollapseSound, playExpandSound } from '../utils/sound';
 
 const restrictToVerticalAxis = ({ transform }) => {
     return {
@@ -115,6 +115,7 @@ export default function TaskManager() {
     const [editingTask, setEditingTask] = useState(null);
     const [sortOrder, setSortOrder] = useState('manual');
     const [isSortMenuOpen, setIsSortMenuOpen] = useState(false);
+    const [showCompleted, setShowCompleted] = useState(false);
 
     const SORT_OPTIONS = [
         { id: 'manual', label: 'Мой порядок' },
@@ -221,7 +222,10 @@ export default function TaskManager() {
         });
     }
 
-    const activeTask = activeId ? filteredTasks.find(t => t.id === activeId) : null;
+    const pendingTasks = filteredTasks.filter(t => !t.completed);
+    const completedTasks = filteredTasks.filter(t => t.completed);
+
+    const activeTask = activeId ? pendingTasks.find(t => t.id === activeId) : null;
 
     // Только используемые категории для фильтров
     const usedCategories = [...new Set(tasks.map(t => t.category).filter(Boolean))];
@@ -302,6 +306,7 @@ export default function TaskManager() {
             </div>
 
             <div id="tour-task-list" className="flex-1 overflow-y-auto flex flex-col gap-3 mb-6 pr-2 pb-2">
+                {/* Незавершённые задачи — основной список */}
                 <DndContext
                     sensors={sensors}
                     collisionDetection={closestCenter}
@@ -311,11 +316,11 @@ export default function TaskManager() {
                     onDragCancel={handleDragCancel}
                 >
                     <SortableContext
-                        items={filteredTasks.map(t => t.id)}
+                        items={pendingTasks.map(t => t.id)}
                         strategy={verticalListSortingStrategy}
                         disabled={sortOrder !== 'manual'}
                     >
-                        {filteredTasks.map((task, index) => (
+                        {pendingTasks.map((task, index) => (
                             <SortableTaskItem
                                 key={task.id}
                                 task={task}
@@ -342,10 +347,69 @@ export default function TaskManager() {
                         ) : null}
                     </DragOverlay>
                 </DndContext>
-                {filteredTasks.length === 0 && (
+
+                {pendingTasks.length === 0 && completedTasks.length === 0 && (
                     <div className="text-center text-text-secondary py-8 flex items-center justify-center flex-col gap-2">
                         <Check size={48} className="opacity-20" />
                         <p>{activeFilter === 'all' ? 'На сегодня задач нет. Отличный повод расслабиться!' : 'В этой категории задач нет.'}</p>
+                    </div>
+                )}
+
+                {pendingTasks.length === 0 && completedTasks.length > 0 && (
+                    <div className="text-center text-text-secondary py-6 flex items-center justify-center flex-col gap-2">
+                        <div className="text-3xl">🎉</div>
+                        <p className="text-sm font-medium text-emerald-400">Все задачи выполнены!</p>
+                    </div>
+                )}
+
+                {/* Выполненные задачи — свёрток */}
+                {completedTasks.length > 0 && (
+                    <div className="mt-1">
+                        <button
+                            onClick={() => {
+                                const next = !showCompleted;
+                                setShowCompleted(next);
+                                next ? playExpandSound() : playCollapseSound();
+                            }}
+                            onMouseEnter={playHoverSound}
+                            className="w-full flex items-center justify-between px-3 py-2 rounded-xl bg-white/[0.03] hover:bg-white/[0.06] border border-white/[0.06] transition-all duration-200 group"
+                        >
+                            <div className="flex items-center gap-2">
+                                <div className="w-5 h-5 rounded-full bg-emerald-500/15 flex items-center justify-center">
+                                    <Check size={12} className="text-emerald-400" />
+                                </div>
+                                <span className="text-xs font-medium text-text-secondary group-hover:text-white transition-colors">
+                                    Выполненные ({completedTasks.length})
+                                </span>
+                            </div>
+                            <ChevronDown
+                                size={14}
+                                className={`text-text-secondary group-hover:text-white transition-all duration-300 ${showCompleted ? 'rotate-180' : ''}`}
+                            />
+                        </button>
+
+                        <div
+                            className={`flex flex-col gap-2 overflow-hidden transition-all duration-300 ease-in-out ${
+                                showCompleted ? 'max-h-[2000px] opacity-100 mt-2' : 'max-h-0 opacity-0 mt-0'
+                            }`}
+                        >
+                            {completedTasks.map((task, index) => (
+                                <TaskItem
+                                    key={task.id}
+                                    task={task}
+                                    index={index}
+                                    handleToggle={handleToggle}
+                                    setDeletingTask={setDeletingTask}
+                                    setEditingTaskCategory={setEditingTaskCategory}
+                                    setEditingTask={setEditingTask}
+                                    attributes={{}}
+                                    listeners={{}}
+                                    style={{}}
+                                    setNodeRef={() => {}}
+                                    isDragOverlay={false}
+                                />
+                            ))}
+                        </div>
                     </div>
                 )}
             </div>
