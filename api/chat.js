@@ -158,44 +158,56 @@ export default async function handler(req) {
         // Если все ключи Google отвалились, пробуем OpenRouter Lifeline
         if (!result && process.env.OPENROUTER_API_KEY) {
             console.log("Google keys exhausted. Falling back to OpenRouter...");
-            try {
-                const orResp = await fetch('https://openrouter.ai/api/v1/chat/completions', {
-                    method: 'POST',
-                    headers: {
-                        'Authorization': `Bearer ${process.env.OPENROUTER_API_KEY}`,
-                        'Content-Type': 'application/json',
-                        'HTTP-Referer': 'https://my-asisstient.vercel.app',
-                        'X-Title': 'Nova Assistant'
-                    },
-                    // Передаем оригинальные messages в формате OpenAI
-                    body: JSON.stringify({
-                        model: 'google/gemini-2.0-flash-001:free',
-                        messages: requestData.messages,
-                        temperature,
-                        max_tokens: max_tokens || 2048
-                    })
-                });
-                
-                if (orResp.ok) {
-                    const orData = await orResp.json();
-                    if (orData.choices && orData.choices[0]?.message?.content) {
-                        return new Response(JSON.stringify({
-                            choices: [{ message: { role: 'assistant', content: orData.choices[0].message.content } }],
-                            usage: { total_tokens: orData.usage?.total_tokens || 0 },
-                            model_used: 'openrouter-free',
-                            ai_provider: 'openrouter',
-                            keys_count: validKeys.length
-                        }), {
-                            status: 200,
-                            headers: { 'Content-Type': 'application/json' }
-                        });
+            
+            // Актуальные бесплатные модели OpenRouter (Март 2026)
+            const freeModels = [
+                'google/gemma-3-27b-it:free',
+                'google/gemma-3-12b-it:free',
+                'meta-llama/llama-3.3-8b-instruct:free'
+            ];
+            
+            for (const freeModel of freeModels) {
+                try {
+                    const orResp = await fetch('https://openrouter.ai/api/v1/chat/completions', {
+                        method: 'POST',
+                        headers: {
+                            'Authorization': `Bearer ${process.env.OPENROUTER_API_KEY}`,
+                            'Content-Type': 'application/json',
+                            'HTTP-Referer': 'https://my-asisstient.vercel.app',
+                            'X-Title': 'Nova Assistant'
+                        },
+                        body: JSON.stringify({
+                            model: freeModel,
+                            messages: requestData.messages,
+                            temperature,
+                            max_tokens: max_tokens || 2048
+                        })
+                    });
+                    
+                    if (orResp.ok) {
+                        const orData = await orResp.json();
+                        if (orData.choices && orData.choices[0]?.message?.content) {
+                            return new Response(JSON.stringify({
+                                choices: [{ message: { role: 'assistant', content: orData.choices[0].message.content } }],
+                                usage: { total_tokens: orData.usage?.total_tokens || 0 },
+                                model_used: freeModel,
+                                ai_provider: 'openrouter',
+                                keys_count: validKeys.length
+                            }), {
+                                status: 200,
+                                headers: { 'Content-Type': 'application/json' }
+                            });
+                        }
+                    } else {
+                        const errorText = await orResp.text();
+                        errors.push(`[OpenRouter ${freeModel}] HTTP ${orResp.status}: ${errorText.substring(0, 150)}`);
+                        console.warn(`OpenRouter model ${freeModel} failed: HTTP ${orResp.status}`);
+                        continue; // Пробуем следующую модель
                     }
-                } else {
-                    const errorText = await orResp.text();
-                    errors.push(`[OpenRouter Fallback] HTTP ${orResp.status}: ${errorText.substring(0, 150)}`);
+                } catch (e) {
+                    errors.push(`[OpenRouter ${freeModel} Error] ${e.message}`);
+                    continue;
                 }
-            } catch (e) {
-               errors.push(`[OpenRouter Fallback Error] ${e.message}`);
             }
         }
 
