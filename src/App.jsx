@@ -37,6 +37,7 @@ import { loadUserData, debouncedSave, flushSave, clearLocalData } from './lib/su
 import ToastContainer from './components/ToastContainer';
 import BottomNavigation from './components/BottomNavigation';
 import { playSwipeSound, playExpandSound, playCollapseSound, playHoverSound, isSoundEnabled, toggleSound } from './utils/sound';
+import { startReminderEngine, requestNotificationPermission } from './utils/reminders';
 
 function App() {
   const tokens = useStore(state => state.tokens);
@@ -170,6 +171,9 @@ function App() {
       console.error('[App] Error initializing user data:', err);
     } finally {
       setDataLoading(false);
+      // Запуск движка напоминаний
+      startReminderEngine();
+      requestNotificationPermission();
     }
 
     // Subscribe to store changes for auto-save

@@ -1,23 +1,45 @@
 import { useState } from 'react';
 import { useStore, TASK_CATEGORIES } from '../store/useStore';
-import { X, Save, Edit2 } from 'lucide-react';
+import { X, Save, Edit2, Clock, Bell, Calendar } from 'lucide-react';
 import { playHoverSound, playKeyClick } from '../utils/sound';
+
+const REMINDER_OPTIONS = [
+    { key: '1h', label: 'За 1 час', minutes: 60 },
+    { key: '30m', label: 'За 30 мин', minutes: 30 },
+    { key: '15m', label: 'За 15 мин', minutes: 15 },
+];
 
 export default function EditTaskModal({ task, onClose }) {
     const updateTask = useStore(state => state.updateTask);
     
-    // Fallbacks just in case task is missing
     const [title, setTitle] = useState(task?.title || '');
     const [value, setValue] = useState(task?.value || 10);
     const [categoryId, setCategoryId] = useState(task?.category || null);
+    const [dueDate, setDueDate] = useState(task?.dueDate || '');
+    const [dueTime, setDueTime] = useState(task?.dueTime || '');
+    const [reminders, setReminders] = useState(task?.reminders || []);
     const [dropdownOpen, setDropdownOpen] = useState(false);
 
     if (!task) return null;
 
+    const toggleReminder = (key) => {
+        setReminders(prev => 
+            prev.includes(key) ? prev.filter(r => r !== key) : [...prev, key]
+        );
+    };
+
     const handleSave = (e) => {
         e.preventDefault();
         if (title.trim()) {
-            updateTask(task.id, { title: title.trim(), value: Number(value), category: categoryId });
+            updateTask(task.id, { 
+                title: title.trim(), 
+                value: Number(value), 
+                category: categoryId,
+                dueDate: dueDate || null,
+                dueTime: dueTime || null,
+                reminders: dueTime ? reminders : [],
+                remindersSent: []
+            });
             onClose();
         }
     };
@@ -125,12 +147,67 @@ export default function EditTaskModal({ task, onClose }) {
                             </div>
                         </div>
                     </div>
+
+                    {/* Дата и время */}
+                    <div className="flex gap-4">
+                        <div className="flex flex-col gap-1.5 flex-1">
+                            <label className="text-xs font-semibold text-text-secondary uppercase px-1 flex items-center gap-1">
+                                <Calendar size={10} />
+                                Дата
+                            </label>
+                            <input
+                                type="date"
+                                className="bg-black/30 border border-white/10 rounded-xl p-3 text-sm text-white focus:border-accent focus:ring-1 focus:ring-accent outline-none w-full [color-scheme:dark]"
+                                value={dueDate}
+                                onChange={(e) => setDueDate(e.target.value)}
+                            />
+                        </div>
+                        <div className="flex flex-col gap-1.5 flex-1">
+                            <label className="text-xs font-semibold text-text-secondary uppercase px-1 flex items-center gap-1">
+                                <Clock size={10} />
+                                Время
+                            </label>
+                            <input
+                                type="time"
+                                className="bg-black/30 border border-white/10 rounded-xl p-3 text-sm text-white focus:border-accent focus:ring-1 focus:ring-accent outline-none w-full [color-scheme:dark]"
+                                value={dueTime}
+                                onChange={(e) => setDueTime(e.target.value)}
+                            />
+                        </div>
+                    </div>
+
+                    {/* Напоминания — только если задано время */}
+                    {dueTime && (
+                        <div className="flex flex-col gap-1.5">
+                            <label className="text-xs font-semibold text-text-secondary uppercase px-1 flex items-center gap-1">
+                                <Bell size={10} />
+                                Напоминания
+                            </label>
+                            <div className="flex gap-2">
+                                {REMINDER_OPTIONS.map(opt => (
+                                    <button
+                                        key={opt.key}
+                                        type="button"
+                                        onClick={() => toggleReminder(opt.key)}
+                                        onMouseEnter={playHoverSound}
+                                        className={`flex-1 py-2.5 rounded-xl text-xs font-semibold transition-all border ${
+                                            reminders.includes(opt.key) 
+                                                ? 'bg-accent/15 text-accent border-accent/30 shadow-[0_0_10px_rgba(109,40,217,0.2)]' 
+                                                : 'bg-white/5 text-text-secondary border-white/10 hover:bg-white/10'
+                                        }`}
+                                    >
+                                        {opt.label}
+                                    </button>
+                                ))}
+                            </div>
+                        </div>
+                    )}
                     
                     <button
                         type="submit"
                         disabled={!title.trim()}
                         onMouseEnter={playHoverSound}
-                        className="w-full btn-primary py-3.5 rounded-xl font-bold text-[15px] mt-4 flex items-center justify-center gap-2 disabled:opacity-50"
+                        className="w-full btn-primary py-3.5 rounded-xl font-bold text-[15px] mt-2 flex items-center justify-center gap-2 disabled:opacity-50"
                     >
                         <Save size={18} />
                         Сохранить

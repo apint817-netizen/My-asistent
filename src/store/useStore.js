@@ -197,10 +197,17 @@ export const useStore = create(
         set({ tasks: newTasks });
       },
 
-      addTask: (title, value, category = null) => {
+      addTask: (title, value, category = null, extra = {}) => {
         playAddSound();
         set((state) => ({
-          tasks: [...state.tasks, { id: Date.now().toString(), title, completed: false, value, category }]
+          tasks: [...state.tasks, {
+            id: Date.now().toString(), title, completed: false, value, category,
+            dueDate: extra.dueDate || null,
+            dueTime: extra.dueTime || null,
+            postponed: extra.postponed || false,
+            reminders: extra.reminders || [],
+            remindersSent: []
+          }]
         }));
       },
 
@@ -227,6 +234,41 @@ export const useStore = create(
         )
       })),
 
+      // Перенос задачи на другую дату
+      rescheduleTask: (taskId, newDate) => set((state) => ({
+        tasks: state.tasks.map(t =>
+          t.id === taskId ? { ...t, dueDate: newDate, postponed: false } : t
+        )
+      })),
+
+      // Отложить "на потом"
+      postponeTask: (taskId) => set((state) => ({
+        tasks: state.tasks.map(t =>
+          t.id === taskId ? { ...t, postponed: true } : t
+        )
+      })),
+
+      // Вернуть из "на потом"
+      unpostponeTask: (taskId) => set((state) => ({
+        tasks: state.tasks.map(t =>
+          t.id === taskId ? { ...t, postponed: false } : t
+        )
+      })),
+
+      // Установить время и напоминания
+      setTaskTime: (taskId, dueTime, reminders = []) => set((state) => ({
+        tasks: state.tasks.map(t =>
+          t.id === taskId ? { ...t, dueTime, reminders, remindersSent: [] } : t
+        )
+      })),
+
+      // Пометить напоминание как отправленное
+      markReminderSent: (taskId, reminderKey) => set((state) => ({
+        tasks: state.tasks.map(t =>
+          t.id === taskId ? { ...t, remindersSent: [...(t.remindersSent || []), reminderKey] } : t
+        )
+      })),
+
       deleteTaskWithReason: (taskId, reason) => set((state) => {
         const task = state.tasks.find(t => t.id === taskId);
         if (!task) return state;
@@ -247,7 +289,12 @@ export const useStore = create(
         if (!proposal) return state;
         return {
           taskProposals: state.taskProposals.filter(p => p.id !== id),
-          tasks: [...state.tasks, { id: Date.now().toString(), title: proposal.title, completed: false, value: proposal.points, category: proposal.category || null }]
+          tasks: [...state.tasks, {
+            id: Date.now().toString(), title: proposal.title, completed: false,
+            value: proposal.points, category: proposal.category || null,
+            dueDate: proposal.dueDate || null, dueTime: null,
+            postponed: false, reminders: [], remindersSent: []
+          }]
         };
       }),
       rejectProposal: (id) => set((state) => {
@@ -653,26 +700,40 @@ export const useStore = create(
 
           const carriedCount = carriedTasks.length;
           const plannedCount = plannedToday.length;
-          let dayMessage = `[SYSTEM_NEW_DAY] Пользователь зашел в новый день. Сегодняшняя дата: ${today}. Серия дней: ${newStreak}. `;
-          if (carriedCount > 0 && plannedCount > 0) {
-            dayMessage += `Перенесено ${carriedCount} незавершённых задач с прошлого дня, и запланировано ${plannedCount} на сегодня. `;
-          } else if (carriedCount > 0) {
-            dayMessage += `Перенесено ${carriedCount} незавершённых задач с прошлого дня. `;
-          } else if (plannedCount > 0) {
-            dayMessage += `На сегодня из календаря запланировано ${plannedCount} задач.`;
-          } else {
-            dayMessage += 'Список чист.';
+          // Дедупликация: проверяем, не было ли уже SYSTEM_NEW_DAY с сегодняшней датой
+          const alreadyHasNewDay = state.chatMessages.some(m =>
+            m.role === 'system' && m.content && m.content.includes('[SYSTEM_NEW_DAY]') && m.content.includes(today)
+          );
+
+          let newChatMessages = [...state.chatMessages];
+          if (!alreadyHasNewDay) {
+            let dayMessage = `[SYSTEM_NEW_DAY] Пользователь зашел в новый день. Сегодняшняя дата: ${today}. Серия дней: ${newStreak}. `;
+            if (carriedCount > 0 && plannedCount > 0) {
+              dayMessage += `Перенесено ${carriedCount} незавершённых задач с прошлого дня, и запланировано ${plannedCount} на сегодня. `;
+            } else if (carriedCount > 0) {
+              dayMessage += `Перенесено ${carriedCount} незавершённых задач с прошлого дня. `;
+            } else if (plannedCount > 0) {
+              dayMessage += `На сегодня из календаря запланировано ${plannedCount} задач.`;
+            } else {
+              dayMessage += 'Список чист.';
+            }
+            newChatMessages.push({ role: 'system', content: dayMessage, timestamp: new Date().toISOString() });
           }
+
+          // Возвращаем отложенные задачи с dueDate == today
+          const allTasks = [...carriedTasks, ...plannedToday];
+          const updatedTasks = allTasks.map(t => {
+            if (t.postponed && t.dueDate === today) return { ...t, postponed: false };
+            if (t.dueDate && t.dueDate < today && !t.completed) return { ...t, dueDate: null };
+            return t;
+          });
 
           return {
             lastActiveDate: today,
             streak: newStreak,
-            tasks: [...carriedTasks, ...plannedToday],
+            tasks: updatedTasks,
             calendarTasks: newCalendarTasks,
-            chatMessages: [
-              ...state.chatMessages,
-              { role: 'system', content: dayMessage, timestamp: new Date().toISOString() }
-            ]
+            chatMessages: newChatMessages
           };
         }
         return state;

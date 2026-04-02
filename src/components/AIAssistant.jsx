@@ -328,6 +328,7 @@ ${calendarStr}
             const usePurchaseRegex = /\[USE_PURCHASE:\s*"?([^"\]]+?)"?\s*\]/g;
             const editProfileRegex = /\[EDIT_PROFILE:\s*"?([^"\|]+?)"?\s*\|\s*"?([^"\]]+?)"?\s*\]/g;
             const requestProfileRegex = /\[REQUEST_PROFILE_INFO\]/g;
+            const postponeTaskRegex = /\[POSTPONE_TASK:\s*"?([^"\|]+?)"?\s*\|\s*"?([^"\]]+?)"?\s*\]/g;
 
             let cleanResponse = responseText;
             let match;
@@ -491,6 +492,21 @@ ${calendarStr}
                 useStore.getState().setHasSeenTour(false);
             }
 
+            // POSTPONE_TASK
+            while ((match = postponeTaskRegex.exec(responseText)) !== null) {
+                const task = findTask(match[1].trim());
+                const dateOrLater = match[2].trim();
+                if (task) {
+                    if (dateOrLater === 'later') {
+                        useStore.getState().postponeTask(task.id);
+                        useStore.getState().addToast(`⏸️ «${task.title}» отложена`, 'info');
+                    } else {
+                        useStore.getState().rescheduleTask(task.id, dateOrLater);
+                        useStore.getState().addToast(`📅 «${task.title}» перенесена на ${dateOrLater}`, 'info');
+                    }
+                }
+            }
+
             cleanResponse = cleanResponse
                 .replace(completeRegex, '').replace(uncompleteRegex, '').replace(editRegex, '')
                 .replace(addTaskRegex, '').replace(addCalendarTaskRegex, '')
@@ -499,6 +515,7 @@ ${calendarStr}
                 .replace(addRewardRegex, '').replace(deleteRewardRegex, '')
                 .replace(buyRewardRegex, '').replace(usePurchaseRegex, '')
                 .replace(editProfileRegex, '')
+                .replace(postponeTaskRegex, '')
                 .replace(startTourRegex, '')
                 .trim();
 

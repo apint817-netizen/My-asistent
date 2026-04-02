@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useStore, TASK_CATEGORIES } from '../store/useStore';
-import { Plus, Check, ArrowDownAZ, ChevronDown, Trophy } from 'lucide-react';
+import { Plus, Check, ArrowDownAZ, ChevronDown, Trophy, Pause } from 'lucide-react';
 import {
     DndContext,
     closestCenter,
@@ -22,7 +22,7 @@ const restrictToVerticalAxis = ({ transform }) => {
     };
 };
 
-function SortableTaskItem({ task, index, handleToggle, setDeletingTask, setEditingTaskCategory, setEditingTask }) {
+function SortableTaskItem({ task, index, handleToggle, setDeletingTask, setEditingTaskCategory, setEditingTask, onPostpone, onReschedule, onUnpostpone }) {
     const {
         attributes,
         listeners,
@@ -48,6 +48,9 @@ function SortableTaskItem({ task, index, handleToggle, setDeletingTask, setEditi
             setDeletingTask={setDeletingTask}
             setEditingTaskCategory={setEditingTaskCategory}
             setEditingTask={setEditingTask}
+            onPostpone={onPostpone}
+            onReschedule={onReschedule}
+            onUnpostpone={onUnpostpone}
             attributes={attributes}
             listeners={listeners}
             style={style}
@@ -65,6 +68,9 @@ export default function TaskManager() {
     const addAiTokensUsed = useStore(state => state.addAiTokensUsed);
     const deleteTaskWithReason = useStore(state => state.deleteTaskWithReason);
     const reorderTasks = useStore(state => state.reorderTasks);
+    const postponeTask = useStore(state => state.postponeTask);
+    const unpostponeTask = useStore(state => state.unpostponeTask);
+    const rescheduleTask = useStore(state => state.rescheduleTask);
 
     const validateInput = (text) => {
         const cleaned = text.trim();
@@ -116,6 +122,7 @@ export default function TaskManager() {
     const [sortOrder, setSortOrder] = useState('manual');
     const [isSortMenuOpen, setIsSortMenuOpen] = useState(false);
     const [showCompleted, setShowCompleted] = useState(false);
+    const [showPostponed, setShowPostponed] = useState(false);
 
     const SORT_OPTIONS = [
         { id: 'manual', label: 'Мой порядок' },
@@ -222,8 +229,11 @@ export default function TaskManager() {
         });
     }
 
-    const pendingTasks = filteredTasks.filter(t => !t.completed);
+    const activeTasks = filteredTasks.filter(t => !t.completed && !t.postponed);
+    const postponedTasks = filteredTasks.filter(t => !t.completed && t.postponed);
     const completedTasks = filteredTasks.filter(t => t.completed);
+    // For backward compatibility
+    const pendingTasks = activeTasks;
 
     // Прогресс очков
     const totalPoints = filteredTasks.reduce((sum, t) => sum + (t.value || 0), 0);
@@ -369,6 +379,9 @@ export default function TaskManager() {
                                 setDeletingTask={setDeletingTask}
                                 setEditingTaskCategory={setEditingTaskCategory}
                                 setEditingTask={setEditingTask}
+                                onPostpone={postponeTask}
+                                onReschedule={rescheduleTask}
+                                onUnpostpone={unpostponeTask}
                             />
                         ))}
                     </SortableContext>
@@ -388,17 +401,71 @@ export default function TaskManager() {
                     </DragOverlay>
                 </DndContext>
 
-                {pendingTasks.length === 0 && completedTasks.length === 0 && (
+                {pendingTasks.length === 0 && postponedTasks.length === 0 && completedTasks.length === 0 && (
                     <div className="text-center text-text-secondary py-8 flex items-center justify-center flex-col gap-2">
                         <Check size={48} className="opacity-20" />
                         <p>{activeFilter === 'all' ? 'На сегодня задач нет. Отличный повод расслабиться!' : 'В этой категории задач нет.'}</p>
                     </div>
                 )}
 
-                {pendingTasks.length === 0 && completedTasks.length > 0 && (
+                {pendingTasks.length === 0 && (postponedTasks.length > 0 || completedTasks.length > 0) && (
                     <div className="text-center text-text-secondary py-6 flex items-center justify-center flex-col gap-2">
                         <div className="text-3xl">🎉</div>
-                        <p className="text-sm font-medium text-emerald-400">Все задачи выполнены!</p>
+                        <p className="text-sm font-medium text-emerald-400">Все активные задачи выполнены!</p>
+                    </div>
+                )}
+
+                {/* На потом — свёрток */}
+                {postponedTasks.length > 0 && (
+                    <div className="mt-1">
+                        <button
+                            onClick={() => {
+                                const next = !showPostponed;
+                                setShowPostponed(next);
+                                next ? playExpandSound() : playCollapseSound();
+                            }}
+                            onMouseEnter={playHoverSound}
+                            className="w-full flex items-center justify-between px-3 py-2 rounded-xl bg-white/[0.03] hover:bg-white/[0.06] border border-white/[0.06] transition-all duration-200 group"
+                        >
+                            <div className="flex items-center gap-2">
+                                <div className="w-5 h-5 rounded-full bg-gray-500/15 flex items-center justify-center">
+                                    <Pause size={10} className="text-gray-400" />
+                                </div>
+                                <span className="text-xs font-medium text-text-secondary group-hover:text-white transition-colors">
+                                    На потом ({postponedTasks.length})
+                                </span>
+                            </div>
+                            <ChevronDown
+                                size={14}
+                                className={`text-text-secondary group-hover:text-white transition-all duration-300 ${showPostponed ? 'rotate-180' : ''}`}
+                            />
+                        </button>
+
+                        <div
+                            className={`flex flex-col gap-2 overflow-hidden transition-all duration-300 ease-in-out ${
+                                showPostponed ? 'max-h-[2000px] opacity-100 mt-2' : 'max-h-0 opacity-0 mt-0'
+                            }`}
+                        >
+                            {postponedTasks.map((task, index) => (
+                                <TaskItem
+                                    key={task.id}
+                                    task={task}
+                                    index={index}
+                                    handleToggle={handleToggle}
+                                    setDeletingTask={setDeletingTask}
+                                    setEditingTaskCategory={setEditingTaskCategory}
+                                    setEditingTask={setEditingTask}
+                                    onPostpone={postponeTask}
+                                    onReschedule={rescheduleTask}
+                                    onUnpostpone={unpostponeTask}
+                                    attributes={{}}
+                                    listeners={{}}
+                                    style={{}}
+                                    setNodeRef={() => {}}
+                                    isDragOverlay={false}
+                                />
+                            ))}
+                        </div>
                     </div>
                 )}
 
@@ -442,6 +509,9 @@ export default function TaskManager() {
                                     setDeletingTask={setDeletingTask}
                                     setEditingTaskCategory={setEditingTaskCategory}
                                     setEditingTask={setEditingTask}
+                                    onPostpone={postponeTask}
+                                    onReschedule={rescheduleTask}
+                                    onUnpostpone={unpostponeTask}
                                     attributes={{}}
                                     listeners={{}}
                                     style={{}}

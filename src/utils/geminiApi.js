@@ -437,7 +437,7 @@ export function fallbackToOfflineStub(userMessage) {
         return `У меня всё отлично! ⚡ Работаю в офлайн-режиме, но полностью функциональна.\n\n📋 У тебя ${pendingTasks.length} задач в работе${completedTasks.length > 0 ? ` и ${completedTasks.length} уже выполненных` : ''}. Чем могу помочь?`;
     }
     if (/^(что ты (умеешь|можешь|делаешь)|помощь|help|команды)/i.test(msg)) {
-        return `💜 Вот что я умею в офлайн-режиме:\n\n📝 Задачи:\n• «Добавь задачу ...» — создать новую\n• «Добавь на завтра ...» — на будущую дату\n• «Отметь задачу Х» — выполнить по названию\n• «Отметь первую задачу» — по номеру\n• «Верни задачу Х» — отменить выполнение\n• «Удали задачу ...» — удалить\n• «Покажи задачи» — список\n\n🎁 Награды:\n• «Удали награду ...» — удалить\n• «Купи награду ...» — потратить очки`;
+        return `💜 Вот что я умею в офлайн-режиме:\n\n📝 Задачи:\n• «Добавь задачу ...» — создать новую\n• «Добавь на завтра ...» — на будущую дату\n• «Отметь задачу Х» — выполнить по названию\n• «Верни задачу Х» — отменить выполнение\n• «Перенеси задачу Х на завтра» — перенос\n• «Отложи задачу Х» — на потом\n• «Удали задачу ...» — удалить\n• «Покажи задачи» — список\n\n🎁 Награды:\n• «Удали награду ...» — удалить\n• «Купи награду ...» — потратить очки`;
     }
 
     // ═══════════════════════════════════════════════
@@ -581,6 +581,52 @@ export function fallbackToOfflineStub(userMessage) {
             }
         }
         return 'Укажи название или номер задачи для удаления.';
+    }
+
+    // ═══════════════════════════════════════════════
+    // ПЕРЕНОС / ОТЛОЖИТЬ
+    // ═══════════════════════════════════════════════
+    if (msg.includes('перенеси') || msg.includes('перенести') || msg.includes('отложи') || msg.includes('на потом')) {
+        const allActive = pendingTasks.filter(t => !t.postponed);
+        if (allActive.length === 0) {
+            return 'Нет активных задач для переноса.';
+        }
+
+        // «На потом» без конкретной задачи — откладываем по имени
+        const isPostpone = msg.includes('отложи') || msg.includes('на потом');
+
+        const ref = extractAfterPhrase(userMessage, [
+            'перенеси задачу ', 'перенести задачу ', 'отложи задачу ',
+            'перенеси ', 'перенести ', 'отложи '
+        ]);
+
+        // Извлекаем дату из фразы
+        let targetDate = null;
+        let cleanedRef = ref || '';
+        if (/на\s+завтра/i.test(cleanedRef)) {
+            targetDate = new Date(Date.now() + 86400000).toISOString().split('T')[0];
+            cleanedRef = cleanedRef.replace(/на\s+завтра/i, '').trim();
+        } else if (/на\s+послезавтра/i.test(cleanedRef)) {
+            targetDate = new Date(Date.now() + 172800000).toISOString().split('T')[0];
+            cleanedRef = cleanedRef.replace(/на\s+послезавтра/i, '').trim();
+        }
+
+        // Ищем задачу
+        const task = findTaskByText(cleanedRef || msg, allActive);
+        if (task) {
+            if (isPostpone && !targetDate) {
+                return `Откладываю «${task.title}» на потом ⏸️\n[POSTPONE_TASK: "${task.id}" | "later"]`;
+            } else {
+                const dt = targetDate || new Date(Date.now() + 86400000).toISOString().split('T')[0];
+                return `Переношу «${task.title}» на ${dt === new Date(Date.now() + 86400000).toISOString().split('T')[0] ? 'завтра' : dt}! 📅\n[POSTPONE_TASK: "${task.id}" | "${dt}"]`;
+            }
+        }
+
+        if (allActive.length <= 5) {
+            const list = allActive.map((t, i) => `${i + 1}. ${t.title}`).join('\n');
+            return `Какую задачу ${isPostpone ? 'отложить' : 'перенести'}? 🤔\n\n${list}\n\nНазови название или номер.`;
+        }
+        return `Уточни, какую задачу ${isPostpone ? 'отложить' : 'перенести'}.`;
     }
 
     // ═══════════════════════════════════════════════
